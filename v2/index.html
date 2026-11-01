@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1A2B">
+<meta name="color-scheme" content="dark">
+<meta name="format-detection" content="telephone=no">
+<title>ぐにゃ野球</title>
+<!--
+  ぐにゃ野球 段階2入口（画面シェル＋試合エンジン統合）
+  仕様の正：ぐにゃ野球 拡張仕様書 v0.1（A-3 デザイン方針／A-12 モジュール境界／C 段階計画）
+  受け渡し先：Claude Code（実装・検証）
+  含むもの：13画面、試合の物理演算・投打・オート守備、フォーム・球種・モーション設定、デモ広告
+  含まないもの：リーグ進行・育成・スカウト・ミッションの本実装、実広告SDK、実課金
+  仮置き：Q1=B（リーグ戦以外のコインは1日300まで）、Q2=B（k=0.30）、Q3=A（全画面を縦で統一）
+  デバッグ：URL の末尾に ?debug=1
+-->
+<style>
+/* =====================================================================
+   デザイン基盤（仕様書 A-3：ナイターの電光掲示板 × 選手名鑑）
+   色はすべてここの変数から使う。紫系の色と背景グラデーションは使わない（★4の枠だけ例外）
+   ===================================================================== */
+:root{
+  color-scheme:dark;
+  --navy:#0E1A2B;--stand:#0A1422;--panel:#16263D;--panel-2:#1D3253;--line:#2A3D57;--line-2:#1E3048;
+  --text:#F4F6F8;--text-2:#9FB0C3;
+  --amber:#FFB020;--amber-ink:#1B1303;--turf:#2F8F4E;--turf-text:#5BC27E;--red:#E5484D;--red-text:#FF6B6F;
+  --rk-S:#F5B700;--rk-A:#FF5A5F;--rk-B:#F07A28;--rk-C:#E8C547;--rk-D:#9BC53D;--rk-E:#3FA34D;--rk-F:#4C94FF;--rk-G:#8D99AE;
+  --r1:#A86B3C;--r2:#B8C2CC;--r3:#D4A72C;
+  --f-num:"Oswald","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --f-ja:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+  --hdr-h:56px;--tab-h:64px;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:#060D17;color:var(--text);font:500 15px/1.55 var(--f-ja);-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button,input,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer;touch-action:manipulation;text-align:inherit}
+button:disabled{cursor:not-allowed}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.ic{width:24px;height:24px;flex:0 0 auto}
+.ic.sm{width:15px;height:15px;vertical-align:-2px}
+.ic-coin{color:var(--amber)}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.app{position:relative;height:100%;max-width:430px;margin:0 auto;background:var(--navy);display:flex;flex-direction:column;overflow:hidden}
+@media (min-width:432px){.app{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+
+/* ヘッダー・下部タブ（画面シェル） */
+.hdr{flex:0 0 auto;padding-top:var(--safe-t);background:var(--navy);border-bottom:1px solid var(--line)}
+.hdr-in{height:var(--hdr-h);display:flex;align-items:center;gap:6px;padding:0 4px 0 14px}
+.hdr-team{flex:1 1 auto;min-width:0}
+.hdr-team b{display:block;font-size:17px;font-weight:900;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-team span{display:block;font-size:11.5px;color:var(--text-2);line-height:1.3}
+.wallet{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 9px 0 6px;border-radius:15px;background:var(--panel);border:1px solid var(--line)}
+.wallet .ic{width:18px;height:18px}
+.wallet .num{font-size:15.5px;font-weight:600;min-width:2ch;text-align:right}
+.wallet .ic-ticket{color:var(--text-2)}
+.icon-btn{width:44px;height:44px;display:grid;place-items:center;flex:0 0 auto;border-radius:10px;color:var(--text-2)}
+.icon-btn:active{background:var(--panel)}
+.tabs{flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:var(--safe-b);background:var(--stand);border-top:1px solid var(--line)}
+.tab{position:relative;height:var(--tab-h);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text-2);font-size:11.5px;font-weight:700}
+.tab[aria-current="page"]{color:var(--amber)}
+.tab[aria-current="page"]::before{content:"";position:absolute;top:-1px;left:24%;right:24%;height:3px;border-radius:0 0 3px 3px;background:var(--amber)}
+.app.is-immersive .hdr,.app.is-immersive .tabs{display:none}
+.view{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;outline:none}
+
+/* 画面の共通部品 */
+.screen{padding:14px 14px 28px}
+.screen>*+*{margin-top:14px}
+.page-h{display:flex;align-items:center;gap:2px;margin:-6px 0 0 -10px}
+.page-h h1{font-size:19px;font-weight:900;line-height:1.3}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:22px}
+.sec-h.first{margin-top:2px}
+.sec-h h2{font-size:15.5px;font-weight:900;white-space:nowrap}
+.sec-h p{font-size:12px;color:var(--text-2);text-align:right}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.note{font-size:12.5px;color:var(--text-2)}
+.draft{display:inline-block;padding:0 7px;border:1px solid var(--amber);border-radius:4px;color:var(--amber);font-size:11px;font-weight:700;line-height:1.7;white-space:nowrap}
+.lock-note{display:flex;gap:6px;align-items:flex-start;font-size:12px;color:var(--text-2)}
+.lock-note .ic{width:16px;height:16px;margin-top:1px}
+.warn{color:var(--red-text)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;padding:0 16px;border-radius:10px;font-size:16px;font-weight:900;text-align:center}
+.btn-turf{background:var(--turf);color:#fff;font-size:19px}
+.btn-amber{background:var(--amber);color:var(--amber-ink)}
+.btn-line{background:var(--panel);border:1px solid var(--line)}
+.btn-danger{background:var(--red);color:#fff}
+.btn:disabled,.btn-s:disabled{opacity:.42}
+.btn:not(:disabled):active,.btn-s:not(:disabled):active{transform:translateY(1px)}
+.btn.two-line{flex-direction:column;gap:1px;min-height:60px}
+.btn .cost{font-size:12px;font-weight:700}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stack{display:grid;gap:10px}
+.btn-s{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:44px;min-width:44px;padding:0 14px;border-radius:9px;font-size:14px;font-weight:900;white-space:nowrap}
+
+/* ホーム：チームの数字と電光掲示板 */
+.status{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;align-items:center}
+.ovr{display:grid;place-items:center;align-content:center;gap:4px;height:96px;border:2px solid var(--amber);border-radius:12px}
+.ovr small{font-size:11px;color:var(--text-2);font-weight:700}
+.ovr b{font:700 44px/1 var(--f-num);color:var(--amber)}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.fact dt{font-size:11.5px;color:var(--text-2);font-weight:700}
+.fact dd{font-size:13px;font-weight:700;white-space:nowrap}
+.fact dd b{font:600 24px/1.15 var(--f-num);margin-right:1px}
+.fact.wide{grid-column:1/-1}
+.board{background:var(--stand);border:2px solid #23384F;border-radius:6px;padding:6px 12px 4px}
+.board-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:2px 0 5px;border-bottom:1px solid var(--line-2);font-size:12px;color:var(--text-2);font-weight:700}
+.board-head .led{font:600 16px/1 var(--f-num)}
+.led{color:var(--amber);text-shadow:0 0 10px rgba(255,176,32,.35)}
+.board-row{display:grid;grid-template-columns:2.6em minmax(0,1fr) auto;align-items:center;gap:10px;min-height:46px;border-bottom:1px solid var(--line-2)}
+.board-row:last-child{border-bottom:0}
+.board-side{font-size:11.5px;color:var(--text-2);font-weight:700}
+.board-team{font-size:16px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.board-team.me{color:var(--amber)}
+.board-num{font:600 30px/1 var(--f-num);text-align:right;min-width:2ch}
+.board-foot{display:flex;justify-content:space-between;font-size:11px;color:var(--text-2);padding:4px 0 2px;border-top:1px solid var(--line-2)}
+.res-badge{font:900 13px/1 var(--f-ja);padding:4px 8px;border-radius:4px;color:var(--navy);background:var(--text-2)}
+.res-badge.W{background:var(--turf-text)}.res-badge.L{background:var(--red-text)}
+
+/* 選手カード（主役） */
+.cards2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.pcard{position:relative;display:flex;flex-direction:column;width:100%;aspect-ratio:5/7;min-width:0;padding:8px 8px 9px;border-radius:10px;background:var(--panel);border:2px solid var(--r1);text-align:left;overflow:hidden}
+.pcard.r2{border-color:var(--r2)}.pcard.r3{border-color:var(--r3)}
+.pcard.r4{border-color:transparent;background:linear-gradient(#0C1119,#0C1119) padding-box,linear-gradient(135deg,#7E5E10,#F2D27A 32%,#B4861B 58%,#F6E2A0 84%,#7E5E10) border-box}
+.pc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:4px}
+.pc-pos{display:grid;place-items:center;min-width:28px;height:28px;padding:0 5px;border-radius:6px;background:var(--navy);border:1px solid var(--line);font-size:15px;font-weight:900}
+.pc-ovr{display:block;text-align:right;line-height:1}
+.pc-ovr small{display:block;font-size:10.5px;color:var(--text-2);font-weight:700;margin-bottom:2px}
+.pc-ovr b{font:700 30px/1 var(--f-num);color:var(--amber)}
+.pc-fig{flex:1 1 auto;min-height:0;display:flex;align-items:flex-end;justify-content:center;padding-top:2px;margin-bottom:4px;overflow:hidden}
+.pc-fig svg{display:block;height:100%;max-height:110px;width:auto}
+.pc-name{display:block;font-size:14px;font-weight:900;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-sub{display:block;font-size:11px;color:var(--text-2);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-abs{display:grid;gap:3px;margin-top:5px}
+.ab{display:grid;grid-template-columns:4.2em 1em 2.3em minmax(0,1fr);align-items:center;gap:4px;font-size:11px;line-height:1.1}
+.ab-l{color:var(--text-2);font-weight:700;white-space:nowrap}
+.ab-r{font:700 13px/1 var(--f-num);text-align:center}
+.ab-v{font:600 13px/1 var(--f-num);text-align:right}
+.ab-bar{display:block;height:4px;border-radius:2px;background:#0A1524;overflow:hidden}
+.ab-bar i{display:block;height:100%}
+.pc-ranks{display:flex;justify-content:space-between;margin-top:3px}
+.pc-ranks span{display:flex;flex-direction:column;align-items:center;font-size:10px;color:var(--text-2);line-height:1.2}
+.pc-ranks b{font:700 14px/1 var(--f-num)}
+.pcard.is-big{max-width:300px;margin-left:auto;margin-right:auto;padding:12px}
+.is-big .pc-pos{min-width:36px;height:36px;font-size:19px}
+.is-big .pc-ovr b{font-size:46px}
+.is-big .pc-name{font-size:20px}
+.is-big .pc-sub{font-size:12.5px}
+.is-big .ab{grid-template-columns:4.6em 1.2em 2.8em minmax(0,1fr);font-size:13px}
+.is-big .ab-r,.is-big .ab-v{font-size:17px}
+.is-big .ab-bar{height:6px}
+.is-big .pc-fig svg{max-height:190px}
+.pcard.is-mini{padding:6px}
+.is-mini .pc-pos{min-width:24px;height:24px;font-size:13px}
+.is-mini .pc-ovr small{display:none}
+.is-mini .pc-ovr b{font-size:22px}
+.is-mini .pc-name{font-size:12.5px}
+.is-mini .pc-sub{font-size:10px}
+.fig-body{fill:#22395A}.fig-cap{fill:#2E4B72}
+.fig-num{fill:var(--text);font:700 21px var(--f-num)}
+.r3 .fig-num,.r4 .fig-num{fill:var(--amber)}
+.rk-S{color:var(--rk-S)}.rk-A{color:var(--rk-A)}.rk-B{color:var(--rk-B)}.rk-C{color:var(--rk-C)}.rk-D{color:var(--rk-D)}.rk-E{color:var(--rk-E)}.rk-F{color:var(--rk-F)}.rk-G{color:var(--rk-G)}
+.bg-S{background:var(--rk-S)}.bg-A{background:var(--rk-A)}.bg-B{background:var(--rk-B)}.bg-C{background:var(--rk-C)}.bg-D{background:var(--rk-D)}.bg-E{background:var(--rk-E)}.bg-F{background:var(--rk-F)}.bg-G{background:var(--rk-G)}
+
+/* 一覧・表 */
+.lineup{display:grid}
+.lu{display:grid;grid-template-columns:28px 32px minmax(0,1fr) 34px;align-items:center;gap:8px;width:100%;min-height:60px;padding:7px 10px;border-top:1px solid var(--line-2);text-align:left}
+.lu:first-child{border-top:0}
+.lu-no{font:700 22px/1 var(--f-num);color:var(--amber);text-align:center}
+.lu-pos{display:grid;place-items:center;height:30px;border-radius:6px;background:var(--navy);border:1px solid var(--line);font-weight:900;font-size:15px}
+.lu-pos.misfit{border-color:var(--red);color:var(--red-text)}
+.lu-main{min-width:0}
+.lu-main b{display:block;font-size:14.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lu-main small{display:block;font-size:11px;color:var(--text-2)}
+.lu-ovr{font:700 22px/1 var(--f-num);text-align:right}
+.mini-abs{display:flex;gap:8px;margin-top:2px;font-size:11px;color:var(--text-2);white-space:nowrap}
+.mini-abs span{display:inline-flex;align-items:baseline;gap:2px}
+.mini-abs b{font:700 13px/1 var(--f-num)}
+.mini-abs em{font:600 13px/1 var(--f-num);font-style:normal;color:var(--text)}
+.next-tag{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:var(--turf);color:#fff;font-size:10.5px;line-height:1.7;vertical-align:2px}
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{padding:8px 5px;font-size:11.5px;font-weight:700;color:var(--text-2);text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px 5px;text-align:right;font:600 15px/1 var(--f-num);border-bottom:1px solid var(--line-2);white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{padding-left:12px}
+.tbl th:last-child,.tbl td:last-child{padding-right:12px}
+.tbl .t-team{text-align:left;font:700 13.5px/1.2 var(--f-ja)}
+.tbl tr.me td{background:rgba(255,176,32,.09)}
+.tbl tr.me .t-team{color:var(--amber)}
+.tbl tbody tr:last-child td{border-bottom:0}
+.sched-row{display:grid;grid-template-columns:3.6em minmax(0,1fr) 3.6em 4.4em;align-items:center;gap:8px;min-height:46px;padding:0 12px;border-top:1px solid var(--line-2);font-size:13.5px}
+.sched-row:first-child{border-top:0}
+.sched-row.is-next{background:rgba(47,143,78,.16)}
+.sched-row .rd{font:600 13px/1 var(--f-num);color:var(--text-2)}
+.sched-row .vs{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sched-row .ha{font-size:11.5px;color:var(--text-2)}
+.res{text-align:right;font:600 14px/1 var(--f-num);color:var(--text-2)}
+.res.W{color:var(--turf-text)}.res.L{color:var(--red-text)}.res.next{color:var(--amber);font-family:var(--f-ja);font-weight:900}
+.modes{display:grid;gap:8px}
+.mode,.row-link{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:10px;width:100%;min-height:58px;padding:8px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line);text-align:left}
+.mode b,.row-link b{display:block;font-size:15px;font-weight:900}
+.mode small,.row-link small{display:block;font-size:11.5px;color:var(--text-2)}
+.mode .ic,.row-link .ic{color:var(--text-2)}
+.badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--red);color:#fff;font:600 12.5px/1 var(--f-num)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;border-radius:10px;background:var(--stand);border:1px solid var(--line)}
+.seg button{min-height:44px;border-radius:7px;font-size:13.5px;font-weight:700;color:var(--text-2);text-align:center}
+.seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--text)}
+.chips{display:flex;gap:6px;overflow-x:auto}
+.chip-btn{flex:0 0 auto;min-height:44px;padding:0 14px;border-radius:22px;border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--text-2)}
+.chip-btn[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kv{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:11px 12px;border-top:1px solid var(--line-2);font-size:13.5px}
+.kv:first-child{border-top:0}
+.kv>span:first-child{color:var(--text-2);font-weight:700}
+.kv b{font-weight:900}
+.kv b.num{font-size:18px}
+.kv small{font-size:12px;color:var(--text-2)}
+.prog{display:block;height:5px;margin-top:6px;border-radius:3px;background:var(--navy);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--amber)}
+.detail .prog{margin:0 12px 10px}
+.pips{display:inline-flex;gap:5px}
+.pips i{width:12px;height:12px;border-radius:2px;border:1px solid var(--amber)}
+.pips i.on{background:var(--amber)}
+.mission,.shop-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border-top:1px solid var(--line-2)}
+.mission:first-child,.shop-item:first-child{border-top:0}
+.mission b,.shop-item b{display:block;font-size:14px;font-weight:700}
+.mission small,.shop-item small{display:block;font-size:11.5px;color:var(--text-2)}
+.owned{font-size:12px;font-weight:700;color:var(--turf-text);white-space:nowrap}
+.scout-hero{display:grid;justify-items:center;gap:4px;padding:16px;border-radius:10px;background:var(--stand);border:2px solid #23384F}
+.scout-pity{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:700;color:var(--text-2)}
+.scout-pity b{font:600 46px/1 var(--f-num)}
+.scout-btns{display:grid;gap:10px}
+.season-hero{display:flex;justify-content:center;align-items:baseline;gap:8px;padding:12px;font-weight:900;color:var(--text-2)}
+.season-hero b{font:600 64px/1 var(--f-num)}
+.data-btns{display:flex;flex-wrap:wrap;gap:8px;padding:12px}
+.field{display:grid;gap:6px;padding:12px;border-top:1px solid var(--line-2)}
+.field:first-child{border-top:0}
+.field label{display:flex;justify-content:space-between;font-size:13.5px;font-weight:700}
+.field output{font:600 15px/1 var(--f-num);color:var(--amber)}
+.field input[type=range]{width:100%;height:44px;accent-color:var(--amber)}
+.field select{min-height:44px;padding:0 10px;border-radius:8px;background:var(--navy);border:1px solid var(--line)}
+
+/* スカウト演出 */
+.reveal{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:calc(20px + var(--safe-t)) 20px calc(20px + var(--safe-b));background:var(--stand)}
+.reveal-kind{font-size:13px;font-weight:700;color:var(--text-2)}
+.flip{display:block;width:min(240px,64vw);aspect-ratio:5/7;perspective:900px}
+.flip-in{position:relative;display:block;width:100%;height:100%;transition:transform .7s cubic-bezier(.2,.7,.2,1);transform-style:preserve-3d}
+.flip.is-open .flip-in{transform:rotateY(180deg)}
+.flip-face{position:absolute;inset:0;display:block;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+.flip-back{display:grid;place-items:center;align-content:center;gap:10px;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--text-2);font-size:13px;font-weight:700}
+.flip-back .ic{width:72px;height:72px;color:var(--amber)}
+.flip-front{transform:rotateY(180deg)}
+.flip-front .pcard{height:100%}
+.flip.r3.is-open .pcard,.flip.r4.is-open .pcard{box-shadow:0 0 0 3px rgba(212,167,44,.35),0 0 40px rgba(212,167,44,.35)}
+.reveal-after{display:grid;gap:12px;width:100%;max-width:340px}
+.reveal-tag{text-align:center;font-weight:900}
+.reveal-tag .new{display:inline-block;margin-right:8px;padding:0 8px;border-radius:4px;background:var(--amber);color:var(--amber-ink);font:700 13px/1.7 var(--f-num)}
+.skip{min-height:44px;padding:0 18px;border-radius:22px;border:1px solid var(--line);color:var(--text-2);font-weight:700}
+
+/* 試合画面（試合エンジン接続点の外側だけを画面遷移が描く） */
+.game{display:flex;flex-direction:column;height:100%;background:var(--navy)}
+.game-top{flex:0 0 auto;display:flex;align-items:flex-start;gap:6px;padding:calc(8px + var(--safe-t)) 6px 8px 10px}
+.sb{flex:1 1 auto;min-width:0;background:var(--stand);border:2px solid #23384F;border-radius:6px;padding:3px 8px 4px}
+.sb table{width:100%;border-collapse:collapse;table-layout:fixed}
+.sb th{font-size:10.5px;color:var(--text-2);font-weight:700;text-align:center;padding:1px 0}
+.sb th:first-child{width:44%}
+.sb td{font:600 17px/1.3 var(--f-num);text-align:center;color:var(--amber)}
+.sb td.t{text-align:left;font:900 12.5px/1.3 var(--f-ja);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb td.now{background:rgba(255,176,32,.14)}
+.sb td.sum{color:var(--text)}
+.sb-meta{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--text-2);margin-top:1px}
+.sb-meta .outs{color:var(--amber);letter-spacing:1px}
+.engine-mount{flex:1 1 auto;min-height:0;margin:0 10px;border:1px solid #3A506E;border-radius:8px;overflow-y:auto;background:#07152B}
+.game-strip{flex:0 0 auto;height:64px;margin-bottom:var(--safe-b);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;padding:6px 10px}
+.strip-card{display:grid;grid-template-columns:28px minmax(0,1fr);gap:6px;align-items:center;padding:3px 8px;border-radius:8px;background:var(--panel);border:1px solid var(--line);min-width:0}
+.strip-card.wide{grid-column:1/-1;grid-template-columns:minmax(0,1fr)}
+.sc-pos{display:grid;place-items:center;height:28px;border-radius:6px;background:var(--navy);font-weight:900;font-size:14px}
+.sc-main{min-width:0}
+.sc-main b{display:block;font-size:12.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-main small{display:block;font-size:11px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 2b 試合エンジン：キャンバスと操作盤（DOMは画面層の GameSurface が管理） */
+.eng{position:relative;display:flex;flex-direction:column;min-height:100%}
+.eng-stage{position:relative;flex:0 0 auto;background:#07152B;overflow:hidden}
+.eng-canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;touch-action:manipulation}
+.eng-banner{position:absolute;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none;opacity:0;background:rgba(4,10,18,.24);transition:opacity .16s}
+.eng-banner.show{opacity:1}.eng-banner b{font-size:32px;font-weight:900;color:#fff;text-shadow:0 3px 0 #101820}.eng-banner span{font-size:13px;font-weight:900;color:var(--amber)}
+.eng-controls{display:grid;gap:8px;padding:9px;background:var(--stand);border-top:1px solid var(--line)}
+.eng-status{min-height:20px;font-size:12px;font-weight:700;color:var(--text-2);text-align:center}
+.eng-pitch-row{display:grid;grid-template-columns:minmax(0,1fr) 1fr;gap:8px}
+.eng-select,.eng-action{min-height:46px;border-radius:9px;border:1px solid var(--line);background:var(--panel);padding:0 10px;font-size:14px;font-weight:900;text-align:center}
+.eng-action.main{background:var(--amber);border-color:var(--amber);color:var(--amber-ink)}
+.eng-action.swing{min-height:54px;background:var(--red);border-color:var(--red);color:#fff;font-size:19px;letter-spacing:.08em}
+.eng-action.swing.pulse{transform:scale(.97)}
+.eng-action:disabled,.eng-select:disabled{opacity:.38}
+.eng-meter{height:6px;border-radius:3px;background:var(--panel);overflow:hidden}.eng-meter i{display:block;width:50%;height:100%;background:var(--turf-text)}
+@media (max-height:700px){.eng-controls{gap:5px;padding:6px}.eng-action.swing{min-height:46px}.game-strip{height:58px}}
+
+/* モーダル・広告・通知 */
+.sheet-back{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:rgba(3,8,15,.74)}
+.sheet{width:100%;max-width:430px;max-height:88%;overflow-y:auto;padding:18px 16px calc(18px + var(--safe-b));border-radius:14px 14px 0 0;background:var(--panel);border-top:2px solid var(--amber)}
+.sheet h2{font-size:18px;font-weight:900}
+.sheet>p{font-size:13.5px;color:var(--text-2);margin-top:6px}
+.sheet .btn,.sheet .btn-row{margin-top:14px}
+.lb-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}
+.lb-day{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:78px;padding:6px 4px;border-radius:8px;border:1px solid var(--line);background:var(--navy);text-align:center}
+.lb-day small{font-size:11px;color:var(--text-2);font-weight:700}
+.lb-day b{font:600 20px/1 var(--f-num)}
+.lb-day span{font-size:10.5px;line-height:1.3}
+.lb-day.today{border:2px solid var(--amber)}
+.lb-day.done{opacity:.5}
+.lb-day.big{grid-column:span 2}
+.ad{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:#04080E}
+.ad-tag{font-size:12px;font-weight:700;color:var(--text-2);border:1px solid var(--line);border-radius:4px;padding:2px 8px}
+.ad-box{width:min(300px,80vw);aspect-ratio:4/5;display:grid;place-items:center;padding:20px;border:2px dashed #3A506E;border-radius:12px;text-align:center;color:var(--text-2);font-size:13.5px}
+.ad-count{font:700 52px/1 var(--f-num);color:var(--amber)}
+.toast-layer{position:fixed;left:0;right:0;bottom:calc(var(--tab-h) + var(--safe-b) + 12px);z-index:90;display:flex;justify-content:center;pointer-events:none}
+.toast{max-width:min(380px,calc(100% - 28px));padding:11px 16px;border-radius:10px;background:var(--text);color:var(--navy);font-size:13.5px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.rotate{display:none}
+@media (orientation:landscape) and (max-height:500px){.rotate{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;background:var(--navy);text-align:center}.rotate b{font-size:18px;font-weight:900}}
+.dbg-fab{position:fixed;right:max(10px,calc(50% - 205px));bottom:calc(var(--tab-h) + var(--safe-b) + 70px);z-index:60;min-height:44px;padding:0 14px;border-radius:22px;background:#000;border:1px solid var(--amber);color:var(--amber);font-size:12.5px;font-weight:700}
+.fps{position:fixed;left:8px;top:calc(var(--safe-t) + 62px);z-index:70;padding:3px 7px;border-radius:5px;background:#000;color:var(--turf-text);font:600 12px/1.2 var(--f-num);pointer-events:none}
+.dbg-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.dbg-list .btn{margin-top:0;min-height:48px;font-size:13.5px}
+.dbg-out{margin-top:12px;max-height:38vh;overflow:auto;padding:10px;border-radius:8px;background:var(--navy);font:500 11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app" class="app">
+  <header class="hdr" id="hdr"></header>
+  <main class="view" id="view" tabindex="-1"></main>
+  <nav class="tabs" id="tabs" aria-label="メインメニュー"></nav>
+</div>
+<div id="layer-modal"></div>
+<div id="layer-overlay"></div>
+<div class="toast-layer" id="layer-toast" aria-live="polite"></div>
+<div id="layer-debug"></div>
+<div class="rotate" role="alert"><div><b>縦向きでお使いください</b><p class="note">このゲームは縦画面で遊ぶように作っています</p></div></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 4.5h14v8.2L12 19.5 5 12.7z"/></symbol>
+    <symbol id="i-ball" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M7.4 5.7c1.5 1.7 2.3 3.9 2.3 6.3s-.8 4.6-2.3 6.3M16.6 5.7c-1.5 1.7-2.3 3.9-2.3 6.3s.8 4.6 2.3 6.3"/></symbol>
+    <symbol id="i-jersey" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 3.5 4 6l1.8 4.6L8 9.8v10.7h8V9.8l2.2.8L20 6l-5-2.5c-.5 1.4-1.6 2.2-3 2.2s-2.5-.8-3-2.2z"/></symbol>
+    <symbol id="i-notebook" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 3.5v17M12.5 8H16M12.5 11.5H16M12.5 15h2"/></symbol>
+    <symbol id="i-coins" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="7" rx="7" ry="2.8"/><path d="M5 7v4.8c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8V7M5 11.8v4.8c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-4.8"/></symbol>
+    <symbol id="i-checklist" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="m7.5 9.3 1.6 1.6 3-3.2M7.5 15.3l1.6 1.6 3-3.2M14 9.8h3M14 15.8h3"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.6"/><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3.5 7.5h17v3a1.8 1.8 0 0 0 0 3.6v3h-17v-3a1.8 1.8 0 0 0 0-3.6z"/><path d="M15 8v8.6" stroke-dasharray="1.6 1.8"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor"/><circle cx="12" cy="12" r="5.4" fill="none" stroke="#0E1A2B" stroke-opacity=".45" stroke-width="1.6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 8 12l6.5 6.5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 5.5 6.5 6.5-6.5 6.5"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6.5v11M15 6.5v11"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></symbol>
+  </defs>
+</svg>
+<script>
+'use strict';
+/* =====================================================================
+   コードの区画は仕様書 A-12「モジュール境界」と同じ。定義の順番＝依存の順番：
+     共通基盤（CONFIG・Util・Events・Save・SelfTest）
+     → 4 経済・広告（Economy・Ads・Missions・LoginBonus）
+     → 3 育成（Growth）
+     → 2a リーグ進行（League・Correction）
+     → 2b 試合エンジン本体（MatchEngine：legacy-game.html から統合済み）
+     → 1 画面遷移（View・Shell・Modals・GameHud・Screens・Router・Actions・App）
+     → デバッグ（Debug）→ 自己テストの登録 → 起動
+   依存の向き：1 → 2a・2b・3・4 ／ 2a → 3・4 ／ 3 → 4 ／ 2b → なし（試合の通知を出すだけ）
+   localStorage に触れてよいのは Save だけ。段階1〜3は CONFIG.FEATURES.persistence=false で書かない。
+   ===================================================================== */
+
+/* =====================================================================
+   共通基盤：定数 CONFIG（バランス値・仮置き値・段階ごとの機能スイッチ・表示名）
+   ===================================================================== */
+const CONFIG = Object.freeze({
+  VERSION: '段階2 試合統合 0.2',
+  FEATURES: Object.freeze({
+    persistence: false,    // 段階4：gunya.save.v2 の保存・読み込み・移行
+    leagueProgress: false, // 段階2：試合結果をリーグに記録して節を進める
+    leagueRewards: false,  // 段階2：リーグ戦の報酬を試合終了時にまとめて付与
+    correction: false,     // 段階2：能力補正を試合設定で有効にする
+    growth: false,         // 段階3：経験値・特訓・限界突破・スカウトの排出と消費
+    daily: false,          // 段階4：ログボ・ミッションの付与とリーグ戦以外の1日上限
+  }),
+  PROVISIONAL: Object.freeze({  // 仕様書 D の仮置き
+    Q1_nonLeagueDailyCap: 300,  // Q1=B：リーグ戦以外のコイン獲得は1日合計300まで
+    Q2_correctionK: 0.30,       // Q2=B：能力の効き具合 k
+    Q3_orientation: 'portrait', // Q3=A：全画面を縦で統一（横向きのスマホでは案内を出す）
+  }),
+  ECONOMY: Object.freeze({
+    startCoins: 100, startScoutTickets: 3, hitCoins: 20, homerunCoins: 50,
+    leagueResultCoins: Object.freeze({ W: 100, D: 60, L: 40 }),
+    seasonRankRewards: Object.freeze([
+      { label: '1位', coins: 1500, guaranteeTickets: 1 }, { label: '2位', coins: 1000 },
+      { label: '3位', coins: 700 }, { label: '4位以下', coins: 400 },
+    ]),
+    maxCoins: 9999999, maxTickets: 999, ledgerSize: 50,
+  }),
+  ADS: Object.freeze({ settingsAdSeconds: 4, rewardAdSeconds: 5 }),
+  SCOUT: Object.freeze({
+    rates: Object.freeze({ 4: 0.03, 3: 0.12, 2: 0.35, 1: 0.50 }),
+    guaranteeRates: Object.freeze({ 4: 0.20, 3: 0.80 }),
+    costs: Object.freeze({ single: { coins: 300, scoutTickets: 1 }, ten: { coins: 3000 }, guarantee: { guaranteeTickets: 1 } }),
+    pity: 50,
+  }),
+  GROWTH: Object.freeze({ maxLv: Object.freeze({ 1: 20, 2: 30, 3: 40, 4: 50 }), limitBreakLv: 5, limitBreakMax: 4, trainCost: 100, trainExp: 150, misfitDefense: 0.7 }),
+  LEAGUE: Object.freeze({ rounds: 10, innings: 3, dayBoundaryHour: 4 }),
+  LABELS: Object.freeze({
+    pos: Object.freeze({ C: '捕', '1B': '一', '2B': '二', '3B': '三', SS: '遊', LF: '左', CF: '中', RF: '右', DH: '指', P: '投' }),
+    posName: Object.freeze({ C: '捕手', '1B': '一塁手', '2B': '二塁手', '3B': '三塁手', SS: '遊撃手', LF: '左翼手', CF: '中堅手', RF: '右翼手', DH: '指名打者', P: '投手' }),
+    pitch: Object.freeze({ fastball: 'まっすぐ', curve: 'カーブ', slider: 'スライダー', fork: 'フォーク', shoot: 'シュート', sinker: 'シンカー', mypitch: 'マイ変化球' }),
+    rarity: Object.freeze({ 1: 'ルーキー', 2: 'レギュラー', 3: 'スター', 4: 'レジェンド' }),
+    mode: Object.freeze({ league: 'リーグ戦', practice: '練習', challenge10: '10球チャレンジ', exhibition: 'エキシビション' }),
+  }),
+});
+
+/* ---- 共通基盤：道具 Util ---- */
+const Util = (() => {
+  const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ESC[c]);
+  const fmt = (n) => Number(n || 0).toLocaleString('ja-JP');
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  // 日付キー：端末時刻から4時間引いた日の年月日（仕様書 A-8）
+  const dayKey = (date = new Date()) => {
+    const d = new Date(date.getTime() - CONFIG.LEAGUE.dayBoundaryHour * 3600000);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  // シード付き乱数（mulberry32）。同じシードなら同じ並び
+  const seeded = (seed) => () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const copy = (o) => JSON.parse(JSON.stringify(o));
+  return { esc, fmt, clamp, dayKey, seeded, copy };
+})();
+
+/* ---- 共通基盤：通知バス Events（試合の通知 match:* は 2b だけが出す） ---- */
+const Events = (() => {
+  const map = new Map();
+  function on(type, fn) {
+    if (!map.has(type)) map.set(type, new Set());
+    map.get(type).add(fn);
+    return () => map.get(type).delete(fn);
+  }
+  function emit(type, payload) {
+    const set = map.get(type);
+    if (!set) return;
+    [...set].forEach((fn) => { try { fn(payload); } catch (e) { console.error('[Events]', type, e); } });
+  }
+  return { on, emit };
+})();
+
+/* ---- 共通基盤：保存基盤 Save（localStorage に触れてよいのはここだけ） ---- */
+const Save = (() => {
+  // 段階1〜3の確認は本番キーを一切使わない。
+  const KEYS = Object.freeze({ main: 'gunya.save.v2.dev', bak: 'gunya.save.v2.dev.bak', backupV1: 'gunya.backup.v1.dev', broken: 'gunya.save.v2.dev.broken' });
+  const slices = new Map();
+  const meta = { createdAt: new Date().toISOString(), migratedFrom: null, migrationReport: [] };
+  let last = null;
+  const register = (name, api) => { slices.set(name, api); };
+  function snapshot() {
+    const data = { schemaVersion: 2, meta: { ...meta, updatedAt: new Date().toISOString() } };
+    slices.forEach((api) => Object.assign(data, api.exportSlice()));
+    return data;
+  }
+  function readMain() {
+    // 段階4：本体 → .bak → v1移行 → 新規 の順に読む（仕様書 A-10）。ここは枠だけ
+    try { const raw = window.localStorage.getItem(KEYS.main); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+  // 読み込んで各モジュールに渡す。段階1〜3は既定値で始める
+  function load() {
+    let data = null;
+    let source = 'new';
+    if (CONFIG.FEATURES.persistence) { data = readMain(); if (data) source = 'v2'; }
+    slices.forEach((api) => api.importSlice(data || {}));
+    last = snapshot();
+    return { source };
+  }
+  // 状態が変わる操作の直後に呼ぶ。段階1〜3は書き込まず、写しだけ作る
+  function commit(reason) {
+    last = snapshot();
+    last.meta.reason = reason;
+    if (!CONFIG.FEATURES.persistence) return { ok: true, persisted: false };
+    try {
+      const prev = window.localStorage.getItem(KEYS.main);
+      if (prev) window.localStorage.setItem(KEYS.bak, prev);
+      window.localStorage.setItem(KEYS.main, JSON.stringify(last));
+      return { ok: true, persisted: true };
+    } catch (e) { return { ok: false, persisted: false, error: e.name }; }
+  }
+  const peek = () => last || snapshot();
+  const exportText = () => JSON.stringify(peek(), null, 2);
+  const importText = () => ({ ok: false, reason: '読み込みは段階4で作ります' });
+  const reset = () => ({ ok: false, reason: '初期化は段階4で作ります' });
+  return { KEYS, register, load, commit, peek, exportText, importText, reset };
+})();
+
+/* ---- 共通基盤：自己テスト SelfTest（関数は true か、ずれの説明を返す） ---- */
+const SelfTest = (() => {
+  const tests = [];
+  const add = (name, fn) => { tests.push({ name, fn }); };
+  function run() {
+    const failures = [];
+    let passed = 0;
+    tests.forEach(({ name, fn }) => {
+      try { const r = fn(); if (r === true) passed++; else failures.push(`${name}：${r === false ? '期待と違う' : r}`); }
+      catch (e) { failures.push(`${name}：${e.message}`); }
+    });
+    return { total: tests.length, passed, failed: failures.length, failures };
+  }
+  return { add, run };
+})();
+
+/* =====================================================================
+   4 経済・広告（Economy・Ads・Missions・LoginBonus）
+   ほかのモジュールは呼ばない。必要な情報は通知で受けるか、画面遷移から渡してもらう。
+   広告や確認は自分で表示しない（出すかどうかを返し、表示は画面遷移が行う）。
+   ===================================================================== */
+const { Economy, Ads, Missions, LoginBonus } = (() => {
+  const E = CONFIG.ECONOMY;
+  const CURRENCIES = ['coins', 'scoutTickets', 'guaranteeTickets'];
+  // ショップの品目。名前と価格は仮：現行HTMLの値に置き換える（initial は最初から使える）
+  const CATALOG = Object.freeze([
+    { id: 'pitch-fastball', kind: 'pitch', key: 'fastball', name: 'まっすぐ', price: 0, initial: true },
+    { id: 'pitch-curve', kind: 'pitch', key: 'curve', name: 'カーブ', price: 200 },
+    { id: 'pitch-slider', kind: 'pitch', key: 'slider', name: 'スライダー', price: 200 },
+    { id: 'pitch-fork', kind: 'pitch', key: 'fork', name: 'フォーク', price: 300 },
+    { id: 'pitch-shoot', kind: 'pitch', key: 'shoot', name: 'シュート', price: 300 },
+    { id: 'pitch-sinker', kind: 'pitch', key: 'sinker', name: 'シンカー', price: 300 },
+    { id: 'pitch-mypitch', kind: 'pitch', key: 'mypitch', name: 'マイ変化球', price: 500 },
+    { id: 'pform-over', kind: 'pitchingForm', key: 'overhand', name: 'オーバースロー', price: 0, initial: true },
+    { id: 'pform-three', kind: 'pitchingForm', key: 'threeQuarter', name: 'スリークォーター', price: 200 },
+    { id: 'pform-side', kind: 'pitchingForm', key: 'side', name: 'サイドスロー', price: 300 },
+    { id: 'pform-under', kind: 'pitchingForm', key: 'under', name: 'アンダースロー', price: 300 },
+    { id: 'pform-tornado', kind: 'pitchingForm', key: 'tornado', name: 'トルネード', price: 500 },
+    { id: 'bform-standard', kind: 'battingForm', key: 'standard', name: 'スタンダード', price: 0, initial: true },
+    { id: 'bform-open', kind: 'battingForm', key: 'open', name: 'オープンスタンス', price: 200 },
+    { id: 'bform-closed', kind: 'battingForm', key: 'closed', name: 'クローズドスタンス', price: 200 },
+    { id: 'bform-oneleg', kind: 'battingForm', key: 'oneLeg', name: '一本足打法', price: 300 },
+    { id: 'bform-sway', kind: 'battingForm', key: 'sway', name: '振り子打法', price: 500 },
+  ]);
+  const LIST = { pitch: 'pitches', pitchingForm: 'pitchingForms', battingForm: 'battingForms' };
+  const PACKS = Object.freeze([
+    { id: 'coins-s', name: 'コインパック 小', coins: 500 },
+    { id: 'coins-l', name: 'コインパック 大', coins: 1500 },
+    { id: 'premium', name: 'プレミアムパス', premium: true },
+  ]);
+  const REWARD = Object.freeze({ shop: { gain: { coins: 50 }, perDay: 3, label: '50コイン' } }); // 仮：現行のリワード広告に合わせる
+  const DAILY = Object.freeze([
+    { id: 'playLeague', name: 'リーグ戦を1試合プレイする', goal: 1, reward: { coins: 100 }, scope: 'リーグ戦' },
+    { id: 'hits5', name: 'ヒットを5本打つ', goal: 5, reward: { coins: 100 }, scope: '全モード' },
+    { id: 'k3', name: '三振を3つ奪う', goal: 3, reward: { coins: 100 }, scope: '全モード' },
+  ]);
+  const ALL_CLEAR = Object.freeze({ id: 'allClear', name: '3つすべて受け取る', reward: { scoutTickets: 1 } });
+  const ACHIEVEMENTS = Object.freeze([
+    { id: 'firstWin', name: 'リーグ戦で初勝利', goal: 1, stat: 'leagueWins', reward: { coins: 300 } },
+    { id: 'wins10', name: 'リーグ戦で通算10勝', goal: 10, stat: 'leagueWins', reward: { scoutTickets: 3 } },
+    { id: 'hr10', name: '通算本塁打10本', goal: 10, stat: 'homeruns', reward: { coins: 300 } },
+    { id: 'hr50', name: '通算本塁打50本', goal: 50, stat: 'homeruns', reward: { coins: 1000 } },
+    { id: 'hr100', name: '通算本塁打100本', goal: 100, stat: 'homeruns', reward: { guaranteeTickets: 1 } },
+    { id: 'champion', name: 'シーズン優勝', goal: 1, reward: { coins: 1000 } },
+    { id: 'lv20', name: '選手を1人Lv20にする', goal: 1, reward: { coins: 500 } },
+    { id: 'legend', name: '★4の選手を獲得する', goal: 1, reward: { coins: 500 } },
+  ]);
+  const LOGIN_TABLE = Object.freeze([
+    { day: 1, reward: { coins: 100 } }, { day: 2, reward: { coins: 150 } }, { day: 3, reward: { scoutTickets: 1 } },
+    { day: 4, reward: { coins: 200 } }, { day: 5, reward: { coins: 200 } }, { day: 6, reward: { coins: 250 } },
+    { day: 7, reward: { guaranteeTickets: 1 } },
+  ]);
+
+  const s = {
+    coins: E.startCoins, scoutTickets: E.startScoutTickets, guaranteeTickets: 0,
+    ledger: [],
+    dailyCap: { dayKey: null, nonLeagueEarned: 0 },
+    unlocks: { pitches: ['fastball'], pitchingForms: ['overhand'], battingForms: ['standard'] },
+    premium: { pass: false, purchases: [] },
+    ads: { dayKey: null, rewardCount: 0 }, // 仕様書 A-10 に未記載。段階4で項目を追記するか決める
+    // デイリーの進捗は仮データ（段階4で通知から数える）
+    missions: { dayKey: null, progress: { playLeague: 0, hits5: 2, k3: 3 }, claimed: {}, allClearClaimed: false, achievements: { firstWin: { claimed: true } } },
+    login: { lastDayKey: null, count: 0 },
+  };
+  let career = { hits: 0, homeruns: 0, strikeouts: 0, leagueWins: 0 };
+  let pendingLeague = null;
+  let lastMatchRewards = null;
+  let loginShownThisSession = false;
+
+  const rewardText = (r) => (r.coins ? `${Util.fmt(r.coins)}コイン` : r.scoutTickets ? `スカウトチケット${r.scoutTickets}枚` : r.guaranteeTickets ? `★3以上確定チケット${r.guaranteeTickets}枚` : '');
+  const wallet = () => ({ coins: s.coins, scoutTickets: s.scoutTickets, guaranteeTickets: s.guaranteeTickets });
+  function log(cur, delta, reason) {
+    s.ledger.unshift({ at: new Date().toISOString(), cur, delta, reason });
+    if (s.ledger.length > E.ledgerSize) s.ledger.length = E.ledgerSize;
+  }
+  function changed(reason) { Events.emit('wallet:changed', wallet()); Save.commit(reason); }
+  function canSpend(cost = {}) { return CURRENCIES.every((c) => (cost[c] || 0) <= s[c]); }
+  function spend(cost, reason) {
+    if (!canSpend(cost)) return false;
+    CURRENCIES.forEach((c) => { const v = Math.floor(cost[c] || 0); if (v > 0) { s[c] -= v; log(c, -v, reason); } });
+    changed(reason);
+    return true;
+  }
+  function capNonLeague(v) {
+    const k = Util.dayKey();
+    if (s.dailyCap.dayKey !== k) s.dailyCap = { dayKey: k, nonLeagueEarned: 0 };
+    const g = Math.min(v, Math.max(0, CONFIG.PROVISIONAL.Q1_nonLeagueDailyCap - s.dailyCap.nonLeagueEarned));
+    s.dailyCap.nonLeagueEarned += g;
+    return g;
+  }
+  // source：league ／ nonLeague（Q1の1日上限の対象）／ purchase ／ ad ／ debug など
+  function earn(gain, reason, source = 'other') {
+    const out = {};
+    CURRENCIES.forEach((c) => {
+      let v = Math.max(0, Math.floor(gain[c] || 0));
+      if (!v) return;
+      if (c === 'coins' && source === 'nonLeague' && CONFIG.FEATURES.daily) v = capNonLeague(v);
+      v = Math.min(v, (c === 'coins' ? E.maxCoins : E.maxTickets) - s[c]);
+      if (v > 0) { s[c] += v; log(c, v, reason); out[c] = v; }
+    });
+    if (Object.keys(out).length) changed(reason);
+    return out;
+  }
+  const isUnlocked = (item) => s.unlocks[LIST[item.kind]].includes(item.key);
+  const getUnlocks = () => Util.copy(s.unlocks);
+  const getCatalog = () => CATALOG.map((i) => ({ ...i, unlocked: isUnlocked(i), affordable: s.coins >= i.price }));
+  function buyUnlock(itemId) {
+    const item = CATALOG.find((i) => i.id === itemId);
+    if (!item) return { ok: false, reason: '見つからない品目です' };
+    if (isUnlocked(item)) return { ok: false, reason: 'もう解禁しています' };
+    if (!spend({ coins: item.price }, `unlock:${item.id}`)) return { ok: false, reason: 'コインが足りません' };
+    s.unlocks[LIST[item.kind]].push(item.key);
+    Events.emit('unlocks:changed', getUnlocks());
+    Save.commit('unlock');
+    return { ok: true, item };
+  }
+  const getPacks = () => PACKS.map((p) => ({ ...p, owned: !!(p.premium && s.premium.pass) }));
+  function demoPurchase(packId) {
+    const p = PACKS.find((x) => x.id === packId);
+    if (!p) return { ok: false, reason: '見つからないパックです' };
+    if (p.premium && s.premium.pass) return { ok: false, reason: 'もう持っています' };
+    s.premium.purchases.push({ id: p.id, at: new Date().toISOString() });
+    if (p.premium) { s.premium.pass = true; Events.emit('premium:changed', true); Save.commit('demoPurchase'); }
+    else earn({ coins: p.coins }, `demoPurchase:${p.id}`, 'purchase');
+    return { ok: true, pack: p };
+  }
+
+  // 試合の通知を受ける（ヒット・本塁打のコイン。リーグ戦は試合終了時にまとめる）
+  Events.on('match:start', (e) => { pendingLeague = e.mode === 'league' ? { hits: 0, homeruns: 0 } : null; });
+  Events.on('match:hit', (e) => {
+    if (e.side !== 'user') return;
+    const hr = e.kind === 'HR';
+    if (e.mode === 'league') { if (pendingLeague) pendingLeague[hr ? 'homeruns' : 'hits'] += 1; return; }
+    earn({ coins: hr ? E.homerunCoins : E.hitCoins }, hr ? 'homerun' : 'hit', 'nonLeague');
+  });
+  Events.on('match:end', (e) => {
+    if (e.mode !== 'league' || !pendingLeague) { lastMatchRewards = null; pendingLeague = null; return; }
+    const p = pendingLeague;
+    const r = { result: e.result, hits: p.hits, hitCoins: p.hits * E.hitCoins, homeruns: p.homeruns, homerunCoins: p.homeruns * E.homerunCoins, resultCoins: E.leagueResultCoins[e.result] || 0, granted: CONFIG.FEATURES.leagueRewards };
+    r.total = r.hitCoins + r.homerunCoins + r.resultCoins;
+    if (r.granted) earn({ coins: r.total }, 'leagueMatch', 'league');
+    lastMatchRewards = r;
+    pendingLeague = null;
+  });
+  Events.on('match:aborted', () => { pendingLeague = null; });
+  Events.on('record:updated', (c) => { career = { ...career, ...c }; });
+
+  const Economy = {
+    getWallet: wallet, canSpend, spend, earn,
+    getLedger: () => s.ledger.slice(),
+    getUnlocks, getCatalog, buyUnlock, getPacks, demoPurchase,
+    isPremium: () => s.premium.pass,
+    getLastMatchRewards: () => (lastMatchRewards ? { ...lastMatchRewards } : null),
+    syncCareer: (c) => { career = { ...career, ...c }; },
+  };
+
+  function rollAds() { const k = Util.dayKey(); if (s.ads.dayKey !== k) { s.ads.dayKey = k; s.ads.rewardCount = 0; } }
+  const Ads = {
+    // 設定を確定したとき：広告を出すか・何秒かだけを返す（表示は画面遷移）
+    onSettingsChanged: () => (s.premium.pass ? { show: false, seconds: 0 } : { show: true, seconds: CONFIG.ADS.settingsAdSeconds }),
+    rewardStatus(placement) {
+      rollAds();
+      const d = REWARD[placement];
+      return { left: Math.max(0, d.perDay - s.ads.rewardCount), perDay: d.perDay, label: d.label, seconds: CONFIG.ADS.rewardAdSeconds, skipAd: s.premium.pass };
+    },
+    grantReward(placement) {
+      rollAds();
+      const d = REWARD[placement];
+      if (!d) return { ok: false, reason: '対象外の広告枠です' };
+      if (s.ads.rewardCount >= d.perDay) return { ok: false, reason: '今日の回数は終わりました' };
+      s.ads.rewardCount += 1;
+      earn(d.gain, `rewardAd:${placement}`, 'ad');
+      return { ok: true, label: d.label };
+    },
+  };
+
+  const Missions = {
+    list(kind = 'daily') {
+      if (kind === 'daily') {
+        return DAILY.map((m) => { const p = Math.min(m.goal, s.missions.progress[m.id] || 0); return { ...m, progress: p, done: p >= m.goal, claimed: !!s.missions.claimed[m.id], rewardText: rewardText(m.reward) }; });
+      }
+      return ACHIEVEMENTS.map((m) => {
+        const p = Math.min(m.goal, m.stat ? career[m.stat] || 0 : 0);
+        const c = s.missions.achievements[m.id];
+        return { ...m, progress: p, done: p >= m.goal, claimed: !!(c && c.claimed), rewardText: rewardText(m.reward) };
+      });
+    },
+    allClear() {
+      const daily = Missions.list('daily');
+      return { ...ALL_CLEAR, goal: daily.length, progress: daily.filter((m) => m.claimed).length, done: daily.every((m) => m.claimed), claimed: s.missions.allClearClaimed, rewardText: rewardText(ALL_CLEAR.reward) };
+    },
+    unclaimedCount() {
+      const n = [...Missions.list('daily'), ...Missions.list('achievements')].filter((m) => m.done && !m.claimed).length;
+      const ac = Missions.allClear();
+      return n + (ac.done && !ac.claimed ? 1 : 0);
+    },
+    claim() {
+      if (!CONFIG.FEATURES.daily) return { ok: false, reason: '受け取りは段階4で作ります' };
+      return { ok: false, reason: '段階4で実装' };
+    },
+  };
+
+  const LoginBonus = {
+    table: () => LOGIN_TABLE.map((d) => ({ ...d, rewardText: rewardText(d.reward) })),
+    check() {
+      const key = Util.dayKey();
+      const already = s.login.lastDayKey !== null && key <= s.login.lastDayKey; // 端末の日付を戻しても受け取れない
+      return { show: !already && !loginShownThisSession, day: (s.login.count % 7) + 1, dayKey: key };
+    },
+    markShown() { loginShownThisSession = true; },
+    claim() {
+      if (!CONFIG.FEATURES.daily) return { ok: false, reason: '付与は段階4で作ります' };
+      return { ok: false, reason: '段階4で実装' };
+    },
+  };
+
+  Save.register('economy', {
+    exportSlice: () => ({ wallet: wallet(), ledger: s.ledger.slice(), dailyCap: { ...s.dailyCap }, unlocks: getUnlocks(), premium: Util.copy(s.premium), ads: { ...s.ads }, missions: Util.copy(s.missions), login: { ...s.login } }),
+    importSlice: () => { /* 段階4：data.wallet などを検証して取り込む。足りない項目は既定値のまま */ },
+  });
+
+  return { Economy, Ads, Missions, LoginBonus };
+})();
+
+/* =====================================================================
+   3 育成（Growth）：カード・編成・スカウト・経験値・限界突破
+   コインとチケットは必ず経済を通す。リーグの状態・画面・localStorage には触れない。
+   ===================================================================== */
+const Growth = (() => {
+  const G = CONFIG.GROWTH;
+  const LB = CONFIG.LABELS;
+  const up = (o, n, kmhUp) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, k === 'kmh' ? v + kmhUp : v + n]));
+  const B = (id, name, number, pos, rarity, lv1, grow) => ({ id, name, number, type: 'B', pos, rarity, lv1, max: up(lv1, grow, 0) });
+  const P = (id, name, number, rarity, lv1, grow, special) => ({ id, name, number, type: 'P', pos: 'P', rarity, lv1, max: up(lv1, grow, 6), special });
+  // カードマスタ（仮）。Lv1の値と基準最大Lvの値を持つ。IDは一度決めたら変えない・再利用しない
+  const MASTER = Object.freeze([
+    B('S01', '岩城 拓真', 22, 'C', 1, { meet: 43, power: 47, speed: 37, defense: 50 }, 10),
+    B('S02', '剛田 大吾', 44, '1B', 1, { meet: 41, power: 50, speed: 36, defense: 41 }, 10),
+    B('S03', '小牧 舜', 4, '2B', 1, { meet: 49, power: 39, speed: 49, defense: 48 }, 10),
+    B('S04', '鬼塚 勇人', 5, '3B', 1, { meet: 45, power: 50, speed: 41, defense: 45 }, 10),
+    B('S05', '早瀬 蓮', 6, 'SS', 1, { meet: 48, power: 40, speed: 50, defense: 50 }, 10),
+    B('S06', '坂巻 陽平', 9, 'LF', 1, { meet: 44, power: 46, speed: 45, defense: 40 }, 10),
+    B('S07', '駒井 翔太', 8, 'CF', 1, { meet: 47, power: 41, speed: 50, defense: 49 }, 10),
+    B('S08', '本郷 凌', 7, 'RF', 1, { meet: 43, power: 48, speed: 43, defense: 44 }, 10),
+    B('S09', '豪田 力也', 55, 'DH', 1, { meet: 40, power: 50, speed: 36, defense: 36 }, 10),
+    P('S10', '千葉 悠真', 18, 1, { kmh: 138, control: 47, stamina: 50, movement: 46 }, 10, ['slider', 'fork']),
+    P('S11', '杉崎 航', 11, 1, { kmh: 134, control: 50, stamina: 46, movement: 48 }, 10, ['curve', 'sinker']),
+    P('S12', '間宮 陸', 21, 1, { kmh: 136, control: 44, stamina: 50, movement: 49 }, 10, ['shoot', 'slider']),
+    // スカウト演出の見本（未所持）。プール48人は段階3で足す
+    B('B101', '神宮寺 亮', 1, 'CF', 3, { meet: 64, power: 58, speed: 70, defense: 66 }, 18),
+  ]);
+  const master = (id) => MASTER.find((c) => c.id === id) || null;
+  const s = {
+    teamName: 'ぐにゃーズ',
+    owned: Object.fromEntries(MASTER.filter((c) => c.id.startsWith('S')).map((c) => [c.id, { lv: 1, exp: 0, lb: 0, fatigue: 0 }])),
+    lineup: [
+      { cardId: 'S07', pos: 'CF' }, { cardId: 'S03', pos: '2B' }, { cardId: 'S04', pos: '3B' },
+      { cardId: 'S02', pos: '1B' }, { cardId: 'S09', pos: 'DH' }, { cardId: 'S01', pos: 'C' },
+      { cardId: 'S08', pos: 'RF' }, { cardId: 'S06', pos: 'LF' }, { cardId: 'S05', pos: 'SS' },
+    ],
+    rotation: ['S10', 'S11', 'S12'],
+    nextStarter: 0,
+    scout: { pity: 0, totalPulls: 0, adTicketDayKey: null },
+  };
+
+  const rankOf = (v) => (v >= 90 ? 'S' : v >= 80 ? 'A' : v >= 70 ? 'B' : v >= 60 ? 'C' : v >= 50 ? 'D' : v >= 40 ? 'E' : v >= 20 ? 'F' : 'G');
+  const kmhScore = (kmh) => Util.clamp((kmh - 120) * 100 / 45, 0, 100);
+  const expToNext = (lv) => 10 * lv + 40;
+  const maxLvOf = (c, lb = 0) => G.maxLv[c.rarity] + lb * G.limitBreakLv;
+  // 能力（Lv）＝Lv1の値＋（基準最大Lvの値−Lv1の値）×（Lv−1）÷（基準最大Lv−1）、切り捨て（仕様書 A-5）
+  function abilityAtCard(c, lv) {
+    const base = G.maxLv[c.rarity];
+    const out = {};
+    Object.keys(c.lv1).forEach((k) => {
+      const v = c.lv1[k] + Math.floor((c.max[k] - c.lv1[k]) * (lv - 1) / (base - 1));
+      out[k] = Math.min(k === 'kmh' ? 165 : 99, v);
+    });
+    return out;
+  }
+  const overallOf = (c, a) => Math.round(c.type === 'P' ? (kmhScore(a.kmh) + a.control + a.stamina + a.movement) / 4 : (a.meet + a.power + a.speed + a.defense) / 4);
+
+  function getCard(id) {
+    const c = master(id);
+    if (!c) return null;
+    const own = s.owned[id];
+    const lv = own ? own.lv : 1;
+    const lb = own ? own.lb : 0;
+    const abilities = abilityAtCard(c, lv);
+    return {
+      id: c.id, name: c.name, number: c.number, type: c.type, pos: c.pos, posLabel: LB.pos[c.pos], posName: LB.posName[c.pos],
+      rarity: c.rarity, rarityName: LB.rarity[c.rarity], lv, maxLv: maxLvOf(c, lb), exp: own ? own.exp : 0, expNext: expToNext(lv), lb,
+      abilities, overall: overallOf(c, abilities), special: c.special || [], specialNames: (c.special || []).map((p) => LB.pitch[p]),
+      owned: !!own, fatigued: !!(own && own.fatigue > 0),
+    };
+  }
+  const POS_ORDER = { C: 1, '1B': 2, '2B': 3, '3B': 4, SS: 5, LF: 6, CF: 7, RF: 8, DH: 9, P: 10 };
+  const SORTS = {
+    overall: (a, b) => b.overall - a.overall,
+    rarity: (a, b) => b.rarity - a.rarity || b.overall - a.overall,
+    lv: (a, b) => b.lv - a.lv || b.overall - a.overall,
+    pos: (a, b) => POS_ORDER[a.pos] - POS_ORDER[b.pos],
+  };
+  const getOwnedCards = (sort = 'overall') => Object.keys(s.owned).map(getCard).sort(SORTS[sort] || SORTS.overall);
+  const getAbilities = (id) => { const c = getCard(id); return c ? c.abilities : null; };
+  const cardOverall = (id) => { const c = getCard(id); return c ? c.overall : 0; };
+  const fits = (c, pos) => pos === 'DH' || c.pos === pos;
+
+  function getLineup() {
+    return s.lineup.map((slot, i) => {
+      const c = getCard(slot.cardId);
+      const fit = fits(c, slot.pos);
+      const a = { ...c.abilities, defense: fit ? c.abilities.defense : Math.floor(c.abilities.defense * G.misfitDefense) };
+      return { order: i + 1, cardId: c.id, name: c.name, number: c.number, type: 'B', pos: slot.pos, posLabel: LB.pos[slot.pos], fit, abilities: a, overall: c.overall };
+    });
+  }
+  function getRotation() {
+    return s.rotation.map((id, i) => {
+      const c = getCard(id);
+      return { slot: i + 1, cardId: id, name: c.name, number: c.number, type: 'P', abilities: c.abilities, special: c.special, specialNames: c.specialNames, fatigued: c.fatigued, isNext: i === s.nextStarter, overall: c.overall };
+    });
+  }
+  const getTeamSnapshot = () => ({ name: s.teamName, lineup: getLineup(), starter: getRotation()[s.nextStarter] });
+  // チーム総合力＝打撃×0.4＋投手×0.4＋守備走塁×0.2（仕様書 A-5）
+  function teamOverall() {
+    const lu = getLineup();
+    const bat = lu.reduce((t, b) => t + b.abilities.meet + b.abilities.power, 0) / (lu.length * 2);
+    const pit = getRotation().reduce((t, p) => t + p.overall, 0) / s.rotation.length;
+    const fl = lu.filter((b) => b.pos !== 'DH');
+    const fld = fl.reduce((t, b) => t + b.abilities.speed + b.abilities.defense, 0) / (fl.length * 2);
+    return Math.round(bat * 0.4 + pit * 0.4 + fld * 0.2);
+  }
+  const getScoutInfo = () => ({ costs: CONFIG.SCOUT.costs, rates: CONFIG.SCOUT.rates, guaranteeRates: CONFIG.SCOUT.guaranteeRates, pityRemaining: CONFIG.SCOUT.pity - s.scout.pity, enabled: CONFIG.FEATURES.growth });
+  function scout() {
+    // 段階3：Economy.spend で支払い、排出・天井・重複処理を行い、growth:acquired を出す
+    return { ok: false, preview: true, results: [{ cardId: 'B101', status: 'NEW' }], reason: '段階1は演出の見本です（排出と消費は段階3で作ります）' };
+  }
+  const train = () => ({ ok: false, reason: '特訓は段階3で作ります' });
+
+  Save.register('growth', {
+    exportSlice: () => ({ team: { name: s.teamName, lineup: Util.copy(s.lineup), rotation: s.rotation.slice(), nextStarter: s.nextStarter }, cards: Util.copy(s.owned), scout: { ...s.scout } }),
+    importSlice: () => { /* 段階4：data.team・data.cards・data.scout を検証して取り込む */ },
+  });
+
+  return {
+    getCard, getOwnedCards, getAbilities, rankOf, kmhScore, cardOverall, expToNext,
+    abilityAt: (id, lv) => abilityAtCard(master(id), lv),
+    getLineup, getRotation, getTeamSnapshot, teamOverall,
+    getTeamName: () => s.teamName,
+    getScoutInfo, scout, train,
+  };
+})();
+
+/* =====================================================================
+   2a リーグ進行（League・Correction）：試合の窓口（メタ側）
+   エンジン本体には試合設定を渡し、試合の通知を受けるだけ。コイン・経験値は増やさない。
+   ===================================================================== */
+const { League, Correction } = (() => {
+  const k = CONFIG.PROVISIONAL.Q2_correctionK;
+  // 補正倍率 m＝1＋k×（能力−50）÷50（仕様書 A-5）
+  const Correction = Object.freeze({ k, multiplier: (v) => 1 + k * (v - 50) / 50, kmhScore: (kmh) => Growth.kmhScore(kmh) });
+  const m3 = (v) => Math.round(Correction.multiplier(v) * 1000) / 1000;
+  const TEAMS = Object.freeze([
+    { id: 0, name: null, short: null, style: '自チーム', overall: null },
+    { id: 1, name: '千鳥足ペンギンズ', short: 'ペンギンズ', style: 'バランス型', overall: 42 },
+    { id: 2, name: '疾風チーターズ', short: 'チーターズ', style: '機動力型', overall: 47 },
+    { id: 3, name: '湾岸ゴリラズ', short: 'ゴリラズ', style: 'パワー型', overall: 52 },
+    { id: 4, name: '鋼鉄ロボッツ', short: 'ロボッツ', style: '投手力型', overall: 56 },
+    { id: 5, name: '雷神サンダース', short: 'サンダース', style: '総合型', overall: 62 },
+  ]);
+  const CPU_NAMES = Object.freeze([
+    ['白瀬', '氷室', '雪村', '北野', '水谷', '風間', '青木', '月島', '浜田'],
+    ['速水', '疾風', '早川', '駿河', '矢部', '飛田', '風見', '羽田', '若林'],
+    ['岩田', '剛田', '大山', '熊谷', '石原', '土井', '金城', '荒川', '権田'],
+    ['鉄村', '鋼田', '黒金', '機山', '堅田', '重井', '盾野', '守口', '錠前'],
+    ['鳴神', '雷門', '稲妻', '天野', '電田', '光井', '轟', '神谷', '嵐山'],
+  ]);
+  const CPU_GIVEN = Object.freeze(['渉', '迅', '豪', '剛', '翔', '蓮', '陸', '湊', '岳']);
+  const CPU_POS = Object.freeze(['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']);
+  const bounded = (v, lo = 1, hi = 99) => Math.round(Util.clamp(v, lo, hi));
+
+  // CPU選手は保存せず、球団番号×シーズンのシードから毎回同じ10人を再生成する。
+  function generateCpuTeam(teamId, season) {
+    const team = TEAMS[teamId];
+    const rng = Util.seeded((teamId * 1000003) ^ (season * 9176));
+    const seasonBonus = Math.min(15, Math.max(0, season - 1) * 3);
+    const base = team.overall + seasonBonus;
+    const jitter = (spread = 9) => (rng() * 2 - 1) * spread;
+    const lineup = CPU_POS.map((pos, i) => {
+      const stylePower = teamId === 3 ? 7 : teamId === 2 ? -2 : 0;
+      const styleSpeed = teamId === 2 ? 8 : teamId === 3 ? -3 : 0;
+      const styleDefense = teamId === 4 ? 7 : 0;
+      const abilities = {
+        meet: bounded(base + jitter()), power: bounded(base + stylePower + jitter()),
+        speed: bounded(base + styleSpeed + jitter()), defense: bounded(base + styleDefense + jitter()),
+      };
+      return {
+        order: i + 1, cardId: `CPU-${teamId}-${season}-${i + 1}`,
+        name: `${CPU_NAMES[teamId - 1][i]} ${CPU_GIVEN[(i + teamId + season) % CPU_GIVEN.length]}`,
+        number: 2 + i, pos, abilities,
+        mult: { contact: m3(abilities.meet), power: m3(abilities.power), speed: m3(abilities.speed), defense: m3(abilities.defense) },
+      };
+    });
+    const kmh = bounded(128 + base * 0.36 + jitter(4), 120, 165);
+    const abilities = { control: bounded(base + jitter()), stamina: bounded(base + 5 + jitter()), movement: bounded(base + jitter()) };
+    const pitcher = {
+      cardId: `CPU-${teamId}-${season}-P`, name: `${CPU_NAMES[teamId - 1][(teamId + season) % 9]} ${CPU_GIVEN[(teamId * 2 + season) % 9]}`,
+      number: 14 + teamId, kmh, abilities,
+      mult: { velocity: m3(Correction.kmhScore(kmh)), control: m3(abilities.control), movement: m3(abilities.movement) },
+      staminaThreshold: Math.floor(abilities.stamina / 2), special: [teamId % 2 ? 'curve' : 'slider'], fatigued: false,
+      overall: Math.round((Correction.kmhScore(kmh) + abilities.control + abilities.stamina + abilities.movement) / 4),
+    };
+    return { lineup, pitcher };
+  }
+  const PLACEHOLDER_SCORES = [[[4, 2], [1, 5], [3, 2]], [[1, 3], [0, 4], [2, 2]], [[2, 5], [6, 3], [0, 1]]]; // 第1〜3節の仮の結果（ホーム, ビジター）
+  const PLAY_DEFAULT = Object.freeze({ pitchingForm: 'overhand', battingForm: 'standard', myPitch: { direction: 'down', amount: 50 }, motion: { armSwing: 50, release: 50, swingSpeed: 50 } });
+
+  // 6球団の2回総当たり（円順列）。自チームは弱い順に当たり、ホーム5・ビジター5
+  function makeSchedule() {
+    let arr = [0, 5, 4, 3, 2, 1];
+    const first = [];
+    for (let r = 0; r < 5; r++) {
+      const games = [];
+      for (let i = 0; i < 3; i++) {
+        const a = arr[i];
+        const b = arr[5 - i];
+        const homeFirst = (r + i) % 2 === 0;
+        games.push({ home: homeFirst ? a : b, away: homeFirst ? b : a });
+      }
+      first.push(games);
+      arr = [arr[0], arr[5], ...arr.slice(1, 5)];
+    }
+    return [...first, ...first.map((games) => games.map((g) => ({ home: g.away, away: g.home })))];
+  }
+  const s = {
+    season: 1, round: 3, schedule: makeSchedule(),
+    play: Util.copy(PLAY_DEFAULT),
+    career: { hits: 18, homeruns: 7, strikeouts: 12, leagueWins: 2 }, // 仮：v1の通算記録を引き継いだ想定
+    seasonHistory: [], lastResult: null,
+  };
+  PLACEHOLDER_SCORES.forEach((games, r) => games.forEach((score, i) => { s.schedule[r][i].score = score; }));
+  let current = null;
+  let pending = null;
+
+  const winPct = (w, l) => (w + l === 0 ? 0 : w / (w + l));
+  const formatPct = (w, l) => { const p = winPct(w, l); return p >= 1 ? '1.000' : p.toFixed(3).slice(1); };
+  const nameOf = (id) => (id === 0 ? Growth.getTeamName() : TEAMS[id].name);
+  const shortOf = (id) => (id === 0 ? Growth.getTeamName() : TEAMS[id].short);
+  const getTeams = () => TEAMS.map((t) => ({ ...t, name: nameOf(t.id), short: shortOf(t.id), overall: t.id === 0 ? Growth.teamOverall() : t.overall }));
+
+  // 順位：勝率→同率球団どうしの対戦勝率→得失点差→総得点→球団番号（仕様書 A-4）
+  function getStandings() {
+    const rows = TEAMS.map((t) => ({ id: t.id, w: 0, l: 0, d: 0, rs: 0, ra: 0 }));
+    const h2h = {};
+    const rec = (a, b, key) => { const k2 = `${a}-${b}`; h2h[k2] = h2h[k2] || { w: 0, l: 0 }; h2h[k2][key] += 1; };
+    s.schedule.forEach((games) => games.forEach((g) => {
+      if (!g.score) return;
+      const [hs, as] = g.score;
+      const H = rows[g.home];
+      const A = rows[g.away];
+      H.rs += hs; H.ra += as; A.rs += as; A.ra += hs;
+      if (hs === as) { H.d += 1; A.d += 1; }
+      else if (hs > as) { H.w += 1; A.l += 1; rec(g.home, g.away, 'w'); rec(g.away, g.home, 'l'); }
+      else { A.w += 1; H.l += 1; rec(g.away, g.home, 'w'); rec(g.home, g.away, 'l'); }
+    }));
+    rows.forEach((r) => { r.pct = winPct(r.w, r.l); });
+    const sorted = [...rows].sort((a, b) => b.pct - a.pct);
+    const out = [];
+    for (let i = 0; i < sorted.length;) {
+      let j = i;
+      while (j + 1 < sorted.length && sorted[j + 1].pct === sorted[i].pct) j += 1;
+      const group = sorted.slice(i, j + 1);
+      if (group.length > 1) {
+        const ids = group.map((r) => r.id);
+        group.forEach((r) => {
+          let w = 0;
+          let l = 0;
+          ids.forEach((o) => { const x = h2h[`${r.id}-${o}`]; if (x) { w += x.w; l += x.l; } });
+          r.h2h = winPct(w, l);
+        });
+        group.sort((a, b) => (b.h2h - a.h2h) || ((b.rs - b.ra) - (a.rs - a.ra)) || (b.rs - a.rs) || (a.id - b.id));
+      }
+      out.push(...group);
+      i = j + 1;
+    }
+    const lead = out[0];
+    return out.map((r, idx) => {
+      const gb = idx === 0 ? null : ((lead.w - r.w) + (r.l - lead.l)) / 2;
+      return { ...r, rank: idx + 1, name: nameOf(r.id), short: shortOf(r.id), isUser: r.id === 0, pctText: formatPct(r.w, r.l), gb, gbText: gb === null ? '-' : String(gb) };
+    });
+  }
+  function getSchedule() {
+    return s.schedule.map((games, r) => {
+      const g = games.find((x) => x.home === 0 || x.away === 0);
+      const home = g.home === 0;
+      let result = null;
+      let us = null;
+      let them = null;
+      if (g.score) {
+        us = home ? g.score[0] : g.score[1];
+        them = home ? g.score[1] : g.score[0];
+        result = us > them ? 'W' : us < them ? 'L' : 'D';
+      }
+      return { round: r + 1, games: games.map((x) => ({ ...x })), user: { opponentId: home ? g.away : g.home, home, result, us, them } };
+    });
+  }
+  function getNextMatch() {
+    const r = Math.min(s.round, CONFIG.LEAGUE.rounds - 1);
+    const g = s.schedule[r].find((x) => x.home === 0 || x.away === 0);
+    const home = g.home === 0;
+    return { round: r + 1, opponentId: home ? g.away : g.home, home };
+  }
+  const getSeason = () => ({ season: s.season, played: s.round, nextRound: Math.min(s.round + 1, CONFIG.LEAGUE.rounds), rounds: CONFIG.LEAGUE.rounds });
+
+  // 試合設定（仕様書 A-12 の約束）。倍率はここで計算し、エンジン本体は掛けるだけ
+  function buildMatchConfig(mode = 'league') {
+    const base = {
+      mode, innings: CONFIG.LEAGUE.innings, seed: 0, play: Util.copy(s.play),
+      unlockedPitches: Economy.getUnlocks().pitches,
+      correction: { enabled: CONFIG.FEATURES.correction && mode === 'league', k },
+    };
+    if (mode !== 'league') return { ...base, userSide: 'away', teams: null }; // 現行モードは現行のまま
+    const next = getNextMatch();
+    const snap = Growth.getTeamSnapshot();
+    const lineup = snap.lineup.map((b) => ({
+      order: b.order, cardId: b.cardId, name: b.name, number: b.number, pos: b.pos,
+      abilities: { meet: b.abilities.meet, power: b.abilities.power, speed: b.abilities.speed, defense: b.abilities.defense },
+      mult: { contact: m3(b.abilities.meet), power: m3(b.abilities.power), speed: m3(b.abilities.speed), defense: m3(b.abilities.defense) },
+    }));
+    const st = snap.starter;
+    const a = st.abilities;
+    const pitcher = {
+      cardId: st.cardId, name: st.name, number: st.number, kmh: a.kmh,
+      abilities: { control: a.control, stamina: a.stamina, movement: a.movement },
+      mult: { velocity: m3(Correction.kmhScore(a.kmh)), control: m3(a.control), movement: m3(a.movement) },
+      staminaThreshold: Math.floor(a.stamina / 2), special: st.special.slice(), fatigued: st.fatigued, overall: st.overall,
+    };
+    const cpu = generateCpuTeam(next.opponentId, s.season);
+    return {
+      ...base, userSide: next.home ? 'home' : 'away', seed: s.season * 1000 + next.round * 10 + next.opponentId,
+      teams: { user: { id: 0, name: snap.name, lineup, pitcher }, opponent: { id: next.opponentId, name: nameOf(next.opponentId), lineup: cpu.lineup, pitcher: cpu.pitcher } },
+    };
+  }
+  function updatePlaySettings(patch) {
+    const next = { ...s.play, ...patch, myPitch: { ...s.play.myPitch, ...(patch.myPitch || {}) }, motion: { ...s.play.motion, ...(patch.motion || {}) } };
+    if (JSON.stringify(next) === JSON.stringify(s.play)) return false;
+    s.play = next;
+    Save.commit('settings');
+    return true;
+  }
+
+  // 試合の通知を受ける：記録（リーグ戦は試合終了時にまとめる）と結果
+  function flush() {
+    if (!pending) return;
+    s.career.hits += pending.hits;
+    s.career.homeruns += pending.homeruns;
+    s.career.strikeouts += pending.strikeouts;
+    pending = { hits: 0, homeruns: 0, strikeouts: 0 };
+    Events.emit('record:updated', { ...s.career });
+  }
+  Events.on('match:start', (e) => {
+    const next = getNextMatch();
+    current = { mode: e.mode, userSide: e.userSide, round: e.mode === 'league' ? next.round : null, opponentId: e.mode === 'league' ? next.opponentId : null };
+    pending = { hits: 0, homeruns: 0, strikeouts: 0 };
+  });
+  Events.on('match:hit', (e) => {
+    if (e.side !== 'user' || !pending) return;
+    pending.hits += 1;
+    if (e.kind === 'HR') pending.homeruns += 1;
+    if (e.mode !== 'league') flush();
+  });
+  Events.on('match:strikeout', (e) => {
+    if (e.pitcherSide !== 'user' || !pending) return;
+    pending.strikeouts += 1;
+    if (e.mode !== 'league') flush();
+  });
+  Events.on('match:end', (e) => {
+    if (!current) return;
+    flush();
+    const userIsHome = current.userSide === 'home';
+    const userName = current.mode === 'league' ? Growth.getTeamName() : 'あなた';
+    const oppName = current.mode === 'league' ? nameOf(current.opponentId) : '相手';
+    s.lastResult = {
+      mode: e.mode, modeLabel: CONFIG.LABELS.mode[e.mode], result: e.result, score: { ...e.score }, userSide: current.userSide,
+      round: current.round, opponentId: current.opponentId,
+      homeName: userIsHome ? userName : oppName, awayName: userIsHome ? oppName : userName,
+      mvp: e.mvp, recorded: false,
+    };
+    if (e.mode === 'league' && CONFIG.FEATURES.leagueProgress) {
+      // 段階2：日程に結果を書き、CPU同士の2試合を決着させ、節を進める
+    }
+    current = null;
+    pending = null;
+    Save.commit('matchEnd');
+  });
+  Events.on('match:aborted', () => { current = null; pending = null; });
+
+  Save.register('league', {
+    exportSlice: () => {
+      const me = getStandings().find((r) => r.isUser);
+      return {
+        league: { season: s.season, round: s.round, schedule: Util.copy(s.schedule) },
+        seasonHistory: s.seasonHistory.slice(),
+        stats: { career: { ...s.career }, league: { w: me.w, l: me.l, d: me.d } },
+        settings: Util.copy(s.play),
+      };
+    },
+    importSlice: () => { /* 段階4：data.league などを検証して取り込む */ },
+  });
+
+  const League = {
+    getTeams, getStandings, getSchedule, getNextMatch, getSeason, buildMatchConfig,
+    getLastResult: () => (s.lastResult ? { ...s.lastResult } : null),
+    getCareer: () => ({ ...s.career }),
+    getPlaySettings: () => Util.copy(s.play),
+    updatePlaySettings, formatPct,
+    resultDestination: (result = s.lastResult) => (result && result.mode === 'league' && result.round >= CONFIG.LEAGUE.rounds ? 'season' : 'pregame'),
+  };
+  return { League, Correction };
+})();
+
+/* =====================================================================
+   2b 試合エンジン本体（legacy-game.html のプレー層を移植）
+   入力は MatchConfig と描画ポート、出力は match:* 通知だけ。DOM・保存・財布には触れない。
+   ===================================================================== */
+const MatchEngine = (() => {
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const enabled = (c) => !!(c && c.correction && c.correction.enabled);
+  const mv = (o, key) => (o && o.mult && Number.isFinite(o.mult[key]) ? o.mult[key] : 1);
+  const stamina = (p, count) => 1 - Math.min(0.20, Math.max(0, count - (p.staminaThreshold || 25)) * 0.01);
+  const fatigue = (p) => (p && p.fatigued ? 0.85 : 1);
+  const special = (p, x) => !!(p && x && p.special && p.special.includes(x.pitch));
+  const HOOKS = Object.freeze({
+    sweetSpot: (base, b, c) => (enabled(c) ? base * mv(b, 'contact') : base),
+    exitVelocity: (base, b, c) => (enabled(c) ? base * mv(b, 'power') : base),
+    runSpeed: (base, b, c) => (enabled(c) ? base * mv(b, 'speed') : base),
+    fielderRange: (base, f, c) => (enabled(c) ? base * mv(f, 'defense') : base),
+    pitchSpeed: (base, p, c, x) => (enabled(c) ? base * mv(p, 'velocity') * fatigue(p) * stamina(p, x.count) : base),
+    pitchScatter: (base, p, c, x) => (enabled(c) ? base / (mv(p, 'control') * fatigue(p) * stamina(p, x.count)) * (special(p, x) ? 0.9 : 1) : base),
+    pitchBreak: (base, p, c, x) => (enabled(c) ? base * mv(p, 'movement') * fatigue(p) * (special(p, x) ? 1.15 : 1) : base),
+  });
+  const PITCHES = Object.freeze({
+    fastball: { name: 'まっすぐ', speed: 1.00, bx: 0, by: 0 }, curve: { name: 'カーブ', speed: 0.82, bx: -34, by: 26 },
+    slider: { name: 'スライダー', speed: 0.88, bx: -47, by: 7 }, fork: { name: 'フォーク', speed: 0.86, bx: 0, by: 45 },
+    shoot: { name: 'シュート', speed: 0.91, bx: 32, by: 5 }, sinker: { name: 'シンカー', speed: 0.86, bx: 21, by: 34 },
+    mypitch: { name: 'マイ変化球', speed: 0.87, bx: 0, by: 0 },
+  });
+  const DEFAULT_BATTER = Object.freeze({ cardId: null, name: '打者', mult: { contact: 1, power: 1, speed: 1, defense: 1 }, abilities: { meet: 50, power: 50, speed: 50, defense: 50 } });
+  const DEFAULT_PITCHER = Object.freeze({ cardId: null, name: '投手', kmh: 142, mult: { velocity: 1, control: 1, movement: 1 }, staminaThreshold: 25, special: [], fatigued: false });
+  const FIELD_HOME = Object.freeze([{ x: 490, y: 252 }, { x: 610, y: 222 }, { x: 725, y: 254 }, { x: 555, y: 165 }, { x: 690, y: 153 }, { x: 820, y: 178 }]);
+  let port = null;
+  let cfg = null;
+  let game = null;
+  let state = 'idle';
+  let raf = 0;
+  let last = 0;
+  let clock = 0;
+  let rng = Math.random;
+  let ball = null;
+  let swingAt = null;
+  let selectedPitch = 'fastball';
+  let fielders = [];
+
+  const matchMode = () => cfg.mode === 'league' || cfg.mode === 'exhibition';
+  const userBatting = () => !matchMode() || ((game.half === 'top') === (cfg.userSide === 'away'));
+  const activeSide = () => (userBatting() ? 'user' : 'opponent');
+  const pitchingSide = () => (userBatting() ? 'opponent' : 'user');
+  const sideKey = (side) => (side === 'user' ? cfg.userSide : cfg.userSide === 'home' ? 'away' : 'home');
+  const team = (side) => (cfg.teams ? cfg.teams[side] : null);
+  const batter = (side = activeSide()) => {
+    const t = team(side);
+    return t && t.lineup && t.lineup.length ? t.lineup[game.order[side] % t.lineup.length] : DEFAULT_BATTER;
+  };
+  const pitcher = (side = pitchingSide()) => (team(side) && team(side).pitcher) || DEFAULT_PITCHER;
+  function emit(type, data = {}) {
+    Events.emit(type, { mode: cfg.mode, inning: game.inning, half: game.half, outs: game.outs, score: { ...game.score }, ...data });
+  }
+  function setUi(status) {
+    if (!port) return;
+    port.update({
+      status, phase: game.phase, batting: userBatting(), selectedPitch,
+      pitches: (cfg.unlockedPitches || ['fastball']).map((id) => ({ id, name: (PITCHES[id] || PITCHES.fastball).name })),
+      canPitch: state === 'running' && game.phase === 'ready', canSwing: state === 'running' && game.phase === 'pitch' && userBatting(),
+      canFinish: cfg.mode !== 'league' && game.phase === 'ready', attempts: game.attempts,
+      total: cfg.mode === 'challenge10' ? 10 : null,
+    });
+  }
+  function atBat() {
+    if (state === 'idle') return;
+    game.phase = 'ready';
+    ball = null;
+    swingAt = null;
+    const side = activeSide();
+    const b = batter(side);
+    emit('match:atBat', { side, order: (game.order[side] % 9) + 1, cardId: b.cardId });
+    setUi(userBatting() ? '投球開始を押し、球を引きつけてスイング' : '球種を選んで投球開始');
+  }
+  function pitchDefinition(id) {
+    const d = { ...(PITCHES[id] || PITCHES.fastball) };
+    if (id === 'mypitch') {
+      const amt = ((cfg.play && cfg.play.myPitch.amount) || 50) / 50;
+      const dir = (cfg.play && cfg.play.myPitch.direction) || 'down';
+      d.bx = dir === 'left' ? -38 * amt : dir === 'right' ? 38 * amt : 0;
+      d.by = dir === 'up' ? -30 * amt : dir === 'down' ? 38 * amt : 0;
+    }
+    return d;
+  }
+  function startPitch() {
+    if (state !== 'running' || game.phase !== 'ready') return;
+    const ps = pitchingSide();
+    const p = pitcher(ps);
+    const ids = cfg.unlockedPitches && cfg.unlockedPitches.length ? cfg.unlockedPitches : ['fastball'];
+    const id = ps === 'user' ? selectedPitch : ids[Math.floor(rng() * ids.length)];
+    const d = pitchDefinition(id);
+    game.pitches[ps] += 1;
+    const x = { pitch: id, count: game.pitches[ps] };
+    const kmh = clamp(HOOKS.pitchSpeed((p.kmh || 142) * d.speed, p, cfg, x), 105, 170);
+    const breakM = clamp(HOOKS.pitchBreak(1, p, cfg, x), 0.55, 1.55);
+    const scatter = clamp(HOOKS.pitchScatter(14, p, cfg, x), 4, 32);
+    const motion = (cfg.play && cfg.play.motion) || { armSwing: 50, release: 50, swingSpeed: 50 };
+    const form = (cfg.play && cfg.play.pitchingForm) || 'overhand';
+    const formY = form === 'under' ? 30 : form === 'side' ? 18 : form === 'threeQuarter' ? 8 : form === 'tornado' ? -8 : 0;
+    const formX = form === 'side' ? 13 : form === 'under' ? 8 : form === 'tornado' ? -7 : 0;
+    ball = { x: 222, y: 300 + formY + (motion.release - 50) * 0.16, t: 0, id, name: d.name, kmh, bx: d.bx * breakM + formX + (rng() - 0.5) * scatter, by: d.by * breakM + (rng() - 0.5) * scatter, releaseY: formY + (motion.release - 50) * 0.16, wind: 0.22 + (100 - motion.armSwing) * 0.002, flight: clamp(0.93 - (kmh - 105) / 180, 0.54, 0.93), hit: false };
+    game.phase = 'windup';
+    emit('match:pitch', { side: ps, pitch: id, kmh: Math.round(kmh), count: game.pitches[ps] });
+    setUi(`${d.name}　${Math.round(kmh)} km/h`);
+  }
+  function swing() {
+    if (state !== 'running' || game.phase !== 'pitch' || !userBatting() || swingAt !== null) return;
+    swingAt = ball.t;
+    if (port) port.swing();
+  }
+  function stat(cardId) {
+    if (!cardId) return null;
+    game.batting[cardId] = game.batting[cardId] || { cardId, ab: 0, h: 0, hr: 0, rbi: 0 };
+    return game.batting[cardId];
+  }
+  function addRuns(side, basesHit) {
+    const bases = game.bases[side];
+    let runs = 0;
+    if (basesHit >= 4) { runs = 1 + bases[0] + bases[1] + bases[2]; bases.splice(0, 3, 0, 0, 0); }
+    else {
+      for (let i = 2; i >= 0; i -= 1) if (bases[i]) { bases[i] = 0; if (i + basesHit >= 3) runs += 1; else bases[i + basesHit] = 1; }
+      bases[basesHit - 1] = 1;
+    }
+    if (runs) { game.score[sideKey(side)] += runs; emit('match:run', { side, runs }); }
+    return runs;
+  }
+  function hitBall(side, quality) {
+    const b = batter(side);
+    const exit = clamp(HOOKS.exitVelocity(72 + quality * 88, b, cfg), 55, 182);
+    const angle = -0.92 + (rng() - 0.5) * 0.42;
+    const dist = clamp(exit * (0.62 + quality * 0.42) + (rng() - 0.5) * 18, 8, 145);
+    const targetX = clamp(500 + Math.cos(angle) * dist * 3.0, 425, 900);
+    const targetY = clamp(360 + Math.sin(angle) * dist * 1.45, 115, 390);
+    const defense = team(side === 'user' ? 'opponent' : 'user');
+    const f = defense && defense.lineup ? defense.lineup[Math.floor(rng() * defense.lineup.length)] : DEFAULT_BATTER;
+    const range = clamp(HOOKS.fielderRange(54, f, cfg), 35, 76);
+    let kind = dist >= 108 ? 'HR' : dist >= 64 ? '2B' : '1B';
+    if (kind !== 'HR' && quality < 0.82 && rng() < clamp(0.60 - quality * 0.34 + (range - 54) / 100, 0.12, 0.72)) kind = 'OUT';
+    ball = { ...ball, hit: true, t: 0, sx: 720, sy: 330, tx: targetX, ty: targetY, peak: 70 + quality * 115, dist, kind };
+    fielders = FIELD_HOME.map((f0) => ({ ...f0, sx: f0.x, sy: f0.y }));
+    game.phase = 'flight';
+    setUi(kind === 'HR' ? '大きな当たり！' : '打球を追っています');
+  }
+  function recordHit(side, kind) {
+    const b = batter(side);
+    const st = side === 'user' ? stat(b.cardId) : null;
+    const bases = kind === 'HR' ? 4 : kind === '2B' ? 2 : 1;
+    const before = game.score[sideKey(side)];
+    const runs = addRuns(side, bases);
+    if (st) { st.ab += 1; st.h += 1; st.rbi += runs; if (kind === 'HR') st.hr += 1; }
+    emit('match:hit', { side, kind, cardId: b.cardId, rbi: runs });
+    if (port) port.banner(kind === 'HR' ? 'ホームラン！' : kind === '2B' ? 'ツーベース！' : 'ヒット！', `${Math.round(ball.dist)}m${runs ? `　${runs}点` : ''}`);
+    game.order[side] += 1;
+    game.attempts += 1;
+    if (cfg.mode === 'challenge10' && game.attempts >= 10) { finish(); return; }
+    if (game.inning >= cfg.innings && game.half === 'bottom' && game.score.home > game.score.away) { finish(); return; }
+    game.phase = 'between'; game.nextAt = clock + 0.85;
+    if (before !== game.score[sideKey(side)]) setUi(`${runs}点入りました`);
+  }
+  function recordOut(side, strikeout = false, label = 'アウト') {
+    const b = batter(side);
+    const st = side === 'user' ? stat(b.cardId) : null;
+    if (st) st.ab += 1;
+    game.outs += 1;
+    game.order[side] += 1;
+    game.attempts += 1;
+    if (strikeout) { if (side === 'opponent') game.k += 1; emit('match:strikeout', { pitcherSide: side === 'user' ? 'opponent' : 'user', cardId: pitcher(side === 'user' ? 'opponent' : 'user').cardId }); }
+    emit('match:out', { side, label });
+    if (port) port.banner(label, `${game.outs}アウト`);
+    if (cfg.mode === 'challenge10' && game.attempts >= 10) { finish(); return; }
+    if (!matchMode()) { game.outs = 0; game.phase = 'between'; game.nextAt = clock + 0.75; setUi(label); return; }
+    if (game.outs >= 3) { changeHalf(); return; }
+    game.phase = 'between'; game.nextAt = clock + 0.75; setUi(label);
+  }
+  function changeHalf() {
+    game.outs = 0;
+    if (game.half === 'top') {
+      if (game.inning >= cfg.innings && game.score.home > game.score.away) { finish(); return; }
+      game.half = 'bottom';
+    } else {
+      if (game.inning >= cfg.innings) { finish(); return; }
+      game.inning += 1; game.half = 'top';
+    }
+    game.phase = 'between'; game.nextAt = clock + 1.0;
+  }
+  function finish(forced) {
+    if (state === 'idle') return;
+    const uk = sideKey('user');
+    const ok = uk === 'home' ? 'away' : 'home';
+    if (forced === 'W' && game.score[uk] <= game.score[ok]) game.score[uk] = game.score[ok] + 1;
+    if (forced === 'L' && game.score[ok] <= game.score[uk]) game.score[ok] = game.score[uk] + 1;
+    if (forced === 'D') { const n = Math.max(game.score.home, game.score.away); game.score.home = n; game.score.away = n; }
+    const result = forced || (game.score[uk] > game.score[ok] ? 'W' : game.score[uk] < game.score[ok] ? 'L' : 'D');
+    const batting = Object.values(game.batting);
+    const best = batting.slice().sort((a, b) => (b.hr * 4 + b.h + b.rbi) - (a.hr * 4 + a.h + a.rbi))[0];
+    const mvp = cfg.teams ? (best && best.h ? best.cardId : cfg.teams.user.pitcher.cardId) : null;
+    state = 'idle';
+    if (raf) cancelAnimationFrame(raf);
+    emit('match:end', { result, score: { ...game.score }, batting, pitching: cfg.teams ? [{ cardId: cfg.teams.user.pitcher.cardId, pitches: game.pitches.user, k: game.k }] : [], mvp });
+  }
+  function resolveContact() {
+    const side = activeSide();
+    if (!userBatting()) {
+      const b = batter(side);
+      const meet = b.abilities && b.abilities.meet || 50;
+      const p = pitcher('user');
+      const control = p.abilities && p.abilities.control || 50;
+      const q = clamp(0.34 + (meet - control) / 180 + (rng() - 0.5) * 0.45, 0.05, 0.96);
+      if (q < 0.30) { recordOut(side, true, '三振！'); return; }
+      if (q < 0.58) { recordOut(side, false, '守備でアウト'); return; }
+      hitBall(side, q);
+      return;
+    }
+    const b = batter(side);
+    const form = cfg.play && cfg.play.battingForm || 'standard';
+    const formWidth = form === 'closed' ? 1.18 : form === 'open' ? 0.83 : form === 'oneLeg' ? 0.76 : 1;
+    const window = clamp(HOOKS.sweetSpot(0.14 * formWidth, b, cfg), 0.075, 0.20);
+    const diff = swingAt === null ? 9 : Math.abs(swingAt - 0.82);
+    if (diff > window) { recordOut(side, true, swingAt === null ? '見逃し三振' : '空振り三振'); return; }
+    hitBall(side, clamp(1 - diff / window, 0.12, 1));
+  }
+  function update(dt) {
+    clock += dt;
+    if (state !== 'running') return;
+    if (game.phase === 'between' && clock >= game.nextAt) { atBat(); return; }
+    if (!ball) return;
+    if (game.phase === 'windup') {
+      ball.t += dt;
+      if (ball.t >= ball.wind) { ball.t = 0; game.phase = 'pitch'; setUi(userBatting() ? 'いまだ！ スイング' : `${ball.name}を投げました`); }
+    } else if (game.phase === 'pitch') {
+      ball.t += dt / ball.flight;
+      const t = clamp(ball.t, 0, 1);
+      ball.x = 222 + 510 * t;
+      ball.y = 300 + (ball.releaseY || 0) * (1 - t) + 30 * t + ball.by * t * t;
+      ball.x += ball.bx * t * t;
+      if (t >= 1) resolveContact();
+    } else if (game.phase === 'flight') {
+      ball.t += dt / 1.25;
+      const t = clamp(ball.t, 0, 1);
+      ball.x = ball.sx + (ball.tx - ball.sx) * t;
+      ball.y = ball.sy + (ball.ty - ball.sy) * t - Math.sin(Math.PI * t) * ball.peak;
+      fielders.forEach((f) => { f.x = f.sx + (ball.tx - f.sx) * t * 0.68; f.y = f.sy + (ball.ty - f.sy) * t * 0.68; });
+      if (t >= 1) { if (ball.kind === 'OUT') recordOut(activeSide(), false, 'ナイスキャッチ'); else recordHit(activeSide(), ball.kind); }
+    }
+  }
+  function player(g, x, y, color, pose = 0) {
+    g.save(); g.translate(x, y); g.strokeStyle = color; g.fillStyle = '#EBC29B'; g.lineCap = 'round';
+    g.lineWidth = 16; g.beginPath(); g.moveTo(0, -56); g.lineTo(Math.sin(pose) * 14, -16); g.stroke();
+    g.lineWidth = 9; g.beginPath(); g.moveTo(-2, -44); g.lineTo(-24, -24 + pose * 8); g.moveTo(4, -43); g.lineTo(25, -30 - pose * 8); g.stroke();
+    g.strokeStyle = '#E8EDF2'; g.lineWidth = 11; g.beginPath(); g.moveTo(0, -16); g.lineTo(-15, 18); g.moveTo(0, -16); g.lineTo(17, 18); g.stroke();
+    g.beginPath(); g.arc(0, -72, 11, 0, 7); g.fill(); g.fillStyle = color; g.fillRect(-12, -82, 24, 7); g.restore();
+  }
+  function draw() {
+    if (!port || !game) return;
+    const g = port.context();
+    if (!g) return;
+    const W = 960, H = 540;
+    g.clearRect(0, 0, W, H); g.fillStyle = '#07152B'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#132A48'; g.fillRect(0, 74, W, 150);
+    g.fillStyle = '#F8D77B'; for (let i = 0; i < 8; i += 1) { g.globalAlpha = 0.16 + (i % 2) * 0.08; g.fillRect(55 + i * 122, 34, 58, 7); } g.globalAlpha = 1;
+    g.fillStyle = '#173C2B'; g.beginPath(); g.moveTo(0, H); g.lineTo(410, 245); g.lineTo(960, H); g.closePath(); g.fill();
+    g.strokeStyle = '#D7C59B'; g.lineWidth = 3; g.beginPath(); g.moveTo(720, 350); g.lineTo(450, 244); g.lineTo(897, 325); g.stroke();
+    FIELD_HOME.forEach((f, i) => { const q = fielders[i] || f; player(g, q.x, q.y + 55, '#2F8F4E', Math.sin(clock * 4 + i) * 0.08); });
+    const motion = cfg.play && cfg.play.motion || { armSwing: 50, release: 50, swingSpeed: 50 };
+    const pitchForm = cfg.play && cfg.play.pitchingForm || 'overhand';
+    const formPose = pitchForm === 'under' ? -0.58 : pitchForm === 'side' ? -0.32 : pitchForm === 'threeQuarter' ? 0.18 : pitchForm === 'tornado' ? 0.72 : 0.38;
+    const pPose = formPose + (game.phase === 'windup' ? Math.sin(clamp(ball.t / ball.wind, 0, 1) * Math.PI) * (0.7 + motion.armSwing / 180) : 0);
+    player(g, 218, 353, '#255FA8', pPose);
+    const form = cfg.play && cfg.play.battingForm || 'standard';
+    const batPose = form === 'open' ? -0.28 : form === 'closed' ? 0.25 : form === 'oneLeg' ? 0.48 : form === 'sway' ? Math.sin(clock * 5) * 0.22 : 0;
+    const sw = swingAt !== null && game.phase === 'pitch' ? clamp((ball.t - swingAt) * (5 + motion.swingSpeed / 18), 0, 1) : 0;
+    player(g, 790, 382, '#C23B32', batPose + sw * 1.2);
+    g.save(); g.translate(794, 303); g.rotate(-1.7 + sw * 2.4); g.strokeStyle = '#B98242'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(78, 0); g.stroke(); g.restore();
+    if (ball) { g.fillStyle = '#FFF'; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 7 : 9, 0, 7); g.fill(); g.strokeStyle = '#D74437'; g.lineWidth = 2; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 5 : 7, 0.4, 2.4); g.stroke(); }
+    g.fillStyle = 'rgba(4,10,18,.76)'; g.fillRect(14, 14, 255, 46); g.fillStyle = '#FFB020'; g.font = '700 22px sans-serif';
+    g.fillText(`${game.inning}回${game.half === 'top' ? '表' : '裏'}　${game.outs}アウト`, 28, 44);
+  }
+  function frame(now) {
+    if (state === 'idle') return;
+    const dt = Math.min(0.034, last ? (now - last) / 1000 : 0); last = now;
+    update(state === 'paused' ? 0 : dt); draw(); raf = requestAnimationFrame(frame);
+  }
+  function mount(drawingPort) { port = drawingPort; }
+  function start(matchConfig) {
+    cfg = matchConfig; state = 'running'; rng = (() => { let s = (cfg.seed || 1) >>> 0; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
+    selectedPitch = (cfg.unlockedPitches && cfg.unlockedPitches[0]) || 'fastball';
+    game = { inning: 1, half: 'top', outs: 0, score: { home: 0, away: 0 }, order: { user: 0, opponent: 0 }, pitches: { user: 0, opponent: 0 }, bases: { user: [0, 0, 0], opponent: [0, 0, 0] }, batting: {}, k: 0, attempts: 0, phase: 'ready', nextAt: 0 };
+    fielders = FIELD_HOME.map((f) => ({ ...f })); clock = 0; last = 0; emit('match:start', { userSide: cfg.userSide }); atBat();
+    if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+  }
+  function choosePitch(id) { if (PITCHES[id] && (cfg.unlockedPitches || []).includes(id)) { selectedPitch = id; setUi('球種を選びました'); } }
+  function pause() { if (state === 'running') { state = 'paused'; setUi('一時停止中'); } }
+  function resume() { if (state === 'paused') { state = 'running'; last = 0; setUi(game.phase === 'ready' ? '試合を再開しました' : 'プレイ中'); } }
+  function abort() { if (state === 'idle') return; state = 'idle'; if (raf) cancelAnimationFrame(raf); emit('match:aborted'); if (port) port.clear(); }
+  function debugAct(kind, forced) {
+    if (state !== 'running') return;
+    const side = activeSide();
+    if (kind === 'hit' || kind === 'hr' || kind === 'oppHit') { ball = { dist: kind === 'hr' ? 120 : 55 }; recordHit(side, kind === 'hr' ? 'HR' : '1B'); }
+    else if (kind === 'oppRun') addRuns('opponent', 1);
+    else if (kind === 'k') recordOut(side, true, '三振！');
+    else if (kind === 'out') recordOut(side, false, 'アウト');
+    else if (kind === 'end') finish(forced);
+  }
+  return { mount, start, startPitch, swing, choosePitch, finish, pause, resume, abort, isRunning: () => state !== 'idle', debugAct, HOOKS };
+})();
+
+/* =====================================================================
+   1 画面遷移（View・Shell・Modals・GameHud・Screens・Router・Actions・App）
+   DOM に触れるのはここだけ。ルール（能力値・報酬・順位など）は持たず、公開関数の値を描く。
+   ===================================================================== */
+const View = (() => {
+  const { esc } = Util;
+  const LB = CONFIG.LABELS;
+  const icon = (id, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${id}"></use></svg>`;
+  const draft = (text = '仮データ') => `<span class="draft">${text}</span>`;
+  const lockNote = (text) => `<p class="lock-note">${icon('lock')}<span>${text}</span></p>`;
+  const pageHead = (title) => `<div class="page-h"><button class="icon-btn" type="button" data-act="back" aria-label="戻る">${icon('back')}</button><h1>${title}</h1></div>`;
+  const figure = (c) => `<svg viewBox="0 0 80 96" aria-hidden="true"><path class="fig-body" d="M12 96V77c0-12 9-21 21-21h14c12 0 21 9 21 21v19z"/><circle class="fig-body" cx="40" cy="37" r="12.5"/><path class="fig-cap" d="M26.5 34a13.5 13 0 0 1 27 0z"/><rect class="fig-cap" x="26.5" y="32" width="34" height="4" rx="2"/><text class="fig-num" x="40" y="89" text-anchor="middle">${c.number}</text></svg>`;
+  // [表示名, 略称, 表示する値, ランクと棒に使う0〜100の値]
+  function triples(c) {
+    const a = c.abilities;
+    return c.type === 'P'
+      ? [['球速', '速', a.kmh, Growth.kmhScore(a.kmh)], ['制球', '制', a.control, a.control], ['スタミナ', 'ス', a.stamina, a.stamina], ['変化', '変', a.movement, a.movement]]
+      : [['ミート', 'ミ', a.meet, a.meet], ['パワー', 'パ', a.power, a.power], ['走力', '走', a.speed, a.speed], ['守備', '守', a.defense, a.defense]];
+  }
+  const abilityList = (c) => triples(c).map(([l, , v, sc]) => {
+    const r = Growth.rankOf(sc);
+    return `<span class="ab"><span class="ab-l">${l}</span><span class="ab-r rk-${r}">${r}</span><span class="ab-v">${v}</span><span class="ab-bar"><i class="bg-${r}" style="width:${Math.max(3, Math.round(sc))}%"></i></span></span>`;
+  }).join('');
+  const miniRanks = (c) => triples(c).map(([, sh, , sc]) => { const r = Growth.rankOf(sc); return `<span>${sh}<b class="rk-${r}">${r}</b></span>`; }).join('');
+  const miniAbs = (c) => triples(c).map(([, sh, v, sc]) => { const r = Growth.rankOf(sc); return `<span>${sh}<b class="rk-${r}">${r}</b><em>${v}</em></span>`; }).join('');
+  // 選手カード。opts.go＝押すと選手詳細／opts.size＝'is-big'・'is-mini'／opts.caption＝下段の補足
+  function card(c, opts = {}) {
+    const tag = opts.go ? 'button' : opts.tag || 'div';
+    const attrs = opts.go ? ` type="button" data-go="player" data-id="${c.id}" aria-label="${esc(c.name)}の詳細"` : '';
+    const body = opts.size === 'is-mini' ? `<span class="pc-ranks">${miniRanks(c)}</span>` : `<span class="pc-abs">${abilityList(c)}</span>`;
+    const sub = `${'★'.repeat(c.rarity)} ${c.rarityName}　Lv${c.lv}${opts.caption ? `　${esc(opts.caption)}` : ''}`;
+    return `<${tag} class="pcard r${c.rarity}${opts.size ? ` ${opts.size}` : ''}"${attrs}><span class="pc-top"><span class="pc-pos">${c.posLabel}</span><span class="pc-ovr"><small>総合</small><b>${c.overall}</b></span></span><span class="pc-fig">${figure(c)}</span><span class="pc-name">${esc(c.name)}</span><span class="pc-sub">${sub}</span>${body}</${tag}>`;
+  }
+  // 相手の先発（カードマスタにいない選手）をカードの形で見せる
+  function oppPitcherCard(p) {
+    const view = { id: 'cpu', name: p.name, number: p.number, type: 'P', posLabel: '投', rarity: 2, rarityName: '相手', lv: '—', overall: p.overall, abilities: { kmh: p.kmh, control: p.abilities.control, stamina: p.abilities.stamina, movement: p.abilities.movement } };
+    return card(view, { caption: '相手先発' });
+  }
+  function boardRows(next, teams, userOverall) {
+    const user = { name: Growth.getTeamName(), ovr: userOverall, me: true };
+    const opp = { name: teams[next.opponentId].name, ovr: teams[next.opponentId].overall, me: false };
+    const [away, home] = next.home ? [opp, user] : [user, opp];
+    const row = (t, side) => `<div class="board-row"><span class="board-side">${side}</span><span class="board-team${t.me ? ' me' : ''}">${esc(t.name)}</span><span class="board-num led">${t.ovr}</span></div>`;
+    return row(away, '先攻') + row(home, '後攻');
+  }
+  const lineupRow = (b) => `<button class="lu" type="button" data-go="player" data-id="${b.cardId}"><span class="lu-no">${b.order}</span><span class="lu-pos${b.fit ? '' : ' misfit'}">${b.posLabel}</span><span class="lu-main"><b>${esc(b.name)}</b><span class="mini-abs">${miniAbs(b)}</span>${b.fit ? '' : '<small class="warn">守備 −30%（適性外）</small>'}</span><span class="lu-ovr">${b.overall}</span></button>`;
+  const rotationRow = (p) => `<button class="lu" type="button" data-go="player" data-id="${p.cardId}"><span class="lu-no">${p.slot}</span><span class="lu-pos">投</span><span class="lu-main"><b>${esc(p.name)}${p.isNext ? '<span class="next-tag">次の先発</span>' : ''}</b><span class="mini-abs">${miniAbs(p)}</span><small>得意球種：${p.specialNames.join('・')}${p.fatigued ? '　疲労 −15%' : ''}</small></span><span class="lu-ovr">${p.overall}</span></button>`;
+  const standingsTable = (rows) => `<div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>位</th><th class="t-team">球団</th><th>勝</th><th>敗</th><th>分</th><th>勝率</th><th>差</th></tr></thead><tbody>${rows.map((r) => `<tr class="${r.isUser ? 'me' : ''}"><td>${r.rank}</td><td class="t-team">${esc(r.short)}</td><td>${r.w}</td><td>${r.l}</td><td>${r.d}</td><td>${r.pctText}</td><td>${r.gbText}</td></tr>`).join('')}</tbody></table></div>`;
+  const seg = (items, key, cur, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([k, t]) => `<button type="button" data-act="setParam" data-key="${key}" data-val="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
+  return { icon, draft, lockNote, pageHead, card, oppPitcherCard, boardRows, lineupRow, rotationRow, standingsTable, seg, miniAbs, LB };
+})();
+
+/* ---- 1 画面遷移：試合キャンバスのDOMアダプター ---- */
+const GameSurface = (() => {
+  let root = null;
+  let bannerTimer = 0;
+  let lastPitchList = '';
+  const one = (sel) => (root ? root.querySelector(sel) : null);
+  function markup() {
+    return `<div class="eng">
+      <div class="eng-stage"><canvas class="eng-canvas" width="960" height="540" aria-label="ぐにゃ野球の試合画面"></canvas><div class="eng-banner" aria-live="polite"><b></b><span></span></div></div>
+      <div class="eng-controls">
+        <p class="eng-status" aria-live="polite">試合を準備しています</p>
+        <div class="eng-pitch-row"><select class="eng-select" data-engine-pitch aria-label="球種"></select><button class="eng-action main" type="button" data-engine-act="pitch">投球開始</button></div>
+        <button class="eng-action swing" type="button" data-engine-act="swing">スイング</button>
+        <div class="eng-meter" aria-hidden="true"><i></i></div>
+        <button class="eng-action" type="button" data-engine-act="finish" hidden>このモードを終了</button>
+      </div>
+      <div hidden aria-hidden="true">
+        <button data-eng="hit"></button><button data-eng="hr"></button><button data-eng="out"></button><button data-eng="k"></button><button data-eng="oppHit"></button><button data-eng="oppRun"></button>
+        <button data-eng="end" data-r="W"></button><button data-eng="end" data-r="L"></button><button data-eng="end" data-r="D"></button>
+      </div>
+    </div>`;
+  }
+  function update(v) {
+    if (!root) return;
+    const status = one('.eng-status');
+    const pitch = one('[data-engine-act="pitch"]');
+    const swing = one('[data-engine-act="swing"]');
+    const finish = one('[data-engine-act="finish"]');
+    const select = one('[data-engine-pitch]');
+    if (status) status.textContent = `${v.status}${v.total ? `　${v.attempts}/${v.total}球` : ''}`;
+    if (pitch) { pitch.disabled = !v.canPitch; pitch.textContent = v.batting ? '投球開始' : '投げる'; }
+    if (swing) swing.disabled = !v.canSwing;
+    if (finish) { finish.hidden = !v.canFinish; finish.disabled = !v.canFinish; }
+    const key = JSON.stringify(v.pitches || []);
+    if (select && key !== lastPitchList) { select.innerHTML = (v.pitches || []).map((p) => `<option value="${Util.esc(p.id)}">${Util.esc(p.name)}</option>`).join(''); lastPitchList = key; }
+    if (select) { select.value = v.selectedPitch; select.disabled = v.batting || !v.canPitch; }
+  }
+  function banner(big, sub) {
+    const box = one('.eng-banner');
+    if (!box) return;
+    box.querySelector('b').textContent = big;
+    box.querySelector('span').textContent = sub || '';
+    box.classList.add('show');
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => { if (box) box.classList.remove('show'); }, 700);
+  }
+  function swingFx() {
+    const b = one('[data-engine-act="swing"]');
+    if (!b) return;
+    b.classList.add('pulse');
+    setTimeout(() => b.classList.remove('pulse'), 100);
+  }
+  function context() {
+    const c = one('canvas');
+    if (!c || /jsdom/i.test(navigator.userAgent)) return null;
+    return c.getContext('2d');
+  }
+  function onClick(ev) {
+    const b = ev.target.closest('[data-engine-act],[data-eng]');
+    if (!b || b.disabled) return;
+    if (b.dataset.engineAct === 'pitch') MatchEngine.startPitch();
+    else if (b.dataset.engineAct === 'swing') MatchEngine.swing();
+    else if (b.dataset.engineAct === 'finish') MatchEngine.finish();
+    else if (b.dataset.eng === 'end') MatchEngine.debugAct('end', b.dataset.r);
+    else if (b.dataset.eng) MatchEngine.debugAct(b.dataset.eng);
+  }
+  function mount(target) {
+    root = target;
+    lastPitchList = '';
+    root.innerHTML = markup();
+    root.addEventListener('click', onClick);
+    root.addEventListener('change', (ev) => { if (ev.target.matches('[data-engine-pitch]')) MatchEngine.choosePitch(ev.target.value); });
+    const canvas = one('canvas');
+    if (canvas) canvas.addEventListener('pointerdown', () => { if (!one('[data-engine-act="swing"]').disabled) MatchEngine.swing(); else MatchEngine.startPitch(); });
+    const port = { context, update, banner, swing: swingFx, clear: () => { if (root) root.innerHTML = ''; } };
+    MatchEngine.mount(port);
+    return port;
+  }
+  return { mount };
+})();
+
+/* ---- 1 画面遷移：画面シェル（ヘッダー・タブ・モーダル・デモ広告・トースト） ---- */
+const Shell = (() => {
+  const TABS = [['home', 'ホーム', 'home'], ['match', '試合', 'ball'], ['team', '編成', 'jersey'], ['scout', 'スカウト', 'notebook'], ['shop', 'ショップ', 'coins']];
+  let modal = null;
+  let modalOpts = null;
+  let pendingOk = null;
+  let overlay = false;
+  let toastTimer = 0;
+  let shownCoins = null;
+  const $ = (id) => document.getElementById(id);
+  function mount() {
+    $('hdr').innerHTML = `<div class="hdr-in"><div class="hdr-team"><b id="hdr-name"></b><span id="hdr-sub"></span></div><span class="wallet" aria-label="コイン">${View.icon('coin', 'ic-coin')}<span class="num" id="hdr-coins">0</span></span><span class="wallet" aria-label="スカウトチケット">${View.icon('ticket', 'ic-ticket')}<span class="num" id="hdr-tickets">0</span></span><button class="icon-btn" type="button" data-go="config" aria-label="設定">${View.icon('gear')}</button></div>`;
+    $('tabs').innerHTML = TABS.map(([id, label, ic]) => `<button class="tab" type="button" data-go="${id}" data-tabid="${id}">${View.icon(ic)}<span>${label}</span></button>`).join('');
+    refreshHeader();
+  }
+  function renderTabs(active) {
+    document.querySelectorAll('.tab').forEach((t) => { if (t.dataset.tabid === active) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
+  }
+  // コインは0.4秒で数え上げる（NAV-05：0.5秒以内に正しい値）
+  function countUp(el, from, to) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (from === to || reduce || !window.requestAnimationFrame) { el.textContent = Util.fmt(to); return; }
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / 400);
+      el.textContent = Util.fmt(Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) window.requestAnimationFrame(step);
+    };
+    window.requestAnimationFrame(step);
+  }
+  function refreshHeader() {
+    if (!$('hdr-name')) return;
+    const w = Economy.getWallet();
+    const season = League.getSeason();
+    $('hdr-name').textContent = Growth.getTeamName();
+    $('hdr-sub').textContent = `シーズン${season.season}　第${season.nextRound}節`;
+    countUp($('hdr-coins'), shownCoins === null ? w.coins : shownCoins, w.coins);
+    shownCoins = w.coins;
+    $('hdr-tickets').textContent = Util.fmt(w.scoutTickets);
+  }
+  function toast(text) {
+    $('layer-toast').innerHTML = `<div class="toast" role="status">${Util.esc(text)}</div>`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $('layer-toast').innerHTML = ''; }, 2400);
+  }
+  // モーダルは履歴を積まない。戻る操作で閉じたときも onClose が呼ばれる
+  function openModal(id, params = {}, opts = {}) {
+    modal = id;
+    modalOpts = opts;
+    $('layer-modal').innerHTML = Modals[id](params);
+    const first = document.querySelector('#layer-modal .sheet button');
+    if (first) first.focus({ preventScroll: true });
+  }
+  function closeModal(reason = 'ui') {
+    if (!modal) return;
+    const opts = modalOpts || {};
+    modal = null;
+    modalOpts = null;
+    $('layer-modal').innerHTML = '';
+    if (opts.onClose) opts.onClose(reason);
+  }
+  function confirm(p, onOk, onCancel) {
+    pendingOk = onOk;
+    openModal('confirm', p, { onClose: (reason) => { if (reason !== 'ok' && onCancel) onCancel(); } });
+  }
+  function confirmOk() { const fn = pendingOk; pendingOk = null; closeModal('ok'); if (fn) fn(); }
+  // デモ広告：数秒の全画面表示。閉じるまで戻る操作は効かない
+  function showDemoAd(seconds, label = 'デモ広告') {
+    return new Promise((resolve) => {
+      overlay = true;
+      let left = seconds;
+      const draw = () => { $('layer-overlay').innerHTML = `<div class="ad" role="dialog" aria-modal="true" aria-label="${Util.esc(label)}"><span class="ad-tag">${Util.esc(label)}</span><div class="ad-box"><div><p>ここに広告が入ります（デモ）</p><p class="note">実際の広告SDKは使いません</p></div></div><b class="ad-count num" aria-live="polite">${left}</b><p class="note">あと${left}秒で閉じます</p></div>`; };
+      draw();
+      const timer = setInterval(() => {
+        left -= 1;
+        if (left > 0) { draw(); return; }
+        clearInterval(timer);
+        $('layer-overlay').innerHTML = '';
+        overlay = false;
+        resolve();
+      }, 1000);
+    });
+  }
+  return { mount, renderTabs, refreshHeader, toast, openModal, closeModal, confirm, confirmOk, showDemoAd, hasModal: () => !!modal, hasOverlay: () => overlay, currentModal: () => modal };
+})();
+
+/* ---- 1 画面遷移：モーダルの中身（下から出るシート） ---- */
+const Modals = (() => {
+  const sheet = (inner, backAct) => `<div class="sheet-back" data-act="${backAct}"><div class="sheet" role="dialog" aria-modal="true" data-act="noop">${inner}</div></div>`;
+  const big = (r) => (r.coins ? [Util.fmt(r.coins), 'コイン'] : r.scoutTickets ? [r.scoutTickets, 'スカウト券'] : [r.guaranteeTickets, '★3以上確定']);
+  return {
+    loginBonus() {
+      const lb = LoginBonus.check();
+      const days = LoginBonus.table().map((d) => { const [n, unit] = big(d.reward); return `<div class="lb-day${d.day === lb.day ? ' today' : ''}${d.day < lb.day ? ' done' : ''}${d.day === 7 ? ' big' : ''}"><small>${d.day}日目</small><b>${n}</b><span>${unit}</span></div>`; }).join('');
+      return sheet(`<h2>ログインボーナス</h2><p>今日は${lb.day}日目の報酬です。受け取った日数で進み、7日目の次は1日目に戻ります。</p><div class="lb-grid">${days}</div><button class="btn btn-amber" type="button" data-act="claimLoginBonus">受け取る</button>`, 'closeModal');
+    },
+    pause: () => sheet(`<h2>一時停止</h2><p>試合は止まっています。</p><button class="btn btn-turf" type="button" data-act="resume">再開</button><button class="btn btn-line" type="button" data-act="askQuit">試合をやめる</button>`, 'resume'),
+    confirm: (p) => sheet(`<h2>${Util.esc(p.title)}</h2><p>${Util.esc(p.body)}</p><div class="btn-row"><button class="btn btn-line" type="button" data-act="closeModal">${Util.esc(p.cancelLabel || 'やめておく')}</button><button class="btn ${p.danger ? 'btn-danger' : 'btn-amber'}" type="button" data-act="confirmOk">${Util.esc(p.okLabel)}</button></div>`, 'closeModal'),
+    debug: () => sheet(`<h2>デバッグ</h2><p>${CONFIG.VERSION}。URL に ?debug=1 があるときだけ出ます。</p><div class="dbg-list"><button class="btn btn-line" type="button" data-act="debugCoins">コイン＋1,000</button><button class="btn btn-line" type="button" data-act="debugTickets">チケット＋10</button><button class="btn btn-line" type="button" data-act="debugFps">FPS表示の切り替え</button><button class="btn btn-amber" type="button" data-act="debugTest">自己テスト</button><button class="btn btn-line" type="button" data-act="debugSave">保存データの枠</button><button class="btn btn-line" type="button" data-act="debugSeason">シーズン終了画面</button><button class="btn btn-line" type="button" data-act="debugLogin">ログボを表示</button><button class="btn btn-line" type="button" data-act="closeModal">閉じる</button></div><pre class="dbg-out" id="dbg-out">結果はここに出ます</pre>`, 'closeModal'),
+  };
+})();
+
+/* ---- 1 画面遷移：試合画面のスコアボードと選手の帯（試合の通知を受けて描く） ---- */
+const GameHud = (() => {
+  let offs = [];
+  let cfg = null;
+  let lines = null;
+  let info = null;
+  let pitcherSide = null;
+  const $ = (id) => document.getElementById(id);
+  const teamKey = (side) => (side === 'user' ? cfg.userSide : cfg.userSide === 'home' ? 'away' : 'home');
+  function names() {
+    if (!cfg.teams) return cfg.userSide === 'home' ? { home: 'あなた', away: '相手' } : { home: '相手', away: 'あなた' };
+    const u = cfg.teams.user.name;
+    const o = cfg.teams.opponent.name;
+    return cfg.userSide === 'home' ? { home: u, away: o } : { home: o, away: u };
+  }
+  function mark(e) {
+    info = { inning: e.inning, half: e.half, outs: e.outs, score: e.score };
+    const key = e.half === 'top' ? 'away' : 'home';
+    if (lines[key][e.inning - 1] == null) lines[key][e.inning - 1] = 0;
+  }
+  function drawBoard() {
+    const el = $('g-board');
+    if (!el || !info) return;
+    const n = names();
+    const cols = Array.from({ length: cfg.innings }, (_, i) => i);
+    const row = (key) => `<tr><td class="t">${Util.esc(n[key])}</td>${cols.map((i) => { const v = lines[key][i]; const now = info.inning === i + 1 && (info.half === 'top') === (key === 'away'); return `<td class="${now ? 'now' : ''}">${v == null ? '' : v}</td>`; }).join('')}<td class="sum">${info.score[key]}</td></tr>`;
+    el.innerHTML = `<table><thead><tr><th></th>${cols.map((i) => `<th>${i + 1}</th>`).join('')}<th>計</th></tr></thead><tbody>${row('away')}${row('home')}</tbody></table><div class="sb-meta"><span>${CONFIG.LABELS.mode[cfg.mode]}　${info.inning}回${info.half === 'top' ? '表' : '裏'}</span><span>アウト <b class="outs">${'●'.repeat(info.outs)}${'○'.repeat(3 - info.outs)}</b></span></div>`;
+  }
+  function drawStrip(e) {
+    const el = $('g-strip');
+    if (!el) return;
+    if (!cfg.teams) { el.innerHTML = `<div class="strip-card wide"><span class="sc-main"><b>${CONFIG.LABELS.mode[cfg.mode]}</b><small>現行モード（能力補正なし）</small></span></div>`; return; }
+    const userBat = e.side === 'user';
+    const b = userBat ? cfg.teams.user.lineup.find((x) => x.cardId === e.cardId) : null;
+    pitcherSide = userBat ? 'opponent' : 'user';
+    const p = cfg.teams[pitcherSide === 'user' ? 'user' : 'opponent'].pitcher;
+    const bat = b
+      ? `<span class="sc-pos">${CONFIG.LABELS.pos[b.pos]}</span><span class="sc-main"><b>${e.order}番 ${Util.esc(b.name)}</b><small>ミ${b.abilities.meet} パ${b.abilities.power} 走${b.abilities.speed}</small></span>`
+      : `<span class="sc-pos">打</span><span class="sc-main"><b>${e.order}番 相手打者</b><small>段階2で表示</small></span>`;
+    el.innerHTML = `<div class="strip-card">${bat}</div><div class="strip-card"><span class="sc-pos">投</span><span class="sc-main"><b>${Util.esc(p.name)}</b><small><span id="g-kmh">${p.kmh}</span>km/h　球数 <span id="g-count">0</span></small></span></div>`;
+  }
+  function bind(config) {
+    unbind();
+    cfg = config;
+    lines = { away: [], home: [] };
+    info = null;
+    offs = [
+      Events.on('match:start', (e) => { mark(e); drawBoard(); }),
+      Events.on('match:atBat', (e) => { mark(e); drawBoard(); drawStrip(e); }),
+      Events.on('match:run', (e) => { mark(e); const key = teamKey(e.side); lines[key][e.inning - 1] = (lines[key][e.inning - 1] || 0) + e.runs; drawBoard(); }),
+      Events.on('match:out', (e) => { mark(e); drawBoard(); }),
+      Events.on('match:pitch', (e) => { if (e.side !== pitcherSide) return; const c = $('g-count'); const k = $('g-kmh'); if (c) c.textContent = e.count; if (k && e.kmh) k.textContent = Math.round(e.kmh); }),
+    ];
+  }
+  function unbind() { offs.forEach((off) => off()); offs = []; }
+  return { bind, unbind };
+})();
+
+/* ---- 1 画面遷移：13画面（ホーム／試合ハブ／編成／スカウト／ショップ／ミッション／設定／試合前／試合／試合結果／シーズン終了／選手詳細／スカウト演出） ---- */
+const Screens = (() => {
+  const { esc, fmt } = Util;
+  const LB = CONFIG.LABELS;
+  const KIND = { single: '単発スカウト', ten: '10連スカウト', guarantee: '確定チケット' };
+  const RESULT = { W: '勝ち', L: '負け', D: '引き分け' };
+  const S = {};
+
+  S.home = () => {
+    const season = League.getSeason();
+    const me = League.getStandings().find((r) => r.isUser);
+    const next = League.getNextMatch();
+    const ovr = Growth.teamOverall();
+    const starter = Growth.getCard(Growth.getRotation().find((p) => p.isNext).cardId);
+    const cleanup = Growth.getCard(Growth.getLineup()[3].cardId);
+    const daily = Missions.list('daily');
+    const badge = Missions.unclaimedCount();
+    return `<section class="screen">
+      <p class="note">${View.draft()}　リーグの値は段階2で実データになります</p>
+      <div class="status"><div class="ovr"><small>チーム総合力</small><b>${ovr}</b></div>
+        <dl class="facts"><div class="fact"><dt>順位</dt><dd><b>${me.rank}</b>位</dd></div><div class="fact"><dt>勝率</dt><dd><b>${me.pctText}</b></dd></div>
+        <div class="fact wide"><dt>成績（${season.played}試合）</dt><dd><b>${me.w}</b>勝 <b>${me.l}</b>敗 <b>${me.d}</b>分</dd></div></dl></div>
+      <div class="board" role="group" aria-label="次の試合"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, League.getTeams(), ovr)}<div class="board-foot"><span>数字はチーム総合力</span><span>${next.home ? 'ホーム' : 'ビジター'}</span></div></div>
+      <button class="btn btn-turf" type="button" data-act="startLeague">試合開始</button>
+      <div class="sec-h"><h2>先発予定と4番打者</h2><p>押すと詳細</p></div>
+      <div class="cards2">${View.card(starter, { go: true, caption: '先発予定' })}${View.card(cleanup, { go: true, caption: '4番' })}</div>
+      <button class="row-link" type="button" data-go="missions">${View.icon('checklist')}<span><b>ミッション</b><small>デイリー ${daily.filter((m) => m.done).length}/${daily.length} 達成</small></span>${badge ? `<span class="badge" aria-label="未受取 ${badge}件">${badge}</span>` : '<span></span>'}${View.icon('chevron')}</button>
+    </section>`;
+  };
+
+  S.match = () => {
+    const season = League.getSeason();
+    const next = League.getNextMatch();
+    const teams = League.getTeams();
+    const sched = League.getSchedule().map((rd) => {
+      const u = rd.user;
+      const isNext = rd.round === next.round;
+      const res = u.result ? `<span class="res ${u.result}">${{ W: '勝', L: '負', D: '分' }[u.result]} ${u.us}-${u.them}</span>` : `<span class="res${isNext ? ' next' : ''}">${isNext ? '次' : '—'}</span>`;
+      return `<div class="sched-row${isNext ? ' is-next' : ''}"><span class="rd">第${rd.round}節</span><span class="vs">${esc(teams[u.opponentId].name)}</span><span class="ha">${u.home ? 'ホーム' : 'ビジター'}</span>${res}</div>`;
+    }).join('');
+    const mode = (m, title, sub) => `<button class="mode" type="button" data-act="playMode" data-mode="${m}">${View.icon('ball')}<span><b>${title}</b><small>${sub}</small></span><span></span>${View.icon('chevron')}</button>`;
+    return `<section class="screen">
+      <div class="sec-h first"><h2>シーズン${season.season}</h2><p>${View.draft()}　第${season.played}節まで消化</p></div>
+      <div class="board"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, teams, Growth.teamOverall())}</div>
+      <button class="btn btn-turf" type="button" data-act="startLeague">試合開始</button>
+      <div class="sec-h"><h2>順位表</h2><p>勝率は引き分けを除く</p></div>${View.standingsTable(League.getStandings())}
+      <div class="sec-h"><h2>日程</h2><p>自チームの10試合</p></div><div class="panel">${sched}</div>
+      <div class="sec-h"><h2>その他のモード</h2><p>リーグの成績には入りません</p></div>
+      <div class="modes">${mode('practice', '練習', '現行の練習モード')}${mode('challenge10', '10球チャレンジ', '現行のまま')}${mode('exhibition', 'エキシビション', '現行の3回制の試合')}</div>
+    </section>`;
+  };
+
+  S.pregame = () => {
+    const cfg = League.buildMatchConfig('league');
+    const next = League.getNextMatch();
+    const u = cfg.teams.user;
+    return `<section class="screen">${View.pageHead('試合前')}
+      <div class="board"><div class="board-head"><span>第${next.round}節　${next.home ? 'ホーム（後攻）' : 'ビジター（先攻）'}</span><span>総合力</span></div>${View.boardRows(next, League.getTeams(), Growth.teamOverall())}</div>
+      <div class="sec-h"><h2>先発投手</h2><p>${u.pitcher.fatigued ? '疲労 −15%' : '疲労なし'}</p></div>
+      <div class="cards2">${View.card(Growth.getCard(u.pitcher.cardId), { go: true, caption: '自軍' })}${View.oppPitcherCard(cfg.teams.opponent.pitcher)}</div>
+      <div class="sec-h"><h2>スタメン</h2><p>チーム総合力 ${Growth.teamOverall()}</p></div>
+      <div class="panel lineup">${Growth.getLineup().map(View.lineupRow).join('')}</div>
+      <div class="btn-row"><button class="btn btn-line" type="button" data-go="team">オーダー変更</button><button class="btn btn-turf" type="button" data-act="playball">プレイボール</button></div>
+    </section>`;
+  };
+
+  // 試合：外側（スコアボード・選手の帯・一時停止）だけを描き、中は試合エンジンに任せる
+  S.game = () => `<section class="game">
+      <div class="game-top"><div class="sb" id="g-board" aria-label="スコアボード"></div><button class="icon-btn" type="button" data-act="pause" aria-label="一時停止">${View.icon('pause')}</button></div>
+      <div class="engine-mount" id="engine-mount"><!-- 試合エンジン接続点：MatchEngine.mount() の中身はエンジン本体が描く --></div>
+      <div class="game-strip" id="g-strip"></div>
+    </section>`;
+
+  S.result = () => {
+    const r = League.getLastResult();
+    if (!r) return `<section class="screen">${View.pageHead('試合結果')}<p class="note">表示できる結果がありません。</p><button class="btn btn-line" type="button" data-go="match">試合ハブへ</button></section>`;
+    const league = r.mode === 'league';
+    const rw = Economy.getLastMatchRewards();
+    const row = (label, value) => `<div class="kv"><span>${label}</span><b class="num">${value}</b></div>`;
+    const rewards = league && rw ? `<div class="sec-h"><h2>コイン</h2><p>${rw.granted ? '付与済み' : '表示のみ（リーグ報酬は未実装）'}</p></div><div class="panel">${row(`ヒット ${rw.hits}本 ×${CONFIG.ECONOMY.hitCoins}`, fmt(rw.hitCoins))}${row(`本塁打 ${rw.homeruns}本 ×${CONFIG.ECONOMY.homerunCoins}`, fmt(rw.homerunCoins))}${row(`試合報酬（${RESULT[rw.result]}）`, fmt(rw.resultCoins))}${row('合計', fmt(rw.total))}</div>` : '';
+    const mvp = league && r.mvp ? Growth.getCard(r.mvp) : null;
+    return `<section class="screen">
+      <div class="sec-h first"><h2>${league ? `第${r.round}節の結果` : `${r.modeLabel}の結果`}</h2><p>${View.draft()}</p></div>
+      <div class="board"><div class="board-head"><span>試合終了</span><span class="res-badge ${r.result}">${RESULT[r.result]}</span></div>
+        <div class="board-row"><span class="board-side">先攻</span><span class="board-team${r.userSide === 'away' ? ' me' : ''}">${esc(r.awayName)}</span><span class="board-num led">${r.score.away}</span></div>
+        <div class="board-row"><span class="board-side">後攻</span><span class="board-team${r.userSide === 'home' ? ' me' : ''}">${esc(r.homeName)}</span><span class="board-num led">${r.score.home}</span></div></div>
+      ${league ? rewards : '<p class="note">現行モードでは、ヒットと本塁打のコインはその場で入ります。</p>'}
+      ${mvp ? `<div class="sec-h"><h2>MVP</h2><p>押すと詳細</p></div><div class="cards2">${View.card(mvp, { go: true, caption: 'MVP' })}<p class="note">経験値は段階3で付与します。出場した10人に＋60、勝ったら＋40、MVPに＋100です。</p></div>` : ''}
+      <div class="stack">${league ? (League.resultDestination(r) === 'season' ? '<button class="btn btn-turf" type="button" data-go="season">シーズン結果へ</button>' : '<button class="btn btn-turf" type="button" data-act="startLeague">次の試合へ</button>') : ''}<div class="btn-row"><button class="btn btn-line" type="button" data-go="match">試合ハブ</button><button class="btn btn-line" type="button" data-go="home">ホーム</button></div></div>
+    </section>`;
+  };
+
+  S.season = () => {
+    const rows = League.getStandings();
+    const me = rows.find((r) => r.isUser);
+    const rewards = CONFIG.ECONOMY.seasonRankRewards.map((x, i) => {
+      const mine = i === Math.min(me.rank, 4) - 1;
+      return `<div class="kv"><span>${x.label}${mine ? '（あなた）' : ''}</span><b>${fmt(x.coins)}コイン${x.guaranteeTickets ? `＋★3以上確定チケット${x.guaranteeTickets}枚` : ''}</b></div>`;
+    }).join('');
+    return `<section class="screen">${View.pageHead('シーズン終了')}
+      <p class="note">${View.draft()}　段階1は今の順位で表示しています</p>
+      <div class="season-hero"><span>最終順位</span><b class="led">${me.rank}</b><span>位</span></div>
+      <div class="sec-h"><h2>順位報酬</h2></div><div class="panel">${rewards}</div>
+      <div class="sec-h"><h2>最終順位表</h2></div>${View.standingsTable(rows)}
+      <button class="btn btn-amber" type="button" disabled>報酬を受け取って次のシーズンへ</button>
+      ${View.lockNote('次のシーズンへの切り替えは段階2で作ります')}
+    </section>`;
+  };
+
+  S.team = (p) => {
+    const tab = p.tab || 'order';
+    const sort = p.sort || 'overall';
+    let body;
+    if (tab === 'pitchers') {
+      body = `<div class="sec-h"><h2>先発ローテ</h2><p>順番に先発します</p></div><div class="panel lineup">${Growth.getRotation().map(View.rotationRow).join('')}</div>${View.lockNote('ローテの入れ替えは段階3で作ります')}`;
+    } else if (tab === 'list') {
+      const chips = [['overall', '総合力'], ['rarity', 'レア度'], ['lv', 'Lv'], ['pos', '守備位置']].map(([k, t]) => `<button class="chip-btn" type="button" data-act="setParam" data-key="sort" data-val="${k}" aria-pressed="${sort === k}">${t}</button>`).join('');
+      const cards = Growth.getOwnedCards(sort);
+      body = `<div class="sec-h"><h2>所持選手</h2><p>${cards.length}人</p></div><div class="chips" role="group" aria-label="並べ替え">${chips}</div><div class="grid3">${cards.map((c) => View.card(c, { go: true, size: 'is-mini' })).join('')}</div>`;
+    } else {
+      body = `<div class="sec-h"><h2>スタメン</h2><p>チーム総合力 ${Growth.teamOverall()}</p></div><div class="panel lineup">${Growth.getLineup().map(View.lineupRow).join('')}</div><button class="btn btn-line" type="button" disabled>おまかせ編成</button>${View.lockNote('打順の入れ替え・守備位置の変更・おまかせ編成は段階3で作ります')}`;
+    }
+    return `<section class="screen"><div class="sec-h first"><h2>編成</h2><p>${View.draft()}</p></div>${View.seg([['order', 'オーダー'], ['pitchers', '投手'], ['list', '選手一覧']], 'tab', tab, '編成の表示')}${body}</section>`;
+  };
+
+  S.player = (p) => {
+    const c = Growth.getCard(p.id);
+    if (!c) return `<section class="screen">${View.pageHead('選手詳細')}<p class="note">選手が見つかりません。</p></section>`;
+    const pct = c.lv >= c.maxLv ? 100 : Math.round((c.exp / c.expNext) * 100);
+    const pips = Array.from({ length: CONFIG.GROWTH.limitBreakMax }, (_, i) => `<i class="${i < c.lb ? 'on' : ''}"></i>`).join('');
+    return `<section class="screen">${View.pageHead('選手詳細')}
+      ${View.card(c, { size: 'is-big' })}
+      <div class="panel detail"><div class="kv"><span>レベル</span><b class="num">Lv${c.lv}<small> / ${c.maxLv}</small></b></div><div class="kv"><span>経験値</span><b class="num">${c.exp}<small> / ${c.expNext}</small></b></div><span class="prog"><i style="width:${pct}%"></i></span>
+        <div class="kv"><span>限界突破</span><span class="pips" aria-label="限界突破 ${c.lb}/${CONFIG.GROWTH.limitBreakMax}">${pips}</span></div>
+        ${c.type === 'P' ? `<div class="kv"><span>得意球種</span><b>${c.specialNames.join('・')}</b></div>` : `<div class="kv"><span>守備位置</span><b>${c.posLabel}（${c.posName}）</b></div>`}</div>
+      <button class="btn btn-amber" type="button" disabled>特訓（100コインで経験値＋150）</button>
+      ${View.lockNote(`特訓と限界突破は段階3で作ります${c.owned ? '' : '。この選手は未所持の見本です'}`)}
+    </section>`;
+  };
+
+  S.scout = () => {
+    const info = Growth.getScoutInfo();
+    const pct = (v) => `${Math.round(v * 100)}%`;
+    const rateRow = (r) => `<tr><td class="t-team">${'★'.repeat(r)} ${LB.rarity[r]}</td><td>${pct(info.rates[r])}</td><td>${info.guaranteeRates[r] ? pct(info.guaranteeRates[r]) : '—'}</td></tr>`;
+    return `<section class="screen">
+      <div class="sec-h first"><h2>スカウト</h2><p>${View.draft('演出の枠')}</p></div>
+      <div class="scout-hero"><div class="scout-pity"><span>★4確定まで</span><b class="led">${info.pityRemaining}</b><span>回</span></div><p class="note">★4が出ないまま50回目のスカウトは★4が確定します</p></div>
+      <div class="scout-btns">
+        <button class="btn btn-amber two-line" type="button" data-act="scout" data-kind="single"><span>単発スカウト</span><span class="cost">${View.icon('coin', 'ic-coin sm')} 300 または ${View.icon('ticket', 'sm')} 1枚</span></button>
+        <button class="btn btn-amber two-line" type="button" data-act="scout" data-kind="ten"><span>10連スカウト</span><span class="cost">${View.icon('coin', 'ic-coin sm')} 3,000　10人目は★3以上</span></button>
+        <button class="btn btn-line two-line" type="button" data-act="scout" data-kind="guarantee"><span>確定チケットを使う</span><span class="cost">★3以上を1人</span></button>
+      </div>
+      ${View.lockNote('段階1は演出の流れだけを見られます。コインとチケットは減らず、排出は段階3で作ります')}
+      <div class="sec-h"><h2>提供割合</h2><p>同じレア度の中は均等</p></div>
+      <div class="panel tbl-wrap"><table class="tbl"><thead><tr><th class="t-team">レア度</th><th>通常</th><th>確定枠</th></tr></thead><tbody>${[4, 3, 2, 1].map(rateRow).join('')}</tbody></table></div>
+      <button class="btn btn-line" type="button" disabled>広告を見てチケット1枚（1日1回）</button>
+    </section>`;
+  };
+
+  S.reveal = (p) => {
+    const res = (p.results || [])[0];
+    const c = res ? Growth.getCard(res.cardId) : null;
+    if (!c) return `<section class="screen">${View.pageHead('スカウト')}<p class="note">結果がありません。</p></section>`;
+    return `<section class="reveal">
+      <p class="reveal-kind">${KIND[p.kind] || 'スカウト'}${p.preview ? '（演出の見本）' : ''}</p>
+      <button class="flip r${c.rarity}" type="button" id="flip" data-act="flipCard" aria-label="カードをめくる"><span class="flip-in"><span class="flip-face flip-back">${View.icon('ball')}<span>タップでめくる</span></span><span class="flip-face flip-front">${View.card(c, { tag: 'span' })}</span></span></button>
+      <div class="reveal-after" id="reveal-after" hidden><p class="reveal-tag"><span class="new">${res.status}</span>${esc(c.name)}　${'★'.repeat(c.rarity)}${c.rarityName}</p>
+        <div class="btn-row"><button class="btn btn-line" type="button" data-act="back">スカウトに戻る</button><button class="btn btn-amber" type="button" data-go="player" data-id="${c.id}">選手詳細</button></div></div>
+      <button class="skip" type="button" id="skip" data-act="flipCard">スキップ</button>
+    </section>`;
+  };
+
+  S.shop = () => {
+    const cat = Economy.getCatalog();
+    const ad = Ads.rewardStatus('shop');
+    const item = (i) => `<div class="shop-item"><span><b>${i.name}</b><small>${i.initial ? '最初から使える' : i.unlocked ? '解禁済み' : i.affordable ? '未解禁' : '未解禁　コインが足りません'}</small></span>${i.unlocked ? '<span class="owned">使える</span>' : `<button class="btn-s btn-amber" type="button" data-act="buyUnlock" data-id="${i.id}"${i.affordable ? '' : ' disabled'} aria-label="${i.name}を${i.price}コインで解禁">${View.icon('coin', 'sm')}<span class="num">${fmt(i.price)}</span></button>`}</div>`;
+    const group = (kind, title) => { const items = cat.filter((i) => i.kind === kind); return `<div class="sec-h"><h2>${title}</h2><p>${items.filter((i) => i.unlocked).length}/${items.length} 解禁</p></div><div class="panel">${items.map(item).join('')}</div>`; };
+    const pack = (p) => `<div class="shop-item"><span><b>${p.name}</b><small>${p.premium ? 'デモ広告が出なくなります' : `${fmt(p.coins)}コイン`}</small></span>${p.owned ? '<span class="owned">購入済み</span>' : `<button class="btn-s btn-line" type="button" data-act="demoPurchase" data-id="${p.id}">デモ購入</button>`}</div>`;
+    return `<section class="screen">
+      <div class="sec-h first"><h2>ショップ</h2><p>${View.draft('名前と価格は仮')}</p></div>
+      ${group('pitch', '球種')}${group('pitchingForm', '投球フォーム')}${group('battingForm', '打撃フォーム')}
+      <div class="sec-h"><h2>デモ課金</h2><p>実際の支払いは発生しません</p></div><div class="panel">${Economy.getPacks().map(pack).join('')}</div>
+      <div class="sec-h"><h2>リワード広告（デモ）</h2><p>今日あと${ad.left}回</p></div>
+      <button class="btn btn-line" type="button" data-act="rewardAd"${ad.left ? '' : ' disabled'}>広告を見て${ad.label}を受け取る</button>
+    </section>`;
+  };
+
+  S.missions = (p) => {
+    const tab = p.tab || 'daily';
+    const row = (m) => `<div class="mission"><span><b>${m.name}</b><small>${m.scope ? `${m.scope}　` : ''}報酬 ${m.rewardText}</small><span class="prog" aria-hidden="true"><i style="width:${Math.round((m.progress / m.goal) * 100)}%"></i></span><small class="num">${m.progress} / ${m.goal}</small></span>${m.claimed ? '<span class="owned">受取済み</span>' : `<button class="btn-s ${m.done ? 'btn-amber' : 'btn-line'}" type="button" data-act="claimMission" data-id="${m.id}"${m.done ? '' : ' disabled'}>受け取る</button>`}</div>`;
+    let body;
+    if (tab === 'achievements') {
+      body = `<div class="sec-h"><h2>通算ミッション</h2><p>一度だけ受け取れます</p></div><div class="panel">${Missions.list('achievements').map(row).join('')}</div>`;
+    } else if (tab === 'login') {
+      const lb = LoginBonus.check();
+      body = `<div class="sec-h"><h2>ログインボーナス</h2><p>午前4時に日付が変わります</p></div><div class="panel"><div class="kv"><span>次に受け取る日</span><b>${lb.day}日目</b></div><div class="kv"><span>日付キー</span><b class="num">${lb.dayKey}</b></div></div><button class="btn btn-line" type="button" data-act="openLoginBonus">${View.icon('calendar')}7日分の報酬を見る</button>`;
+    } else {
+      body = `<div class="sec-h"><h2>デイリー</h2><p>午前4時にリセット</p></div><div class="panel">${Missions.list('daily').map(row).join('')}${row(Missions.allClear())}</div>`;
+    }
+    return `<section class="screen">${View.pageHead('ミッション')}<p class="note">${View.draft()}　受け取りと進捗の記録は段階4で作ります</p>${View.seg([['daily', 'デイリー'], ['achievements', '通算'], ['login', 'ログボ']], 'tab', tab, 'ミッションの表示')}${body}</section>`;
+  };
+
+  S.config = () => {
+    const ps = League.getPlaySettings();
+    const un = Economy.getUnlocks();
+    const cat = Economy.getCatalog();
+    const opts = (kind, list, cur) => cat.filter((i) => i.kind === kind && list.includes(i.key)).map((i) => `<option value="${i.key}"${i.key === cur ? ' selected' : ''}>${i.name}</option>`).join('');
+    const dirs = [['down', '落ちる'], ['left', '左へ曲がる'], ['right', '右へ曲がる'], ['up', '浮き上がる']].map(([k, t]) => `<option value="${k}"${k === ps.myPitch.direction ? ' selected' : ''}>${t}</option>`).join('');
+    const range = (id, label, v) => `<div class="field"><label for="f-${id}">${label}<output id="o-${id}">${v}</output></label><input id="f-${id}" type="range" min="0" max="100" step="1" value="${v}" data-out="o-${id}"></div>`;
+    return `<section class="screen">${View.pageHead('設定')}
+      <p class="note">球種・フォーム・変化量・モーションは次の試合から反映されます。確定するたびに4秒のデモ広告が流れます（プレミアムパスでは流れません）。</p>
+      <div class="panel" id="play-form">
+        <div class="field"><label for="f-pform">投球フォーム</label><select id="f-pform">${opts('pitchingForm', un.pitchingForms, ps.pitchingForm)}</select></div>
+        <div class="field"><label for="f-bform">打撃フォーム</label><select id="f-bform">${opts('battingForm', un.battingForms, ps.battingForm)}</select></div>
+        <div class="field"><label for="f-mydir">マイ変化球の曲がり方</label><select id="f-mydir">${dirs}</select></div>
+        ${range('myAmt', 'マイ変化球の変化量', ps.myPitch.amount)}${range('arm', '腕の振り', ps.motion.armSwing)}${range('rel', 'リリース', ps.motion.release)}${range('swing', 'スイング速度', ps.motion.swingSpeed)}
+      </div>
+      <button class="btn btn-amber" type="button" data-act="confirmSettings">設定を確定</button>
+      <div class="sec-h"><h2>画面</h2></div><div class="panel"><div class="kv"><span>画面の向き</span><b>縦で統一（Q3=A 仮置き）</b></div></div>
+      <div class="sec-h"><h2>データ管理</h2><p>段階4で作ります</p></div>
+      <div class="panel data-btns"><button class="btn-s btn-line" type="button" disabled>書き出し</button><button class="btn-s btn-line" type="button" disabled>読み込み</button><button class="btn-s btn-line" type="button" disabled>初期化</button></div>
+      <p class="note">版：${CONFIG.VERSION}</p>
+    </section>`;
+  };
+
+  const AFTER = {
+    home() { const lb = LoginBonus.check(); if (lb.show) { LoginBonus.markShown(); Shell.openModal('loginBonus'); } },
+    game(p) {
+      const cfg = League.buildMatchConfig(p.mode || 'league');
+      GameHud.bind(cfg);
+      GameSurface.mount(document.getElementById('engine-mount'));
+      MatchEngine.start(cfg);
+    },
+  };
+  const META = Object.freeze({
+    home: { tab: 'home' }, match: { tab: 'match' }, team: { tab: 'team' }, scout: { tab: 'scout' }, shop: { tab: 'shop' },
+    missions: { tab: 'home' }, config: { tab: null }, pregame: { tab: 'match' }, game: { immersive: true }, result: { tab: 'match' },
+    season: { tab: 'match' }, player: { tab: 'team' }, reveal: { immersive: true },
+  });
+  return {
+    names: Object.keys(S),
+    has: (n) => Object.prototype.hasOwnProperty.call(S, n),
+    meta: (n) => META[n] || {},
+    render: (n, p) => S[n](p || {}),
+    after: (n, p) => { if (AFTER[n]) AFTER[n](p || {}); },
+  };
+})();
+
+/* ---- 1 画面遷移：ルーター（自前の履歴を正とし、ブラウザの履歴にも写す） ---- */
+const Router = (() => {
+  let stack = [{ name: 'home', params: {} }];
+  let historyOk = true;
+  const top = () => stack[stack.length - 1];
+  function write(method) {
+    try { window.history[method]({ name: top().name }, '', `#${top().name}`); } catch (e) { historyOk = false; }
+  }
+  function render() {
+    const t = top();
+    const meta = Screens.meta(t.name);
+    GameHud.unbind();
+    if (t.name !== 'game' && MatchEngine.isRunning()) MatchEngine.abort();
+    document.getElementById('app').classList.toggle('is-immersive', !!meta.immersive);
+    Shell.renderTabs(meta.tab || null);
+    const view = document.getElementById('view');
+    view.innerHTML = Screens.render(t.name, t.params);
+    view.scrollTop = 0;
+    Screens.after(t.name, t.params);
+    Shell.refreshHeader();
+  }
+  function go(name, params = {}) {
+    stack.push({ name: Screens.has(name) ? name : 'home', params });
+    write('pushState');
+    render();
+  }
+  function replace(name, params = {}) {
+    stack[stack.length - 1] = { name: Screens.has(name) ? name : 'home', params };
+    write('replaceState');
+    render();
+  }
+  // 同じ画面のまま表示だけ切り替える（画面内のタブ・並べ替え）。履歴は積まない
+  function refresh(patch = {}) { top().params = { ...top().params, ...patch }; render(); }
+  // 起動は常にホームから（途中の画面のURLで開いても試合や演出は始めない：NAV-04）
+  function start() { stack = [{ name: 'home', params: {} }]; write('replaceState'); render(); }
+  function handleBack(fromBrowser) {
+    const keep = () => { if (fromBrowser && historyOk) write('pushState'); };
+    if (Shell.hasOverlay()) { keep(); return; }                                       // デモ広告中は戻らない
+    if (Shell.hasModal()) { Shell.closeModal('back'); keep(); return; }              // モーダルを閉じる
+    if (top().name === 'game' && MatchEngine.isRunning()) { Actions.pause(); keep(); return; } // 試合中は一時停止
+    if (stack.length <= 1) return;                                                     // ホームではブラウザに任せる
+    stack.pop();
+    if (top().name === 'game') top().name = 'match';                                   // 終わった試合へは戻らない
+    render();
+  }
+  function back() { if (historyOk && stack.length > 1) window.history.back(); else handleBack(false); }
+  return { go, replace, refresh, start, back, current: () => ({ ...top() }), depth: () => stack.length, onPopState: () => handleBack(true) };
+})();
+
+/* ---- 1 画面遷移：操作（data-act）。各モジュールの公開関数を呼ぶだけ ---- */
+const Actions = {
+  noop() {},
+  back: () => Router.back(),
+  setParam: (el) => Router.refresh({ [el.dataset.key]: el.dataset.val }),
+  startLeague: () => Router.go('pregame'),
+  playball: () => Router.go('game', { mode: 'league' }),
+  playMode: (el) => Router.go('game', { mode: el.dataset.mode }),
+  pause() {
+    if (!MatchEngine.isRunning() || Shell.hasModal()) return;
+    MatchEngine.pause();
+    Shell.openModal('pause', {}, { onClose: () => MatchEngine.resume() });
+  },
+  resume: () => Shell.closeModal('ui'),
+  askQuit() {
+    Shell.confirm(
+      { title: '試合をやめますか', body: '途中でやめた試合は未消化のまま残り、記録・コイン・経験値は増えません。同じ試合はやり直せます。', okLabel: '試合をやめる', cancelLabel: '続ける', danger: true },
+      () => { MatchEngine.abort(); Router.replace('match'); Shell.toast('試合をやめました。記録は残りません'); },
+      () => MatchEngine.resume(),
+    );
+  },
+  confirmOk: () => Shell.confirmOk(),
+  closeModal: () => Shell.closeModal('ui'),
+  buyUnlock(el) {
+    const r = Economy.buyUnlock(el.dataset.id);
+    Shell.toast(r.ok ? `${r.item.name}を解禁しました` : r.reason);
+    Router.refresh();
+  },
+  demoPurchase(el) {
+    const p = Economy.getPacks().find((x) => x.id === el.dataset.id);
+    if (!p) return;
+    Shell.confirm({ title: `${p.name}をデモ購入`, body: '実際の支払いは発生しません。動作を確かめるためのデモです。', okLabel: 'デモ購入する' }, () => {
+      const r = Economy.demoPurchase(p.id);
+      Shell.toast(r.ok ? `${p.name}をデモ購入しました` : r.reason);
+      Router.refresh();
+    });
+  },
+  rewardAd() {
+    const st = Ads.rewardStatus('shop');
+    if (!st.left) { Shell.toast('今日の回数は終わりました'); return; }
+    const grant = () => { const r = Ads.grantReward('shop'); Shell.toast(r.ok ? `${r.label}を受け取りました` : r.reason); Router.refresh(); };
+    if (st.skipAd) grant(); else Shell.showDemoAd(st.seconds, 'リワード広告（デモ）').then(grant);
+  },
+  confirmSettings() {
+    const v = (id) => document.getElementById(id).value;
+    const changed = League.updatePlaySettings({
+      pitchingForm: v('f-pform'), battingForm: v('f-bform'),
+      myPitch: { direction: v('f-mydir'), amount: Number(v('f-myAmt')) },
+      motion: { armSwing: Number(v('f-arm')), release: Number(v('f-rel')), swingSpeed: Number(v('f-swing')) },
+    });
+    if (!changed) { Shell.toast('変更はありません'); return; }
+    const ad = Ads.onSettingsChanged();
+    const done = () => Shell.toast('設定を確定しました');
+    if (ad.show) Shell.showDemoAd(ad.seconds, '設定変更のデモ広告').then(done); else done();
+  },
+  claimMission(el) { const r = Missions.claim(el.dataset.id); Shell.toast(r.ok ? '受け取りました' : r.reason); Router.refresh(); },
+  openLoginBonus() { LoginBonus.markShown(); Shell.openModal('loginBonus'); },
+  claimLoginBonus() { const r = LoginBonus.claim(); Shell.closeModal('ui'); Shell.toast(r.ok ? '受け取りました' : r.reason); },
+  scout(el) {
+    const r = Growth.scout(el.dataset.kind);
+    if (!r.results || !r.results.length) { Shell.toast(r.reason); return; }
+    Router.go('reveal', { kind: el.dataset.kind, results: r.results, preview: !!r.preview });
+    if (r.preview) Shell.toast(r.reason);
+  },
+  flipCard() {
+    const f = document.getElementById('flip');
+    if (!f || f.classList.contains('is-open')) return;
+    f.classList.add('is-open');
+    const skip = document.getElementById('skip');
+    if (skip) skip.hidden = true;
+    setTimeout(() => { const a = document.getElementById('reveal-after'); if (a) a.hidden = false; }, 380);
+  },
+  debugOpen: () => Shell.openModal('debug'),
+  debugCoins() { Economy.earn({ coins: 1000 }, 'debug', 'debug'); Shell.toast('コインを1,000増やしました'); },
+  debugTickets() { Economy.earn({ scoutTickets: 10 }, 'debug', 'debug'); Shell.toast('チケットを10枚増やしました'); },
+  debugFps: () => Debug.toggleFps(),
+  debugTest() {
+    const r = SelfTest.run();
+    const out = document.getElementById('dbg-out');
+    if (out) out.textContent = `合格${r.passed}件／不合格${r.failed}件${r.failures.length ? `\n${r.failures.join('\n')}` : ''}`;
+  },
+  debugSave() { const out = document.getElementById('dbg-out'); if (out) out.textContent = Save.exportText(); },
+  debugSeason() { Shell.closeModal('ui'); Router.go('season'); },
+  debugLogin() { Shell.openModal('loginBonus'); },
+};
+
+/* ---- デバッグ（?debug=1 のときだけ出す。全モジュールの公開関数を呼べるが、内部の状態は触らない） ---- */
+const Debug = (() => {
+  let enabled = false;
+  try { enabled = new URLSearchParams(window.location.search).get('debug') === '1'; } catch (e) { enabled = false; }
+  let fpsOn = false;
+  let frames = 0;
+  let t0 = 0;
+  function mount() {
+    if (!enabled) return;
+    document.getElementById('layer-debug').innerHTML = '<button class="dbg-fab" type="button" data-act="debugOpen">デバッグ</button><div class="fps" id="fps" hidden></div>';
+  }
+  function loop(t) {
+    if (!fpsOn) return;
+    frames += 1;
+    if (t - t0 >= 1000) { const el = document.getElementById('fps'); if (el) el.textContent = `${Math.round((frames * 1000) / (t - t0))} FPS`; frames = 0; t0 = t; }
+    window.requestAnimationFrame(loop);
+  }
+  function toggleFps() {
+    const el = document.getElementById('fps');
+    if (!el) return;
+    fpsOn = !fpsOn;
+    el.hidden = !fpsOn;
+    if (fpsOn && window.requestAnimationFrame) { frames = 0; t0 = performance.now(); window.requestAnimationFrame(loop); }
+  }
+  return { enabled: () => enabled, mount, toggleFps };
+})();
+
+/* ---- 自己テストの登録（段階ごとに足す。デバッグの「自己テスト」で実行） ---- */
+(() => {
+  const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+  const t = SelfTest.add;
+  t('CARD-01 ランクの境界', () => {
+    const bad = [[99, 'S'], [90, 'S'], [89, 'A'], [80, 'A'], [79, 'B'], [70, 'B'], [69, 'C'], [60, 'C'], [59, 'D'], [50, 'D'], [49, 'E'], [40, 'E'], [39, 'F'], [20, 'F'], [19, 'G'], [1, 'G']].filter(([v, r]) => Growth.rankOf(v) !== r);
+    return bad.length ? `${bad.map(([v]) => v).join('・')} のランクが違う` : true;
+  });
+  t('A-5 補正倍率（k=0.30）', () => (near(Correction.multiplier(50), 1) && near(Correction.multiplier(100), 1.3) && near(Correction.multiplier(0), 0.7)) || `50→${Correction.multiplier(50)} 100→${Correction.multiplier(100)}`);
+  t('A-5 球速の換算', () => (near(Correction.kmhScore(120), 0) && near(Correction.kmhScore(165), 100) && near(Correction.kmhScore(142.5), 50)) || 'km/h から0〜100への換算が違う');
+  t('CARD-02 Lvと能力値', () => {
+    const a1 = Growth.abilityAt('S01', 1);
+    const a10 = Growth.abilityAt('S01', 10);
+    const a20 = Growth.abilityAt('S01', 20);
+    return (a1.meet === 43 && a10.meet === 47 && a20.meet === 53 && a20.defense === 60) || `ミート Lv1=${a1.meet} Lv10=${a10.meet} Lv20=${a20.meet}`;
+  });
+  t('CARD-03 必要経験値', () => {
+    let sum = 0;
+    for (let lv = 1; lv < 20; lv += 1) sum += Growth.expToNext(lv);
+    return (Growth.expToNext(1) === 50 && Growth.expToNext(19) === 230 && sum === 2660) || `Lv20までの合計 ${sum}`;
+  });
+  t('A-6 初期メンバーのチーム総合力', () => Growth.teamOverall() === 45 || `総合力 ${Growth.teamOverall()}`);
+  t('LG-03 日程の総当たり', () => {
+    const sch = League.getSchedule();
+    const pairs = {};
+    let ok = sch.length === 10;
+    sch.forEach((rd) => {
+      const seen = new Set();
+      rd.games.forEach((g) => { seen.add(g.home); seen.add(g.away); const key = [g.home, g.away].sort().join('-'); pairs[key] = pairs[key] || { n: 0, homes: new Set() }; pairs[key].n += 1; pairs[key].homes.add(g.home); });
+      if (seen.size !== 6) ok = false;
+    });
+    const keys = Object.keys(pairs);
+    if (keys.length !== 15 || keys.some((k) => pairs[k].n !== 2 || pairs[k].homes.size !== 2)) ok = false;
+    const userHome = sch.filter((rd) => rd.user.home).length;
+    return (ok && userHome === 5) || `総当たりが崩れている（自チームのホーム ${userHome}試合）`;
+  });
+  t('LG-05 順位とゲーム差（仮データ）', () => {
+    const st = League.getStandings();
+    const ids = st.map((r) => r.id).join(',');
+    const gb = st.map((r) => r.gbText).join(',');
+    return (ids === '5,4,3,0,1,2' && gb === '-,0,0.5,0.5,2.5,2.5') || `順位 ${ids}／差 ${gb}`;
+  });
+  t('LG-05 勝率の表示', () => (League.formatPct(2, 1) === '.667' && League.formatPct(0, 0) === '.000' && League.formatPct(3, 0) === '1.000') || '勝率の表示が違う');
+  t('A-8 日付キー（午前4時で切り替え）', () => (Util.dayKey(new Date(2026, 10, 2, 3, 59)) === '2026-11-01' && Util.dayKey(new Date(2026, 10, 2, 4, 0)) === '2026-11-02') || '日付キーが違う');
+  t('ECO-01 足りない支払いは止まる', () => {
+    const before = Economy.getWallet();
+    const ok = Economy.spend({ coins: before.coins + 1 }, 'selftest');
+    const after = Economy.getWallet();
+    return (!ok && after.coins === before.coins && after.coins >= 0) || '残高が変わった';
+  });
+  t('A-12 試合設定の形', () => {
+    const c = League.buildMatchConfig('league');
+    const b = c.teams.user.lineup[0];
+    return (c.teams.user.lineup.length === 9 && c.userSide === 'away' && c.correction.enabled === false && near(b.mult.contact, 0.982, 1e-6) && c.teams.user.pitcher.staminaThreshold === 25 && near(c.teams.user.pitcher.mult.velocity, 0.94, 1e-6)) || '試合設定の形が違う';
+  });
+  t('P0-1 CPU選手のシード生成', () => {
+    const a = League.buildMatchConfig('league');
+    const b = League.buildMatchConfig('league');
+    const o = a.teams.opponent;
+    const probe = MatchEngine.HOOKS.sweetSpot(10, o.lineup[0], { correction: { enabled: true } });
+    return (o.lineup.length === 9 && o.lineup.every((p) => p.mult && Number.isFinite(p.mult.contact) && Number.isFinite(p.mult.defense)) && o.pitcher.mult && Number.isFinite(probe) && JSON.stringify(o) === JSON.stringify(b.teams.opponent)) || 'CPU野手9人＋先発投手を同じシードから再生成できない';
+  });
+  t('P0-2 最終節後の分岐', () => (League.resultDestination({ mode: 'league', round: 9 }) === 'pregame' && League.resultDestination({ mode: 'league', round: 10 }) === 'season') || '第10節後がシーズン終了画面にならない');
+  t('A-12 接続点（得意球種・スタミナ・疲労）', () => {
+    const cfg = { correction: { enabled: true } };
+    const p = { mult: { velocity: 1, control: 1, movement: 1 }, special: ['fork'], fatigued: false, staminaThreshold: 25 };
+    const H = MatchEngine.HOOKS;
+    return (near(H.pitchBreak(10, p, cfg, { pitch: 'fork', count: 0 }), 11.5) && near(H.pitchSpeed(100, p, cfg, { count: 35 }), 90) && near(H.pitchSpeed(100, { ...p, fatigued: true }, cfg, { count: 0 }), 85) && H.pitchSpeed(100, p, { correction: { enabled: false } }, { count: 99 }) === 100) || '接続点の計算が違う';
+  });
+  t('A-12 保存の枠（段階1は書き込まない）', () => {
+    const r = Save.commit('selftest');
+    const p = Save.peek();
+    return (r.persisted === false && p.schemaVersion === 2 && ['wallet', 'team', 'cards', 'league', 'settings', 'missions'].every((k) => k in p)) || '保存の枠が違う';
+  });
+})();
+
+/* ---- 1 画面遷移：起動と組み立て ---- */
+const App = (() => {
+  function onClick(ev) {
+    const el = ev.target.closest('[data-go],[data-act]');
+    if (!el || el.disabled) return;
+    if (el.dataset.go) { Router.go(el.dataset.go, el.dataset.id ? { id: el.dataset.id } : {}); return; }
+    const fn = Actions[el.dataset.act];
+    if (fn) fn(el, ev);
+  }
+  function onInput(ev) {
+    const out = ev.target.dataset && ev.target.dataset.out;
+    if (out) { const o = document.getElementById(out); if (o) o.textContent = ev.target.value; }
+  }
+  function boot() {
+    Save.load();                              // 段階1〜3は既定値で始める
+    Economy.syncCareer(League.getCareer());   // 経済（ミッション）へ通算記録を渡す
+    Shell.mount();
+    Events.on('wallet:changed', () => Shell.refreshHeader());
+    Events.on('premium:changed', () => Shell.refreshHeader());
+    // 試合が終わったら結果へ（試合の画面は履歴から外す）
+    Events.on('match:end', () => { setTimeout(() => { if (Router.current().name === 'game') Router.replace('result'); }, 0); });
+    document.addEventListener('click', onClick);
+    document.addEventListener('input', onInput);
+    window.addEventListener('popstate', Router.onPopState);
+    Router.start();
+    Debug.mount();
+  }
+  return { boot };
+})();
+
+App.boot();
+</script>
+</body>
+</html>
