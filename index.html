@@ -1,0 +1,1890 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>ぐにゃ野球デモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=Archivo:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef3e8; --panel:#ffffff; --panel2:#f6f8f2; --ink:#17251a; --muted:#65736a;
+  --line:#d7e0d2; --accent:#e8442e; --accent-ink:#fff; --gold:#f5b921; --green:#1e9e57;
+  --chip:#eef4ea; --coin:#b8860b;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0f1712; --panel:#17231b; --panel2:#1c2a20; --ink:#eef5ee; --muted:#9db3a4; --line:#2b3d30; --chip:#223328; --coin:#f5b921; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:"M PLUS Rounded 1c",system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:980px;margin:0 auto;padding:14px 14px 28px}
+.scorebar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.chip{background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:7px 12px;min-width:80px;flex:1}
+.chip .k{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.chip .v{font-family:"Archivo",sans-serif;font-size:22px;font-weight:900;line-height:1.1}
+.chip .v small{font-size:12px;font-family:"M PLUS Rounded 1c",sans-serif;font-weight:700;color:var(--muted)}
+.chip.coin .v{color:var(--coin)}
+.stage{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#0b1e3a;box-shadow:0 10px 30px rgba(10,30,15,.18)}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;touch-action:manipulation;cursor:pointer}
+.banner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center;padding:16px}
+.banner .big{font-family:"Archivo","M PLUS Rounded 1c",sans-serif;font-weight:900;font-size:clamp(34px,7vw,64px);color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.35),0 10px 28px rgba(0,0,0,.5);opacity:0;transform:scale(.7) rotate(-3deg)}
+.banner .sub{margin-top:6px;font-weight:800;font-size:clamp(14px,2.6vw,20px);color:#ffe9a8;text-shadow:0 2px 8px rgba(0,0,0,.6);opacity:0}
+.banner.show .big{animation:pop .55s cubic-bezier(.2,1.6,.4,1) forwards}
+.banner.show .sub{animation:fadein .4s .15s forwards}
+@keyframes pop{to{opacity:1;transform:scale(1) rotate(-2deg)}}
+@keyframes fadein{to{opacity:1}}
+.statebar{display:flex;align-items:center;gap:10px;margin:10px 2px 0;flex-wrap:wrap}
+.pitch-label{font-weight:800;font-size:14px}
+.dots{display:flex;gap:5px}
+.dot{width:11px;height:11px;border-radius:50%;background:var(--line)}
+.dot.hr{background:var(--gold);border:1px solid #c98f00}
+.dot.hit{background:var(--green)}
+.dot.out{background:var(--accent)}
+.dot.foul{background:#9aa79d}
+.status{margin-left:auto;font-size:13px;color:var(--muted);font-weight:700}
+.controls{display:flex;gap:10px;margin-top:12px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-family:inherit;font-weight:800;font-size:16px;border-radius:12px;padding:14px 18px;cursor:pointer;min-height:56px}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn-swing{flex:1.6;background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:22px;letter-spacing:.06em;box-shadow:0 6px 0 #b32a18}
+.btn-swing:active{box-shadow:0 2px 0 #b32a18}
+.btn-pitch{flex:1}
+.btn-ghost{flex:.7}
+.tabs{display:flex;gap:8px;margin-top:12px}
+.tab{flex:1;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-family:inherit;font-weight:800;font-size:15px;border-radius:10px;padding:11px;cursor:pointer;min-height:48px}
+.tab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.timing{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.timing .row{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.track{position:relative;height:14px;border-radius:7px;background:linear-gradient(90deg,#c9d4c6 0%,#c9d4c6 32%,#ffd34d 42%,#1e9e57 47%,#1e9e57 53%,#ffd34d 58%,#c9d4c6 68%,#c9d4c6 100%)}
+.marker{position:absolute;top:-4px;width:4px;height:22px;border-radius:2px;background:var(--ink);left:100%}
+.zone{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{margin:0 0 10px;font-size:15px}
+.card h2 .tag{font-size:11px;color:var(--muted);font-weight:700;margin-left:6px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+td.num,th.num{text-align:right;font-family:"Archivo",sans-serif;font-weight:700}
+tr:last-child td{border-bottom:none}
+.empty{color:var(--muted);font-size:14px}
+.meterWrap{background:var(--panel2);border:1px solid var(--line);border-radius:8px;height:16px;overflow:hidden}
+.meter{height:100%;width:0%;background:repeating-linear-gradient(45deg,#e8442e 0 10px,#f5b921 10px 20px);transition:width .3s}
+.hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
+.final{display:none;margin-top:12px;background:var(--panel);border:2px solid var(--gold);border-radius:12px;padding:16px;text-align:center}
+.final.show{display:block}
+.final .score{font-family:"Archivo",sans-serif;font-size:42px;font-weight:900}
+.final p{margin:4px 0 12px;color:var(--muted);font-weight:700;font-size:14px}
+.kbd{display:inline-block;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;font-size:12px;background:var(--panel2);font-weight:700}
+select,input[type=range]{font-family:inherit}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:4px}
+.field select{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);color:var(--ink);font-size:15px;font-weight:700;min-height:46px}
+.field input[type=range]{width:100%;accent-color:var(--accent)}
+.rangeval{font-family:"Archivo",sans-serif;font-weight:900;color:var(--ink)}
+.btn-wide{width:100%;min-height:50px;font-size:15px}
+.btn-gold{background:var(--gold);border-color:#c98f00;color:#3a2a00}
+.btn-coin{background:var(--panel2)}
+.adnote{font-size:11px;color:var(--muted);font-weight:700;text-align:center;margin-top:6px}
+.poselist{display:flex;flex-direction:column;gap:8px}
+.pose{display:flex;align-items:center;gap:10px;width:100%;text-align:left;appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:10px;padding:10px 12px;cursor:pointer;font-family:inherit}
+.pose .nm{font-weight:800;font-size:15px}
+.pose .ds{font-size:12px;color:var(--muted);font-weight:700}
+.pose .rt{margin-left:auto;font-weight:900;font-size:13px;white-space:nowrap}
+.pose.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.pose .rt.owned{color:var(--green)}
+.pose .rt.price{color:var(--coin)}
+.shopbtns{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.premium-on{font-size:12px;font-weight:900;color:var(--coin);margin-top:8px}
+.overlay{position:fixed;inset:0;background:rgba(6,12,8,.62);display:none;align-items:center;justify-content:center;z-index:60;padding:14px}
+.overlay.show{display:flex}
+.sheet{background:var(--panel);color:var(--ink);border-radius:14px;max-width:540px;width:100%;max-height:88vh;overflow:auto;padding:18px}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .sub2{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:12px;line-height:1.6}
+.shopitem{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--panel2)}
+.shopitem .nm{font-weight:800;font-size:15px}
+.shopitem .ds{font-size:12px;color:var(--muted);font-weight:700}
+.shopitem .buy{margin-left:auto;appearance:none;border:1px solid #c98f00;background:var(--gold);color:#3a2a00;font-family:inherit;font-weight:900;font-size:14px;border-radius:9px;padding:10px 14px;cursor:pointer;white-space:nowrap;min-height:44px}
+.shopitem .buy:disabled{opacity:.45;cursor:default}
+.shopitem .own{margin-left:auto;font-weight:900;color:var(--green);font-size:13px;white-space:nowrap}
+.pack{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px;background:var(--panel2);width:100%;appearance:none;color:var(--ink);font-family:inherit;cursor:pointer;text-align:left}
+.pack .amt{font-family:"Archivo",sans-serif;font-weight:900;font-size:22px}
+.pack .yen{margin-left:auto;font-weight:900;font-size:16px}
+.x{float:right;appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:8px;width:38px;height:38px;font-size:16px;cursor:pointer;font-family:inherit}
+.adbox{background:#101418;color:#fff;border-radius:14px;max-width:440px;width:100%;overflow:hidden}
+.adtag{font-size:11px;font-weight:800;letter-spacing:.08em;padding:8px 12px;color:#9fb2c8;display:flex;justify-content:space-between}
+.adcreative{margin:0 12px;border-radius:10px;padding:26px 16px;text-align:center;min-height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.adcreative .ad-big{font-family:"Archivo","M PLUS Rounded 1c",sans-serif;font-weight:900;font-size:30px;line-height:1.25}
+.adcreative .ad-small{font-size:13px;font-weight:700;opacity:.9}
+.adbar{height:6px;background:#2a3238;margin:14px 12px 0;border-radius:3px;overflow:hidden}
+.adbar>div{height:100%;width:0%;background:var(--gold)}
+.adfoot{display:flex;align-items:center;gap:10px;padding:12px}
+.adfoot span{font-size:13px;font-weight:700;color:#c8d4e0}
+.adfoot button{margin-left:auto;appearance:none;border:none;background:var(--gold);color:#3a2a00;font-family:inherit;font-weight:900;font-size:15px;border-radius:9px;padding:11px 18px;cursor:pointer;min-height:46px}
+.adfoot button:disabled{opacity:.4;cursor:default}
+.matchbar{display:none;align-items:center;gap:12px;margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;flex-wrap:wrap}
+.matchbar.show{display:flex}
+.matchbar .inn{font-family:"Archivo",sans-serif;font-weight:900;font-size:20px}
+.matchbar .mscore{font-weight:900;font-size:16px}
+.matchbar .mscore span{color:var(--muted);font-size:12px;font-weight:700}
+.outs{display:flex;gap:5px;align-items:center}
+.outs i{width:12px;height:12px;border-radius:50%;border:2px solid var(--muted);display:block}
+.outs i.on{background:var(--accent);border-color:var(--accent)}
+.diamond{position:relative;width:44px;height:44px;flex:none}
+.diamond i{position:absolute;width:11px;height:11px;background:var(--panel2);border:2px solid var(--muted);transform:rotate(45deg)}
+.diamond i.on{background:var(--gold);border-color:#c98f00}
+.diamond .b2{left:16px;top:2px}.diamond .b1{right:2px;top:16px}.diamond .b3{left:2px;top:16px}.diamond .bh{left:16px;bottom:2px;background:var(--muted)}
+.matchbar .mnote{margin-left:auto;font-size:12px;color:var(--muted);font-weight:700}
+.motrow{margin-bottom:12px}
+.motrow label{display:flex;justify-content:space-between;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:4px}
+.motrow label .rangeval{color:var(--ink)}
+.motrow input[type=range]{width:100%;accent-color:var(--accent)}
+.motgroup{font-size:13px;font-weight:900;margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--line)}
+.motgroup:first-of-type{border-top:none;padding-top:0;margin-top:0}
+.lifebar{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px;font-weight:700;color:var(--muted)}
+.lifebar b{color:var(--ink);font-family:"Archivo",sans-serif}
+.lifebar button{margin-left:auto;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer}
+.matchlog{display:none;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;line-height:1.7}
+.matchlog.show{display:block}
+.matchlog .cur{color:var(--accent);font-weight:900}
+@media (prefers-reduced-motion: reduce){ .banner.show .big,.banner.show .sub{animation:none;opacity:1;transform:none} }
+</style>
+<style>
+/* ===== app-scale layer: screens + bottom tab bar ===== */
+html,body{height:100%}
+body{display:flex;flex-direction:column;height:100dvh;padding-bottom:0;overflow:hidden}
+#appScroll{flex:1 1 auto;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch}
+.bottomnav{position:static;flex:none}
+.screen[hidden]{display:none!important}
+.screen-wrap{max-width:980px;margin:0 auto;padding:14px 14px 48px}
+button,a,input,select{scroll-margin-bottom:110px;scroll-margin-top:16px}
+.bottomnav{background:var(--panel);border-top:1px solid var(--line);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(10,30,15,.12)}
+.navbtn{flex:1;appearance:none;border:none;background:none;color:var(--muted);font-family:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0 2px;min-height:52px}
+.navbtn .ic{width:30px;height:30px;border-radius:9px;background:var(--chip);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:var(--ink)}
+.navbtn .lb{font-size:10px;font-weight:800;letter-spacing:.02em}
+.navbtn.on{color:var(--accent)}
+.navbtn.on .ic{background:var(--accent);border-color:var(--accent);color:#fff}
+.navbtn .bdg{position:absolute;margin-left:26px;margin-top:-2px;background:var(--accent);color:#fff;font-size:9px;font-weight:900;border-radius:8px;padding:1px 5px}
+.hero{background:linear-gradient(120deg,#0b1e3a,#14532d);color:#fff;border-radius:14px;padding:16px;position:relative;overflow:hidden}
+.hero .tm{font-family:"Archivo","M PLUS Rounded 1c",sans-serif;font-weight:900;font-size:26px;line-height:1.2}
+.hero .sub3{font-size:12px;font-weight:700;opacity:.85;margin-top:4px;line-height:1.6}
+.hero .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.hchip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:800}
+.hchip b{font-family:"Archivo",sans-serif;font-size:16px}
+.appgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media(max-width:640px){.appgrid{grid-template-columns:1fr}}
+.acard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.acard h2{margin:0 0 10px;font-size:15px}
+.acard h2 .tag{font-size:11px;color:var(--muted);font-weight:700;margin-left:6px}
+.bigbtn{appearance:none;width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-family:inherit;border-radius:11px;padding:13px 14px;cursor:pointer;text-align:left;font-weight:800;font-size:15px;min-height:54px;display:flex;align-items:center;gap:10px}
+.bigbtn:active{transform:translateY(1px)}
+.bigbtn .arr{margin-left:auto;color:var(--muted)}
+.bigbtn.red{background:var(--accent);border-color:var(--accent);color:#fff}
+.bigbtn.goldb{background:var(--gold);border-color:#c98f00;color:#3a2a00}
+.menugrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+table.lg{width:100%;border-collapse:collapse;font-size:13px}
+table.lg td,table.lg th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+table.lg td.num,table.lg th.num{text-align:right;font-family:"Archivo",sans-serif;font-weight:700}
+table.lg tr.me td{background:var(--chip);font-weight:800}
+.fix{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.fix .on2{font-weight:800;font-size:14px}
+.fix .od{font-size:12px;color:var(--muted);font-weight:700}
+.fix .res{margin-left:auto;font-weight:900;font-size:13px;white-space:nowrap}
+.fix .res.w{color:var(--green)} .fix .res.l{color:var(--accent)}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pcard{border:1px solid var(--line);border-radius:11px;background:var(--panel2);padding:10px;position:relative}
+.pcard.in{box-shadow:inset 0 0 0 2px var(--green)}
+.pcard .rar{font-family:"Archivo",sans-serif;font-weight:900;font-size:11px;letter-spacing:.06em}
+.pcard .pnm{font-weight:900;font-size:16px;margin-top:2px}
+.pcard .ppos{font-size:11px;color:var(--muted);font-weight:700}
+.pcard .face{height:52px;border-radius:8px;margin:8px 0;display:flex;align-items:center;justify-content:center;font-family:"Archivo",sans-serif;font-weight:900;font-size:22px;color:#fff}
+.stat{margin-top:4px}
+.stat .sr2{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted)}
+.stat .bar{height:7px;border-radius:4px;background:var(--line);overflow:hidden}
+.stat .bar>div{height:100%;background:var(--green)}
+.pcard .prow{display:flex;gap:6px;margin-top:9px}
+.mini{flex:1;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-family:inherit;font-weight:800;font-size:12px;border-radius:8px;padding:8px 4px;cursor:pointer;min-height:38px}
+.mini.goldb{background:var(--gold);border-color:#c98f00;color:#3a2a00}
+.mini:disabled{opacity:.45;cursor:default}
+.rar-SSR{color:#b8860b}.rar-SR{color:#8b5cf6}.rar-R{color:#2b5fbf}.rar-N{color:var(--muted)}
+.face-SSR{background:linear-gradient(135deg,#8a6100,#f5b921)}.face-SR{background:linear-gradient(135deg,#4c2a85,#8b5cf6)}.face-R{background:linear-gradient(135deg,#173a6b,#2b5fbf)}.face-N{background:linear-gradient(135deg,#4b5a4e,#7d8f80)}
+.miss{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:11px 12px;margin-bottom:8px}
+.miss .mt{font-weight:800;font-size:14px}
+.miss .md{font-size:12px;color:var(--muted);font-weight:700;line-height:1.5}
+.miss .prog{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:6px;min-width:110px}
+.miss .prog>div{height:100%;background:var(--gold)}
+.miss .claim{margin-left:auto;flex:none}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal .d{border:1px solid var(--line);border-radius:9px;background:var(--panel2);padding:8px 2px;text-align:center;font-size:11px;font-weight:800}
+.cal .d b{display:block;font-family:"Archivo",sans-serif;font-size:15px;margin-top:2px}
+.cal .d.done{border-color:var(--green);color:var(--green)}
+.cal .d.today{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.scoutban{background:linear-gradient(120deg,#2a1650,#7a1d12);color:#fff;border-radius:12px;padding:16px;text-align:center}
+.scoutban .sb1{font-family:"Archivo","M PLUS Rounded 1c",sans-serif;font-weight:900;font-size:24px}
+.scoutban .sb2{font-size:12px;font-weight:700;opacity:.9;margin-top:4px;line-height:1.6}
+.rates{font-size:12px;color:var(--muted);font-weight:700;line-height:1.8}
+.setrow{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:11px 0}
+.setrow:last-child{border-bottom:none}
+.setrow .sl{font-weight:800;font-size:14px}
+.setrow .sd{font-size:12px;color:var(--muted);font-weight:700}
+.setrow .ctl{margin-left:auto;flex:none}
+.textin{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--panel2);color:var(--ink);font-size:15px;font-weight:700;font-family:inherit;min-height:46px}
+.kv{display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:5px 0;border-bottom:1px solid var(--line)}
+.kv:last-child{border-bottom:none}.kv b{font-family:"Archivo",sans-serif}
+</style>
+</head>
+<body>
+<div id="appScroll">
+<div class="wrap screen" id="screenPlay" hidden>
+
+  <div class="scorebar" aria-label="成績">
+    <div class="chip"><div class="k">ホームラン</div><div class="v"><span id="hrCount">0</span> <small>本</small></div></div>
+    <div class="chip"><div class="k">ベスト飛距離</div><div class="v"><span id="bestDist">0</span> <small>m</small></div></div>
+    <div class="chip"><div class="k">ヒット</div><div class="v"><span id="hitCount">0</span> <small>本</small></div></div>
+    <div class="chip"><div class="k">スコア</div><div class="v" id="scoreVal">0</div></div>
+    <div class="chip coin"><div class="k">コイン</div><div class="v" id="coinVal">0</div></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="game" width="960" height="540" aria-label="ぐにゃ野球ゲーム画面"></canvas>
+    <div class="banner" id="banner"><div class="big" id="bannerBig"></div><div class="sub" id="bannerSub"></div></div>
+  </div>
+
+  <div class="statebar">
+    <span class="pitch-label" id="pitchLabel">1球目 / 10</span>
+    <span class="dots" id="dots"></span>
+    <span class="status" id="statusText">「投球」でスタート</span>
+  </div>
+
+  <div class="lifebar" aria-label="通算記録">
+    <span>通算ベスト <b id="lifeBestScore">0</b>点</span>
+    <span>最長 <b id="lifeBestDist">0</b>m</span>
+    <span>通算HR <b id="lifeHR">0</b>本</span>
+    <span>試合数 <b id="lifeGames">0</b></span>
+    <span id="saveState">保存済み</span>
+    <button type="button" id="wipeSaveBtn">記録をリセット</button>
+  </div>
+
+  <div class="matchbar" id="matchBar" aria-label="試合状況">
+    <span class="inn" id="matchInn">1回表</span>
+    <span class="mscore">自分 <span id="matchRuns">0</span> − <span id="matchOpp">0</span> 相手</span>
+    <span class="outs" id="matchOuts" aria-label="アウトカウント"><i></i><i></i><i></i></span>
+    <span class="diamond" aria-label="塁状況"><i class="b2" id="base2"></i><i class="b1" id="base1"></i><i class="b3" id="base3"></i><i class="bh"></i></span>
+    <span class="mnote" id="matchNote">表は自分の攻撃。裏は守備オートで1打者ずつ進みます</span>
+  </div>
+  <div class="matchlog" id="matchLog" aria-label="守備オート経過"></div>
+
+  <div class="controls">
+    <button class="btn btn-pitch" id="pitchBtn" type="button">▶ 投球</button>
+    <button class="btn btn-swing" id="swingBtn" type="button">振る！</button>
+    <button class="btn btn-ghost" id="resetBtn" type="button">最初から</button>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="モード">
+    <button class="tab on" id="tabChallenge" type="button">チャレンジ（10球）</button>
+    <button class="tab" id="tabMatch" type="button">試合（3回・守備オート）</button>
+    <button class="tab" id="tabPractice" type="button">練習（球種カスタム）</button>
+  </div>
+
+  <div class="timing" aria-label="タイミングゲージ">
+    <div class="row"><span>タイミング</span><span id="timingWord">—</span></div>
+    <div class="track"><div class="marker" id="timingMarker"></div><div class="zone">▲ ド真ん中がジャスト</div></div>
+  </div>
+
+  <div class="final" id="finalBox">
+    <div class="score"><span id="finalScore">0</span> 点</div>
+    <p id="finalLine"></p>
+    <button class="btn btn-swing" id="againBtn" type="button" style="box-shadow:none">もう1回</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>球種・変化カスタム<span class="tag">練習モードで投げさせる球</span></h2>
+      <div class="field">
+        <label for="pitchSel">球種</label>
+        <select id="pitchSel"></select>
+      </div>
+      <div class="field">
+        <label for="dirSel">変化の仕方</label>
+        <select id="dirSel">
+          <option value="type">球種どおり</option>
+          <option value="drop">大きく落ちる</option>
+          <option value="slide">横に滑る</option>
+          <option value="rise">浮き上がる</option>
+          <option value="diag">斜めに沈む</option>
+          <option value="rev">逆方向に曲がる</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="amtRange">変化量 <span class="rangeval" id="amtVal">50</span></label>
+        <input type="range" id="amtRange" min="10" max="100" step="5" value="50">
+      </div>
+      <button class="btn btn-wide btn-gold" id="applyPitchBtn" type="button">この設定で投げさせる</button>
+      <div class="adnote" id="applyNote">設定変更のたびに広告が流れます（プレミアムでオフ）</div>
+      <p class="hint">チャレンジモードでは、解禁した変化球がランダムに混ざります。大きな変化は当てにくくなる代わりに、打てれば飛距離ボーナス。</p>
+    </div>
+
+    <div class="card">
+      <h2>フォーム（ポーズ）<span class="tag">変更のたびに広告</span></h2>
+      <div class="poselist" id="poseList"></div>
+      <div class="premium-on" id="premiumMark" style="display:none">プレミアム有効：広告オフ</div>
+    </div>
+
+    <div class="card">
+      <h2>モーション調整<span class="tag">適用のたびに広告</span></h2>
+      <div class="motgroup">投球モーション</div>
+      <div class="motrow"><label for="motArm">腕の振りの速さ <span class="rangeval" id="motArmVal">50</span></label><input type="range" id="motArm" min="0" max="100" step="5" value="50"></div>
+      <div class="motrow"><label for="motRel">リリース位置（前＝速い／後＝変化大） <span class="rangeval" id="motRelVal">50</span></label><input type="range" id="motRel" min="0" max="100" step="5" value="50"></div>
+      <div class="motrow"><label for="motFol">フォロースルー（球威） <span class="rangeval" id="motFolVal">50</span></label><input type="range" id="motFol" min="0" max="100" step="5" value="50"></div>
+      <div class="motgroup">打撃モーション</div>
+      <div class="motrow"><label for="motSwing">スイング速度 <span class="rangeval" id="motSwingVal">50</span></label><input type="range" id="motSwing" min="0" max="100" step="5" value="50"></div>
+      <div class="motrow"><label for="motTake">テイクバック（溜め＝パワー） <span class="rangeval" id="motTakeVal">50</span></label><input type="range" id="motTake" min="0" max="100" step="5" value="50"></div>
+      <div class="motrow"><label for="motBatFol">フォロースルー（飛距離） <span class="rangeval" id="motBatFolVal">50</span></label><input type="range" id="motBatFol" min="0" max="100" step="5" value="50"></div>
+      <button class="btn btn-wide btn-gold" id="applyMotionBtn" type="button">モーションを適用する</button>
+      <div class="adnote" id="motionNote">モーション適用のたびに広告が流れます（プレミアムでオフ）。練習モードでは自分が投げる球、打撃は全モードに反映されます。</div>
+    </div>
+
+    <div class="card">
+      <h2>球ごとの結果</h2>
+      <div id="logEmpty" class="empty">まだ投げていない</div>
+      <table id="logTable" style="display:none">
+        <thead><tr><th>球</th><th>球種</th><th>結果</th><th class="num">飛距離</th><th class="num">点</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>ぐにゃ度</h2>
+      <div class="meterWrap"><div class="meter" id="gunyaMeter"></div></div>
+      <p class="hint">振るたびにバッターの関節が緩んでいく。ぐにゃ度が上がると体は大きく崩れるが、当たれば飛距離が伸びる。空振り3回で転倒。</p>
+      <p class="hint">操作： <span class="kbd">スペース</span> / 画面タップ / 「振る！」ボタン。球が白い枠に入った瞬間がジャスト。ヒットでコインが貯まる（HR +50 / ヒット +20）。</p>
+      <div class="shopbtns">
+        <button class="btn btn-wide" id="shopBtn" type="button">ショップ（球種・フォーム解禁）</button>
+        <button class="btn btn-wide btn-coin" id="kakinBtn" type="button">コインを買う（デモ課金）</button>
+        <button class="btn btn-wide btn-coin" id="rewardAdBtn" type="button">広告を見て +30コイン</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== HOME ===== -->
+<div class="screen-wrap screen" id="screenHome">
+  <div class="hero">
+    <div class="tm" id="homeTeamName">ぐにゃスターズ</div>
+    <div class="sub3" id="homeSeasonLine">シーズン1 ・ 第1節</div>
+    <div class="rowb">
+      <span class="hchip">コイン <b class="coin-all">0</b></span>
+      <span class="hchip">リーグ順位 <b id="homeRank">-</b></span>
+      <span class="hchip">チーム総合力 <b id="homePower">0</b></span>
+      <span class="hchip">所持選手 <b id="homePlayers">0</b>人</span>
+    </div>
+  </div>
+
+  <div class="acard">
+    <h2>次の試合<span class="tag">リーグ戦（3回制・守備オート）</span></h2>
+    <div class="fix" style="margin-bottom:10px">
+      <div><div class="on2" id="homeNextOpp">—</div><div class="od" id="homeNextOppSub">—</div></div>
+      <span class="res" id="homeNextForm">—</span>
+    </div>
+    <button class="bigbtn red goBtn" type="button" data-to="play" data-match="1">試合をはじめる<span class="arr">▶</span></button>
+    <div style="height:8px"></div>
+    <button class="bigbtn goBtn" type="button" data-to="play">練習・チャレンジで遊ぶ<span class="arr">›</span></button>
+  </div>
+
+  <div class="acard">
+    <h2>ログインボーナス<span class="tag" id="homeLoginTag">1日1回</span></h2>
+    <div class="cal" id="loginCal"></div>
+    <div style="height:10px"></div>
+    <button class="btn btn-wide btn-gold" id="loginClaimBtn" type="button">今日のボーナスを受け取る</button>
+    <div class="adnote" id="loginState">—</div>
+  </div>
+
+  <div class="appgrid" style="margin-top:0">
+    <div class="acard">
+      <h2>スカウト<span class="tag">選手を集める</span></h2>
+      <p class="hint" style="margin-top:0">SSR確率3%。選手は編成すると打撃・投球に反映されます。</p>
+      <button class="bigbtn goldb goBtn" type="button" data-to="scout">スカウトへ<span class="arr">›</span></button>
+    </div>
+    <div class="acard">
+      <h2>ミッション<span class="tag">報酬コイン</span></h2>
+      <p class="hint" style="margin-top:0">受け取り可能な報酬： <b id="homeMissionCount">0</b> 件</p>
+      <button class="bigbtn goBtn" type="button" data-to="missions">ミッションを見る<span class="arr">›</span></button>
+    </div>
+  </div>
+
+  <div class="acard">
+    <h2>メニュー</h2>
+    <div class="menugrid">
+      <button class="bigbtn goBtn" type="button" data-to="league">リーグ順位表<span class="arr">›</span></button>
+      <button class="bigbtn goBtn" type="button" data-to="team">選手・編成<span class="arr">›</span></button>
+      <button class="bigbtn goBtn" type="button" data-to="shop">ショップ<span class="arr">›</span></button>
+      <button class="bigbtn goBtn" type="button" data-to="settings">設定・データ<span class="arr">›</span></button>
+    </div>
+  </div>
+
+  <div class="acard">
+    <h2>通算記録</h2>
+    <div id="homeRecords"></div>
+  </div>
+</div>
+
+<!-- ===== LEAGUE ===== -->
+<div class="screen-wrap screen" id="screenLeague" hidden>
+  <div class="acard" style="margin-top:0">
+    <h2>リーグ順位表<span class="tag" id="leagueSeasonTag">シーズン1</span></h2>
+    <div id="leagueTable"></div>
+    <p class="hint">全7節を戦い抜くとシーズン終了。最終順位でコイン報酬、翌シーズンは相手が強くなります。</p>
+    <div id="seasonEndBox"></div>
+  </div>
+  <div class="acard">
+    <h2>対戦カード・結果</h2>
+    <div id="fixtureList"></div>
+    <button class="bigbtn red goBtn" type="button" data-to="play" data-match="1" id="leaguePlayBtn">次の試合をはじめる<span class="arr">▶</span></button>
+  </div>
+</div>
+
+<!-- ===== TEAM ===== -->
+<div class="screen-wrap screen" id="screenTeam" hidden>
+  <div class="acard" style="margin-top:0">
+    <h2>チーム編成<span class="tag">先発9人まで・能力は試合に反映</span></h2>
+    <div class="kv"><span>チーム総合力</span><b id="teamPower">0</b></div>
+    <div class="kv"><span>打撃補正（ミート／パワー）</span><b id="teamBatFx">—</b></div>
+    <div class="kv"><span>投手力（相手の打撃を抑制）</span><b id="teamPitFx">—</b></div>
+    <div class="kv"><span>所持コイン</span><b class="coin-all">0</b></div>
+    <div style="height:8px"></div>
+    <button class="btn btn-wide" id="autoLineupBtn" type="button">おすすめ編成（能力上位9人）</button>
+  </div>
+  <div class="acard">
+    <h2>先発メンバー</h2>
+    <div class="pgrid" id="lineupGrid"></div>
+    <div class="empty" id="lineupEmpty">先発が未設定です。下の選手一覧から「先発に入れる」を押してください。</div>
+  </div>
+  <div class="acard">
+    <h2>所持選手<span class="tag">レベルアップで能力上昇（コイン消費）</span></h2>
+    <div class="pgrid" id="rosterGrid"></div>
+    <div class="empty" id="rosterEmpty" style="display:none">所持選手がいません。スカウトで選手を集めましょう。</div>
+  </div>
+</div>
+
+<!-- ===== SCOUT ===== -->
+<div class="screen-wrap screen" id="screenScout" hidden>
+  <div class="scoutban">
+    <div class="sb1">期間限定スカウト</div>
+    <div class="sb2">SSR「轟 雷太」「黒鉄 剛」ピックアップ中<br>重複した選手は自動でレベルアップ（限界突破）</div>
+  </div>
+  <div class="acard">
+    <h2>スカウト<span class="tag">所持コイン <span class="coin-all">0</span> ／ チケット <span id="ticketVal">0</span>枚</span></h2>
+    <button class="btn btn-wide btn-gold" id="scout1Btn" type="button">1回スカウト（100コイン）</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-wide btn-gold" id="scout10Btn" type="button">10連スカウト（900コイン・SR以上1枠確定）</button>
+    <p class="rates" style="margin-bottom:0">提供割合： SSR 3% ／ SR 17% ／ R 30% ／ N 50%　スカウト回数： <b id="scoutCountVal">0</b>回</p>
+    <div class="adnote" id="scoutNote"></div>
+  </div>
+  <div class="acard" id="scoutResultCard" style="display:none">
+    <h2>スカウト結果</h2>
+    <div class="pgrid" id="scoutResult"></div>
+  </div>
+  <div class="acard">
+    <h2>ピックアップ選手</h2>
+    <div class="pgrid" id="pickupGrid"></div>
+  </div>
+</div>
+
+<!-- ===== SHOP SCREEN ===== -->
+<div class="screen-wrap screen" id="screenShop" hidden>
+  <div class="acard" style="margin-top:0">
+    <h2>コイン購入<span class="tag">デモ課金・実際の支払いは発生しません</span></h2>
+    <div class="kv"><span>所持コイン</span><b class="coin-all">0</b></div>
+    <div style="height:8px"></div>
+    <div id="shopPackList"></div>
+  </div>
+  <div class="acard">
+    <h2>アイテム・パス</h2>
+    <div id="shopItemList"></div>
+  </div>
+  <div class="acard">
+    <h2>球種・フォーム解禁</h2>
+    <p class="hint" style="margin-top:0">解禁した変化球はチャレンジ／試合にも登場します。</p>
+    <button class="btn btn-wide" id="shopScreenOpenBtn" type="button">解禁ショップを開く</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-wide btn-coin" id="shopScreenRewardBtn" type="button">広告を見て +30コイン</button>
+  </div>
+</div>
+
+<!-- ===== MISSIONS ===== -->
+<div class="screen-wrap screen" id="screenMissions" hidden>
+  <div class="acard" style="margin-top:0">
+    <h2>ミッション<span class="tag">達成でコイン報酬</span></h2>
+    <div id="missionList"></div>
+  </div>
+  <div class="acard">
+    <h2>デイリー<span class="tag">日付が変わるとリセット</span></h2>
+    <div id="dailyList"></div>
+  </div>
+</div>
+
+<!-- ===== SETTINGS ===== -->
+<div class="screen-wrap screen" id="screenSettings" hidden>
+  <div class="acard" style="margin-top:0">
+    <h2>プロフィール</h2>
+    <div class="field"><label for="teamNameInput">チーム名</label><input class="textin" id="teamNameInput" type="text" maxlength="14"></div>
+    <button class="btn btn-wide" id="saveTeamNameBtn" type="button">チーム名を保存</button>
+  </div>
+  <div class="acard">
+    <h2>設定</h2>
+    <div class="setrow"><div><div class="sl">サウンド</div><div class="sd">打球音・効果音のオン／オフ</div></div><span class="ctl"><button class="mini" id="soundToggleBtn" type="button" style="min-width:84px">オン</button></span></div>
+    <div class="setrow"><div><div class="sl">プレミアムパス</div><div class="sd" id="premiumStateText">未購入（広告あり）</div></div><span class="ctl"><button class="mini goldb" id="settingsPremiumBtn" type="button" style="min-width:84px">購入画面</button></span></div>
+    <div class="setrow"><div><div class="sl">セーブデータ</div><div class="sd">コイン・選手・リーグ進行・記録は自動保存（<span id="saveState2">保存済み</span>）</div></div></div>
+  </div>
+  <div class="acard">
+    <h2>データ管理</h2>
+    <div id="settingsRecords"></div>
+    <div style="height:10px"></div>
+    <button class="btn btn-wide" id="settingsWipeBtn" type="button">全データをリセット</button>
+    <p class="hint">ぐにゃ野球 アプリ版2.0（デモ）。実ストア公開・実決済は含まれません。課金はすべてデモ表記です。</p>
+  </div>
+</div>
+
+</div>
+<nav class="bottomnav" aria-label="アプリメニュー">
+  <button class="navbtn on" type="button" data-nav="home"><span class="ic">ホ</span><span class="lb">ホーム</span></button>
+  <button class="navbtn" type="button" data-nav="league"><span class="ic">リ</span><span class="lb">リーグ</span></button>
+  <button class="navbtn" type="button" data-nav="play"><span class="ic">試</span><span class="lb">試合</span></button>
+  <button class="navbtn" type="button" data-nav="team"><span class="ic">選</span><span class="lb">選手</span></button>
+  <button class="navbtn" type="button" data-nav="scout"><span class="ic">ス</span><span class="lb">スカウト</span></button>
+  <button class="navbtn" type="button" data-nav="shop"><span class="ic">店</span><span class="lb">ショップ</span></button>
+  <button class="navbtn" type="button" data-nav="missions"><span class="ic">任</span><span class="lb">任務</span><span class="bdg" id="missionBdg" style="display:none">0</span></button>
+</nav>
+
+<div class="overlay" id="shopOverlay" role="dialog" aria-label="ショップ">
+  <div class="sheet">
+    <button class="x" id="shopClose" type="button" aria-label="閉じる">✕</button>
+    <h3>ショップ</h3>
+    <div class="sub2">所持コイン： <b id="shopCoins">0</b>　ヒットやホームランで貯まります。</div>
+    <div id="shopList"></div>
+  </div>
+</div>
+
+<div class="overlay" id="kakinOverlay" role="dialog" aria-label="コイン購入">
+  <div class="sheet">
+    <button class="x" id="kakinClose" type="button" aria-label="閉じる">✕</button>
+    <h3>コインを買う</h3>
+    <div class="sub2">これはデモ課金です。実際の支払いは発生しません。タップするとコインがそのまま増えます。</div>
+    <div id="packList"></div>
+    <div class="shopitem" style="margin-top:4px">
+      <div><div class="nm">プレミアムパス</div><div class="ds">広告が一切流れなくなる＋設定変更も即反映</div></div>
+      <button class="buy" id="premiumKakinBtn" type="button">¥480（デモ）</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="adOverlay" role="dialog" aria-label="広告">
+  <div class="adbox">
+    <div class="adtag"><span>広告（デモ）</span><span id="adReason"></span></div>
+    <div class="adcreative" id="adCreative">
+      <div class="ad-big" id="adBig"></div>
+      <div class="ad-small" id="adSmall"></div>
+    </div>
+    <div class="adbar"><div id="adProg"></div></div>
+    <div class="adfoot"><span id="adCount">あと4秒</span><button id="adClose" type="button" disabled>閉じる</button></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var cv=document.getElementById('game'), ctx=cv.getContext('2d');
+var W=960,H=540, GROUND=452, PPM=8;
+var PLATE_X=170, PITCHER_X=470, FENCE_M=115;
+var $=function(id){return document.getElementById(id)};
+var pitchBtn=$('pitchBtn'), swingBtn=$('swingBtn'), resetBtn=$('resetBtn'), againBtn=$('againBtn');
+var statusText=$('statusText'), pitchLabel=$('pitchLabel'), dotsEl=$('dots');
+var banner=$('banner'), bannerBig=$('bannerBig'), bannerSub=$('bannerSub');
+var timingMarker=$('timingMarker'), timingWord=$('timingWord');
+
+/* ---------- audio ---------- */
+var AC=null;
+function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended')AC.resume(); return AC; }
+function tone(f,d,type,g,slideTo){ if(window.__sndOff)return; var ac=audio(); if(!ac)return; var o=ac.createOscillator(),gn=ac.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(f,ac.currentTime); if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,ac.currentTime+d); gn.gain.setValueAtTime(g||0.15,ac.currentTime); gn.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+d); o.connect(gn); gn.connect(ac.destination); o.start(); o.stop(ac.currentTime+d); }
+function noiseBurst(dur,g){ if(window.__sndOff)return; var ac=audio(); if(!ac)return; var n=ac.createBufferSource(), buf=ac.createBuffer(1,ac.sampleRate*dur,ac.sampleRate), ch=buf.getChannelData(0); for(var i=0;i<ch.length;i++)ch[i]=(Math.random()*2-1)*(1-i/ch.length); n.buffer=buf; var gn=ac.createGain(); gn.gain.value=g||0.25; var f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=900; n.connect(f); f.connect(gn); gn.connect(ac.destination); n.start(); }
+function sndHit(q){ noiseBurst(0.15,0.35); tone(q==='perfect'?520:380,0.18,'square',0.12, q==='perfect'?980:600); }
+function sndWhiff(){ tone(300,0.22,'sawtooth',0.05,90); }
+function sndCrowd(){ noiseBurst(0.9,0.12); setTimeout(function(){noiseBurst(0.7,0.08)},250); }
+function sndCoin(){ tone(1180,0.09,'square',0.08); setTimeout(function(){tone(1560,0.14,'square',0.08)},80); }
+
+/* ---------- catalogs ---------- */
+var PITCHES=[
+  {id:'straight',name:'まっすぐ',speed:600,ax:0,ay:0,price:0,desc:'素直な直球'},
+  {id:'curve',name:'カーブ',speed:500,ax:30,ay:330,price:200,desc:'大きく落ちる'},
+  {id:'slider',name:'スライダー',speed:560,ax:-190,ay:120,price:250,desc:'横に滑って逃げる'},
+  {id:'fork',name:'フォーク',speed:520,ax:0,ay:470,price:350,desc:'手元でストンと落ちる'},
+  {id:'shoot',name:'シュート',speed:580,ax:170,ay:-30,price:300,desc:'内へ食い込む'},
+  {id:'sinker',name:'シンカー',speed:540,ax:-90,ay:390,price:400,desc:'斜めに沈む'},
+  {id:'custom',name:'マイ変化球',speed:540,ax:0,ay:340,price:500,desc:'変化の仕方と量を自分で決める'}
+];
+function pitchDef(id){ for(var i=0;i<PITCHES.length;i++)if(PITCHES[i].id===id)return PITCHES[i]; return PITCHES[0]; }
+var POSES={
+  square:{name:'スクエア',price:0,win:1,pow:1,gunya:14,batRest:-2.25,spread:10,desc:'標準。バランス型'},
+  open:{name:'オープン',price:300,win:0.72,pow:1.28,gunya:18,batRest:-2.5,spread:17,desc:'芯は狭いが当たれば飛ぶ'},
+  closed:{name:'クローズド',price:300,win:1.4,pow:0.9,gunya:12,batRest:-2.05,spread:5,desc:'芯が広く当てやすい'},
+  ichi:{name:'一本足打法',price:800,win:0.62,pow:1.55,gunya:26,batRest:-2.6,spread:10,desc:'最大パワー。ぐにゃ度も爆上がり'},
+  kannushi:{name:'神主打法',price:800,win:1.15,pow:1.18,gunya:10,batRest:-2.95,spread:8,desc:'バットを高く構える。安定＋飛距離'}
+};
+var POSE_ORDER=['square','open','closed','ichi','kannushi'];
+
+/* ---------- economy / settings + persistence (localStorage) ---------- */
+var SAVE_KEY='gunya-yakyu-save-v3';
+var E={ coins:100, ownedPitch:{straight:true}, ownedPose:{square:true}, premium:false };
+var G={ mode:'challenge', pose:'square', selPitch:'straight', brkDir:'type', brkAmt:50 };
+var RECORDS={ bestScore:0, bestDist:0, totalHR:0, totalHits:0, games:0, totalCoins:0 };
+var SAVE_BAK=SAVE_KEY+'-bak';
+var SAVE_CORRUPT=SAVE_KEY+'-corrupt';
+function parseSave(raw){
+  if(!raw||typeof raw!=='string')return null;
+  try{ var d=JSON.parse(raw); return (d&&typeof d==='object'&&!Array.isArray(d))?d:null; }catch(e){ return null; }
+}
+function isPlainObj(o){ return !!o&&typeof o==='object'&&!Array.isArray(o); }
+function numOr(v,fallback){ return (typeof v==='number'&&isFinite(v))?v:fallback; }
+function saveGame(){
+  try{
+    var data={ coins:E.coins, ownedPitch:E.ownedPitch, ownedPose:E.ownedPose, premium:E.premium,
+      pose:G.pose, selPitch:G.selPitch, brkDir:G.brkDir, brkAmt:G.brkAmt,
+      mot:MOT, records:RECORDS, app:(typeof APP!=='undefined'?APP:null) };
+    // keep the previous generation as a backup (only while it is still readable)
+    var prev=localStorage.getItem(SAVE_KEY);
+    if(prev&&parseSave(prev))localStorage.setItem(SAVE_BAK,prev);
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    var ss=$('saveState'); if(ss)ss.textContent='保存済み '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }catch(e){}
+  renderLife();
+}
+function loadGame(){
+  var d=null;
+  try{
+    var raw=localStorage.getItem(SAVE_KEY);
+    d=parseSave(raw);
+    if(!d&&raw){
+      // main save is corrupted: quarantine it, then restore the previous-generation backup
+      try{ localStorage.setItem(SAVE_CORRUPT,raw); }catch(e){}
+      var bakRaw=localStorage.getItem(SAVE_BAK);
+      d=parseSave(bakRaw);
+      if(d){ try{ localStorage.setItem(SAVE_KEY,bakRaw); }catch(e){} }
+    }
+  }catch(e){}
+  if(!d)return;
+  // per-field validation: missing or wrong-typed values fall back to defaults
+  E.coins=Math.max(0,Math.floor(numOr(d.coins,E.coins)));
+  if(isPlainObj(d.ownedPitch)){ PITCHES.forEach(function(p){ if(d.ownedPitch[p.id]===true)E.ownedPitch[p.id]=true; }); }
+  if(isPlainObj(d.ownedPose)){ POSE_ORDER.forEach(function(id){ if(d.ownedPose[id]===true)E.ownedPose[id]=true; }); }
+  E.ownedPitch.straight=true; E.ownedPose.square=true;
+  E.premium=d.premium===true;
+  if(d.pose&&POSES[d.pose])G.pose=d.pose;
+  if(typeof d.selPitch==='string'){ for(var i=0;i<PITCHES.length;i++)if(PITCHES[i].id===d.selPitch)G.selPitch=d.selPitch; }
+  if(['type','drop','slide','rise','diag','rev'].indexOf(d.brkDir)>=0)G.brkDir=d.brkDir;
+  G.brkAmt=Math.max(10,Math.min(100,numOr(d.brkAmt,G.brkAmt)));
+  if(isPlainObj(d.mot)){ for(var k in MOT){ MOT[k]=Math.max(0,Math.min(100,numOr(d.mot[k],MOT[k]))); MOT_PENDING[k]=MOT[k]; } }
+  if(isPlainObj(d.records)){ for(var r in RECORDS)RECORDS[r]=Math.max(0,numOr(d.records[r],RECORDS[r])); }
+  if(d.app&&typeof APP!=='undefined')mergeApp(d.app);
+}
+function renderLife(){
+  var a=$('lifeBestScore'),b=$('lifeBestDist'),c=$('lifeHR'),d2=$('lifeGames');
+  if(a)a.textContent=RECORDS.bestScore;
+  if(b)b.textContent=RECORDS.bestDist;
+  if(c)c.textContent=RECORDS.totalHR;
+  if(d2)d2.textContent=RECORDS.games;
+}
+
+/* ---------- motion tuning ---------- */
+var MOT={ arm:50, rel:50, fol:50, swing:50, take:50, batFol:50 };
+var MOT_PENDING={ arm:50, rel:50, fol:50, swing:50, take:50, batFol:50 };
+function bindMot(id,key){
+  var el=$(id);
+  el.addEventListener('input',function(){ MOT_PENDING[key]=parseInt(el.value,10); $(id+'Val').textContent=el.value; });
+}
+bindMot('motArm','arm'); bindMot('motRel','rel'); bindMot('motFol','fol');
+bindMot('motSwing','swing'); bindMot('motTake','take'); bindMot('motBatFol','batFol');
+$('applyMotionBtn').addEventListener('click',function(){
+  var changed=false; for(var k in MOT)if(MOT[k]!==MOT_PENDING[k])changed=true;
+  if(!changed){ setStatus('モーションは変更なし'); return; }
+  var apply=function(){ for(var k in MOT)MOT[k]=MOT_PENDING[k]; saveGame(); setStatus('モーションを適用：腕の振り'+MOT.arm+'／スイング速度'+MOT.swing); };
+  apply(); // order guaranteed: save first, then the 4s ad
+  if(!E.premium)playAd({reason:'モーション適用'});
+});
+
+/* ---------- fielders (auto defense) & match state ---------- */
+var FIELDER_HOME=[{x:600,role:'二塁'},{x:730,role:'遊撃'},{x:880,role:'中堅'},{x:1060,role:'右翼'},{x:1230,role:'フェンス際'}];
+var FIELDERS=[];
+function resetFielders(){ FIELDERS=FIELDER_HOME.map(function(f){ return {x:f.x,home:f.x,role:f.role,move:0}; }); }
+resetFielders();
+var M=null;
+function newMatch(){ return { inn:1, half:0, outs:0, bases:[0,0,0], runs:0, opp:0, over:false, phase:'bat', oppOuts:0, oppBases:[0,0,0], defLog:[], batterNo:1, defTimer:null }; }
+function activeOuts(){ return M.half===0? M.outs : M.oppOuts; }
+function activeBases(){ return M.half===0? M.bases : M.oppBases; }
+function renderMatch(){
+  if(!M)return;
+  $('matchInn').textContent=M.inn+'回'+(M.half===0?'表（攻撃）':'裏（守備オート）');
+  $('matchRuns').textContent=M.runs; $('matchOpp').textContent=M.opp;
+  var oc=$('matchOuts').children, ao=activeOuts(), ab=activeBases();
+  for(var i=0;i<3;i++)oc[i].className=ao>i?'on':'';
+  $('base1').className='b1'+(ab[0]?' on':'');
+  $('base2').className='b2'+(ab[1]?' on':'');
+  $('base3').className='b3'+(ab[2]?' on':'');
+  $('matchNote').textContent=M.half===0? '表は自分の攻撃（'+M.outs+'アウト）' : '裏は守備オート中：相手 '+M.oppOuts+'アウト・経過は下のログと一致します';
+  var logEl=$('matchLog');
+  if(M.defLog.length){ logEl.classList.add('show'); logEl.innerHTML=''; M.defLog.slice(-6).forEach(function(t,i,arr){ var d=document.createElement('div'); if(i===arr.length-1)d.className='cur'; d.textContent=t; logEl.appendChild(d); }); }
+  else { logEl.classList.remove('show'); logEl.innerHTML=''; }
+}
+function advanceOn(bases,basesHit){
+  var scored=0, nb=[0,0,0];
+  for(var i=2;i>=0;i--){ if(!bases[i])continue; var dest=i+basesHit; if(dest>=3)scored++; else nb[dest]=1; }
+  if(basesHit>=4)scored+=1; else nb[basesHit-1]=1;
+  return {bases:nb, scored:scored};
+}
+function advanceRunners(basesHit){
+  var r=advanceOn(M.bases,basesHit); M.bases=r.bases; M.runs+=r.scored; return r.scored;
+}
+function matchOut(){
+  if(!M||M.half!==0)return;
+  M.outs++;
+  renderMatch();
+  if(M.outs>=3){ startDefenseHalf(); }
+}
+function startDefenseHalf(){
+  M.half=1; M.phase='defense'; M.oppOuts=0; M.oppBases=[0,0,0]; M.batterNo=1;
+  M.defLog.push(M.inn+'回表 終了：自分 '+M.runs+' 点（3アウト）→ 裏の守備オート開始');
+  pitchBtn.disabled=true; swingBtn.disabled=true;
+  showBanner(M.inn+'回裏','守備オート：相手の攻撃を1打者ずつ処理します',1600);
+  setStatus('守備オート中…');
+  renderMatch();
+  clearTimeout(M.defTimer);
+  M.defTimer=setTimeout(defStep,1100);
+}
+function defStep(){
+  if(!M||M.phase!=='defense')return;
+  var roll=Math.random()+oppHitBias();
+  var label, hit=0;
+  if(roll<0.62){ label='アウト（野手が処理）'; }
+  else if(roll<0.82){ label='ヒット'; hit=1; }
+  else if(roll<0.92){ label='二塁打'; hit=2; }
+  else if(roll<0.96){ label='ホームラン'; hit=4; }
+  else { label='四球'; hit=1; }
+  var scored=0;
+  if(hit>0){
+    if(label==='四球'){
+      // walk: force advance only
+      var nb=[0,0,0]; var b=M.oppBases;
+      if(b[0]&&b[1]&&b[2])scored=1;
+      nb[0]=1; nb[1]=b[0]?1:b[1]; nb[2]=(b[0]&&b[1])?1:b[2];
+      M.oppBases=nb;
+    } else {
+      var r=advanceOn(M.oppBases,hit); M.oppBases=r.bases; scored=r.scored;
+    }
+    M.opp+=scored;
+  } else {
+    M.oppOuts++;
+  }
+  var line=M.inn+'回裏 '+M.batterNo+'人目：'+label+(scored? ' ＋'+scored+'点':'')+' → 相手 '+M.opp+'点・'+M.oppOuts+'アウト';
+  M.defLog.push(line);
+  M.batterNo++;
+  setStatus(line);
+  renderMatch();
+  if(M.oppOuts>=3){
+    M.defLog.push(M.inn+'回裏 終了：相手 '+M.opp+' 点（3アウト）');
+    renderMatch();
+    finishDefenseHalf();
+  } else {
+    M.defTimer=setTimeout(defStep,950);
+  }
+}
+function finishDefenseHalf(){
+  M.phase='bat';
+  swingBtn.disabled=false;
+  if(M.inn>=3){
+    M.over=true; M.half=1;
+    renderMatch();
+    S.phase='done'; pitchBtn.disabled=true; finish(); return;
+  }
+  M.inn++; M.half=0; M.outs=0; M.bases=[0,0,0]; M.oppOuts=0; M.oppBases=[0,0,0];
+  showBanner(M.inn+'回表','攻守交代：自分の攻撃',1500);
+  setStatus(M.inn+'回表：「投球」でスタート');
+  pitchBtn.disabled=false;
+  renderMatch(); updateLabel();
+}
+
+function computeBreak(def,dir,amt){
+  var s=amt/50;
+  if(def.id==='straight')return{ax:0,ay:0};
+  if(dir==='type')return{ax:def.ax*s,ay:def.ay*s};
+  var M=Math.sqrt(def.ax*def.ax+def.ay*def.ay)||340;
+  if(dir==='drop')return{ax:0,ay:M*s};
+  if(dir==='slide')return{ax:-M*0.75*s,ay:M*0.3*s};
+  if(dir==='rise')return{ax:-30*s,ay:-M*0.8*s};
+  if(dir==='diag')return{ax:-M*0.35*s,ay:M*0.95*s};
+  if(dir==='rev')return{ax:M*0.6*s,ay:M*0.1*s};
+  return{ax:def.ax*s,ay:def.ay*s};
+}
+function syncCoins(){ $('coinVal').textContent=E.coins; $('shopCoins').textContent=E.coins; var els=document.querySelectorAll('.coin-all'); for(var i=0;i<els.length;i++)els[i].textContent=E.coins; var ss2=$('saveState2'); if(ss2)ss2.textContent='保存済み'; }
+function addCoins(n,label){ if(n<=0)return; E.coins+=n; RECORDS.totalCoins+=n; syncCoins(); sndCoin(); saveGame(); if(label)setStatus(label+' +'+n+'コイン（残 '+E.coins+'）'); }
+
+/* ---------- fake ads ---------- */
+var ADS=[
+  {big:'ぐにゃエナジー<br>爆裂レモン味',small:'飲めば関節まで柔らかく（※個人の感想です）',bg:'linear-gradient(135deg,#b8860b,#f5b921)'},
+  {big:'関節オイルGX',small:'もう外れない。スイング後のカチッという安心感',bg:'linear-gradient(135deg,#173a6b,#2b5fbf)'},
+  {big:'プロテイン<br>ザ・バット',small:'振るたび強くなる。1日2本、金属バット味',bg:'linear-gradient(135deg,#7a1d12,#e8442e)'},
+  {big:'転倒保険<br>月々300円',small:'ぐにゃ度の高いあなたへ。転んでも安心',bg:'linear-gradient(135deg,#14532d,#1e9e57)'}
+];
+var adBusy=false;
+function playAd(opts){
+  opts=opts||{};
+  if(adBusy)return;
+  if(E.premium&&!opts.reward){ if(opts.onDone)opts.onDone(); return; }
+  adBusy=true;
+  var ad=ADS[Math.floor(Math.random()*ADS.length)];
+  var cre=$('adCreative'); cre.style.background=ad.bg;
+  $('adBig').innerHTML=ad.big; $('adSmall').textContent=ad.small;
+  $('adReason').textContent=opts.reason||'';
+  var closeBtn=$('adClose'), prog=$('adProg'), cnt=$('adCount');
+  closeBtn.disabled=true; closeBtn.textContent='閉じる'; prog.style.width='0%';
+  $('adOverlay').classList.add('show');
+  var t=0, total=4000, watched=false;
+  var iv=setInterval(function(){
+    t+=100; prog.style.width=Math.min(100,t/total*100)+'%';
+    cnt.textContent='あと'+Math.max(0,Math.ceil((total-t)/1000))+'秒';
+    if(t>=total){ clearInterval(iv); watched=true; closeBtn.disabled=false; closeBtn.textContent=opts.reward?('受け取って閉じる（+'+opts.reward+'コイン）'):'閉じる'; cnt.textContent='視聴完了'; }
+  },100);
+  closeBtn.onclick=function(){
+    $('adOverlay').classList.remove('show'); adBusy=false;
+    if(opts.reward&&watched)addCoins(opts.reward,'広告視聴'); // reward only after a completed view
+    if(opts.onDone)opts.onDone();
+  };
+}
+$('rewardAdBtn').addEventListener('click',function(){ playAd({reward:30,reason:'リワード広告'}); });
+
+/* ---------- shop / kakin ---------- */
+function openOverlay(id){ $(id).classList.add('show'); }
+function closeOverlay(id){ $(id).classList.remove('show'); }
+function renderShop(){
+  var list=$('shopList'); list.innerHTML='';
+  function item(nm,ds){
+    var d=document.createElement('div'); d.className='shopitem';
+    var left=document.createElement('div');
+    var n=document.createElement('div'); n.className='nm'; n.textContent=nm;
+    var s=document.createElement('div'); s.className='ds'; s.textContent=ds;
+    left.appendChild(n); left.appendChild(s); d.appendChild(left);
+    var r=document.createElement('div'); r.style.marginLeft='auto'; d.appendChild(r);
+    list.appendChild(d); return r;
+  }
+  function buyBtn(r,label,price,fn){
+    var b=document.createElement('button'); b.className='buy'; b.type='button'; b.textContent=label; b.disabled=E.coins<price;
+    b.addEventListener('click',function(){ if(E.coins<price)return; E.coins-=price; fn(); afterEconomyChange(); });
+    r.appendChild(b);
+  }
+  function ownTag(r){ var s=document.createElement('span'); s.className='own'; s.textContent='解禁済み'; r.appendChild(s); }
+  if(E.premium){ var rp=item('プレミアムパス','広告オフ＋設定変更が即反映'); var s2=document.createElement('span'); s2.className='own'; s2.textContent='有効'; rp.appendChild(s2); }
+  else{ buyBtn(item('プレミアムパス','広告が一切流れなくなる'),'2000コイン',2000,function(){ E.premium=true; setStatus('プレミアムパス有効：広告オフ'); }); }
+  PITCHES.forEach(function(p){
+    if(p.id==='straight')return;
+    var r=item('球種：'+p.name,p.desc);
+    if(E.ownedPitch[p.id])ownTag(r);
+    else buyBtn(r,p.price+'コイン',p.price,function(){ E.ownedPitch[p.id]=true; setStatus(p.name+'を解禁した'); });
+  });
+  POSE_ORDER.forEach(function(id){
+    if(id==='square')return;
+    var p=POSES[id];
+    var r=item('フォーム：'+p.name,p.desc);
+    if(E.ownedPose[id])ownTag(r);
+    else buyBtn(r,p.price+'コイン',p.price,function(){ E.ownedPose[id]=true; setStatus(p.name+'を解禁した'); });
+  });
+  syncCoins();
+}
+function afterEconomyChange(){
+  saveGame();
+  syncCoins(); renderShop(); renderPitchOptions(); renderPoseList();
+  $('premiumMark').style.display=E.premium?'block':'none';
+  $('applyNote').textContent=E.premium?'プレミアム：広告なしで即反映':'設定変更のたびに広告が流れます（プレミアムでオフ）';
+  $('motionNote').textContent=E.premium?'プレミアム：広告なしで即反映されます':'モーション適用のたびに広告が流れます（プレミアムでオフ）。練習モードでは自分が投げる球、打撃は全モードに反映されます。';
+}
+$('shopBtn').addEventListener('click',function(){ renderShop(); openOverlay('shopOverlay'); });
+$('shopClose').addEventListener('click',function(){ closeOverlay('shopOverlay'); });
+$('kakinBtn').addEventListener('click',function(){ openOverlay('kakinOverlay'); });
+$('kakinClose').addEventListener('click',function(){ closeOverlay('kakinOverlay'); });
+(function buildPacks(){
+  var packs=[{c:100,y:'¥120'},{c:550,y:'¥610'},{c:1400,y:'¥1,220'},{c:3000,y:'¥2,580'}];
+  var list=$('packList');
+  packs.forEach(function(pk){
+    var b=document.createElement('button'); b.className='pack'; b.type='button';
+    var a=document.createElement('span'); a.className='amt'; a.textContent=pk.c;
+    var t=document.createElement('span'); t.style.fontWeight='800'; t.textContent='コイン';
+    var y=document.createElement('span'); y.className='yen'; y.textContent=pk.y;
+    b.appendChild(a); b.appendChild(t); b.appendChild(y);
+    b.addEventListener('click',function(){ addCoins(pk.c,'デモ購入'); });
+    list.appendChild(b);
+  });
+})();
+$('premiumKakinBtn').addEventListener('click',function(){
+  if(E.premium){ setStatus('プレミアムは有効です'); return; }
+  E.premium=true; afterEconomyChange(); closeOverlay('kakinOverlay'); setStatus('プレミアムパス有効（デモ購入）：広告オフ');
+});
+
+/* ---------- pitch / pose settings UI ---------- */
+function renderPitchOptions(){
+  var sel=$('pitchSel'); sel.innerHTML='';
+  PITCHES.forEach(function(p){
+    var o=document.createElement('option'); o.value=p.id;
+    o.textContent=E.ownedPitch[p.id]? p.name+'（'+p.desc+'）' : p.name+'（未解禁：'+p.price+'コイン）';
+    o.disabled=!E.ownedPitch[p.id];
+    sel.appendChild(o);
+  });
+  sel.value=G.selPitch;
+  $('dirSel').value=G.brkDir; $('amtRange').value=G.brkAmt; $('amtVal').textContent=G.brkAmt;
+}
+$('amtRange').addEventListener('input',function(){ $('amtVal').textContent=$('amtRange').value; });
+$('applyPitchBtn').addEventListener('click',function(){
+  var np=$('pitchSel').value, nd=$('dirSel').value, na=parseInt($('amtRange').value,10);
+  if(np===G.selPitch&&nd===G.brkDir&&na===G.brkAmt){ setStatus('設定は変更なし'); return; }
+  var apply=function(){ G.selPitch=np; G.brkDir=nd; G.brkAmt=na; saveGame(); setStatus('球種設定を反映：'+pitchDef(np).name); if(G.mode!=='practice')setMode('practice'); };
+  apply(); // order guaranteed: save first, then the 4s ad
+  if(!E.premium)playAd({reason:'球種設定の変更'});
+});
+function renderPoseList(){
+  var list=$('poseList'); list.innerHTML='';
+  POSE_ORDER.forEach(function(id){
+    var p=POSES[id];
+    var b=document.createElement('button'); b.type='button'; b.className='pose'+(G.pose===id?' on':'');
+    var left=document.createElement('span');
+    var n=document.createElement('span'); n.className='nm'; n.textContent=p.name;
+    var br=document.createElement('br');
+    var d=document.createElement('span'); d.className='ds'; d.textContent=p.desc;
+    left.appendChild(n); left.appendChild(br); left.appendChild(d);
+    b.appendChild(left);
+    var rt=document.createElement('span');
+    if(!E.ownedPose[id]){ rt.className='rt price'; rt.textContent=p.price+'コイン'; }
+    else if(G.pose===id){ rt.className='rt owned'; rt.textContent='使用中'; }
+    else { rt.className='rt owned'; rt.textContent='変更する'; }
+    b.appendChild(rt);
+    b.addEventListener('click',function(){
+      if(!E.ownedPose[id]){ renderShop(); openOverlay('shopOverlay'); return; }
+      if(G.pose===id)return;
+      var equip=function(){ G.pose=id; saveGame(); renderPoseList(); setStatus('フォーム変更：'+p.name); };
+      equip(); // order guaranteed: save first, then the 4s ad
+      if(!E.premium)playAd({reason:'フォーム変更'});
+    });
+    list.appendChild(b);
+  });
+}
+
+/* ---------- game state ---------- */
+var S;
+function freshState(){
+  return { phase:'idle', pitchNo:0, total:10, hr:0, hits:0, best:0, score:0, combo:0,
+    results:[], whiffs:0, gunya:0, camX:0, shake:0, t:0, coinsEarned:0 };
+}
+S=freshState();
+var ball={x:PITCHER_X,y:GROUND-116,r:9,vx:0,vy:0,active:false,spin:0,trail:[],_q:null,_foul:false};
+var pitchPlan=null;
+var bat={ swingT:-1, torso:0, torsoV:0, head:0, headV:0, armLag:0, armLagV:0, fall:0, fallV:0, contactDone:false, _wasSwing:false, _pendingQ:null, _pendingDiff:0 };
+function spring(cur,vel,target,k,damp){ vel+=(target-cur)*k; vel*=damp; return [cur+vel,vel]; }
+var pit={armT:0, throwing:false, wob:0};
+var particles=[];
+function burst(x,y,n,colors,speed,world){ for(var i=0;i<n;i++){ var a=Math.random()*Math.PI*2, s=(Math.random()*0.6+0.4)*(speed||260); particles.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-120,life:0.7+Math.random()*0.5,t:0,c:colors[i%colors.length],r:2+Math.random()*3,world:!!world}); } }
+function showBanner(big,sub,ms){
+  bannerBig.textContent=big; bannerSub.textContent=sub||'';
+  banner.classList.remove('show'); void banner.offsetWidth; banner.classList.add('show');
+  clearTimeout(showBanner._t);
+  showBanner._t=setTimeout(function(){banner.classList.remove('show')},ms||1600);
+}
+function setStatus(t){ statusText.textContent=t; }
+function updateLabel(){
+  if(G.mode==='practice')pitchLabel.textContent='練習 '+(S.pitchNo+1)+'球目';
+  else if(G.mode==='match'&&M)pitchLabel.textContent=M.inn+'回'+(M.half===0?'表':'裏')+'・'+(S.pitchNo+1)+'球目';
+  else pitchLabel.textContent=Math.min(S.pitchNo+1,S.total)+'球目 / '+S.total;
+}
+function renderDots(){
+  dotsEl.innerHTML='';
+  if(G.mode==='match'){ if(M)renderMatch(); return; }
+  if(G.mode!=='challenge')return;
+  for(var i=0;i<S.total;i++){
+    var d=document.createElement('span'); d.className='dot';
+    var r=S.results[i];
+    if(r){ if(r.kind==='hr')d.className+=' hr'; else if(r.kind==='hit')d.className+=' hit'; else if(r.kind==='foul')d.className+=' foul'; else d.className+=' out'; }
+    dotsEl.appendChild(d);
+  }
+}
+
+/* ---------- pitch logic ---------- */
+function buildPlan(){
+  if(G.mode==='practice'){
+    var def=pitchDef(G.selPitch);
+    var br=computeBreak(def,G.brkDir,G.brkAmt);
+    return {name:def.name+(def.id==='custom'?'（カスタム）':''), speed:def.speed, ax:br.ax, ay:br.ay};
+  }
+  var pool=[
+    {name:'まっすぐ',speed:600,ax:0,ay:0},
+    {name:'高速',speed:720,ax:0,ay:0},
+    {name:'チェンジアップ',speed:430,ax:0,ay:60}
+  ];
+  PITCHES.forEach(function(d){
+    if(d.id!=='straight'&&d.id!=='custom'&&E.ownedPitch[d.id]){
+      var b=computeBreak(d,'type',50);
+      pool.push({name:d.name,speed:d.speed,ax:b.ax,ay:b.ay});
+    }
+  });
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function startPitch(){
+  if(S.phase==='windup'||S.phase==='pitch'||S.phase==='flight')return;
+  if(M&&M.phase==='defense')return;
+  if(G.mode==='challenge'&&S.pitchNo>=S.total){ finish(); return; }
+  audio();
+  S.phase='windup'; pit.throwing=true; pit.armT=0;
+  resetFielders();
+  pitchPlan=buildPlan();
+  pitchPlan._brkM=(G.mode==='practice')? (1.3-MOT.rel/100*0.55) : 1;
+  ball.x=PITCHER_X; ball.y=GROUND-116; ball.vx=0; ball.vy=0; ball.active=false; ball.trail=[];
+  bat.swingT=-1; bat.contactDone=false; bat.fall=0; bat.fallV=0; bat._wasSwing=false; bat._pendingQ=null;
+  setStatus(pitchPlan.name+'が来る…');
+  pitchBtn.disabled=true;
+}
+function releaseBall(){
+  ball.active=true; ball.vx=-pitchPlan.speed; ball.vy=0;
+  if(G.mode==='practice'){
+    ball.vx*= (0.93+MOT.fol/100*0.16);
+    ball.vy=(MOT.rel-50)*0.85;
+  }
+  S.phase='pitch';
+}
+
+var CONTACT_X=PLATE_X+44, CONTACT_Y=GROUND-120;
+function doSwing(){
+  audio();
+  if(S.phase!=='pitch'&&S.phase!=='windup'&&S.phase!=='idle')return;
+  if(bat.swingT>=0)return;
+  bat.swingT=0; bat.contactDone=false; bat._wasSwing=(S.phase==='pitch');
+  S.gunya=Math.min(100,S.gunya+POSES[G.pose].gunya);
+  updateGunyaMeter();
+  if(S.phase==='pitch'&&ball.active){
+    var tC=0.11;
+    var projX=ball.x+ball.vx*tC+0.5*pitchPlan.ax*tC*tC;
+    var projY=ball.y+ball.vy*tC+0.5*pitchPlan.ay*tC*tC;
+    var dx=projX-CONTACT_X, dy=projY-CONTACT_Y;
+    var err=Math.abs(dx)+Math.max(0,Math.abs(dy)-16)*1.3;
+    var w=POSES[G.pose].win*(1.14-MOT.swing/100*0.38)*teamMeetFactor(), q;
+    if(err<=22*w)q='perfect'; else if(err<=70*w)q='good'; else if(err<=130*w)q='weak'; else q='miss';
+    bat._pendingQ=q; bat._pendingDiff=dx;
+  } else {
+    S.whiffs++;
+    sndWhiff();
+    bat.armLagV+=8;
+    timingWord.textContent=(S.phase==='idle')?'遅すぎ':'早すぎ';
+    if(S.gunya>=55||S.whiffs>=3){ startFall('空振りで腰が外れた'); }
+  }
+}
+function applyContact(){
+  var q=bat._pendingQ; if(!q)return; bat._pendingQ=null;
+  if(q==='miss'){ S.whiffs++; sndWhiff(); timingWord.textContent='空振り'; if(S.gunya>=55||S.whiffs>=3)startFall('空振りで転倒'); return; }
+  var pose=POSES[G.pose];
+  var gunyaBonus=1+S.gunya/220;
+  var base, angle, word;
+  if(q==='perfect'){ base=940; angle=-0.72+(bat._pendingDiff/20)*0.08; word='ジャスト！'; }
+  else if(q==='good'){ base=760; angle=-0.58; word='当たった'; }
+  else { base=520; angle=(Math.random()<0.5?-0.25:-1.05); word='ボテボテ／ファウル気味'; }
+  var foul=false;
+  if(q==='weak'&&Math.random()<0.55)foul=true;
+  var powM=(0.9+MOT.take/100*0.12+MOT.batFol/100*0.12)*teamPowFactor();
+  ball.vx=Math.cos(angle)*base*gunyaBonus*pose.pow*powM*(foul?0.55:1);
+  if(foul)ball.vx*=-0.4;
+  ball.vy=Math.sin(angle)*base*gunyaBonus*pose.pow*powM;
+  ball._fly=angle<-0.5;
+  ball.spin=14;
+  S.phase='flight'; ball.trail=[];
+  sndHit(q);
+  S.shake=q==='perfect'?10:5;
+  bat.armLagV+=q==='perfect'?10:6; bat.torsoV+=4;
+  burst(ball.x,ball.y, q==='perfect'?26:14, ['#fff','#f5b921','#e8442e'], 300, true);
+  timingWord.textContent=word;
+  ball._q=q; ball._foul=foul;
+}
+function startFall(reason){
+  if(S.phase==='fall')return;
+  S.phase='fall'; bat.fallV=2.2;
+  setStatus(reason);
+  showBanner('転倒！',reason,1300);
+  tone(200,0.4,'triangle',0.15,50);
+  setTimeout(function(){
+    recordResult({kind:'out',label:'空振り',dist:0,pts:0,type:pitchPlan?pitchPlan.name:'-'});
+  },900);
+}
+
+/* ---------- results ---------- */
+function defenseResult(distM,nearestDist){
+  if(nearestDist>52)return null;
+  var closeness=1-nearestDist/52;
+  if(ball._fly){
+    var p=0.3+closeness*0.55;
+    return Math.random()<p?'catch':null;
+  }
+  var p2=0.25+closeness*0.6;
+  return Math.random()<p2?'groundout':null;
+}
+function coinFor(r){
+  var base=r.kind==='hr'?50 : r.kind==='hit'?20 : r.kind==='foul'?2 : (r.label==='ゴロ'?5:0);
+  return G.mode==='practice'? Math.floor(base/2) : base;
+}
+function recordResult(r){
+  var c=coinFor(r); if(c>0){ E.coins+=c; S.coinsEarned+=c; RECORDS.totalCoins+=c; syncCoins(); }
+  S.results.push(r); S.pitchNo++;
+  S.whiffs=0;
+  if(r.kind==='hr'){S.hr++; S.combo++; RECORDS.totalHR++; }
+  else if(r.kind==='hit'){S.hits++; S.combo++; RECORDS.totalHits++; }
+  else S.combo=0;
+  trackDaily(r);
+  if(r.dist>S.best)S.best=r.dist;
+  if(r.dist>RECORDS.bestDist)RECORDS.bestDist=r.dist;
+  var inDefense=false;
+  if(G.mode==='match'&&M&&!M.over&&M.half===0){
+    if(r.kind==='hr'){ var sc=advanceRunners(4); r.pts+=sc*100; showBanner('ホームラン！',sc+'点追加',2000); }
+    else if(r.kind==='hit'){ advanceRunners(r.label==='長打'?2:1); }
+    else if(r.kind==='out'){ matchOut(); }
+    renderMatch();
+    inDefense=(M.phase==='defense');
+  }
+  S.score+=r.pts;
+  if(S.score>RECORDS.bestScore)RECORDS.bestScore=S.score;
+  saveGame();
+  syncScoreboard(); renderDots(); renderLog(); updateLabel();
+  if(c>0)setStatus(r.label+(r.dist?' '+r.dist+'m':'')+'　+'+c+'コイン');
+  if(G.mode==='challenge'&&S.pitchNo>=S.total){ S.phase='done'; finish(); }
+  else { S.phase='idle'; ball.active=false; ball.x=PITCHER_X; ball.y=GROUND-116; ball.vx=0; ball.vy=0; S.camX=0; pitchBtn.disabled=inDefense; if(inDefense)setStatus('3アウト：裏の守備オートへ'); else if(c<=0)setStatus('次の球へ'); }
+}
+function finish(){
+  if(finish._done)return; finish._done=true;
+  RECORDS.games++; if(S.score>RECORDS.bestScore)RECORDS.bestScore=S.score; if(S.best>RECORDS.bestDist)RECORDS.bestDist=S.best; saveGame();
+  S.phase='done'; pitchBtn.disabled=true;
+  onLeagueMatchEnd();
+  $('finalScore').textContent=S.score;
+  var line;
+  if(G.mode==='match'&&M)line='試合終了：自分 '+M.runs+' − '+M.opp+' 相手。'+(M.runs>M.opp?'勝利！':M.runs===M.opp?'引き分け':'敗戦')+'　ベスト '+S.best+'m・獲得 '+S.coinsEarned+'コイン。';
+  else if(G.mode==='practice')line='練習終了。ベスト '+S.best+'m・獲得 '+S.coinsEarned+'コイン。';
+  else if(S.hr>=3)line='ホームラン '+S.hr+'本・ベスト '+S.best+'m。獲得 '+S.coinsEarned+'コイン。';
+  else if(S.hits+S.hr>=4)line='ヒット '+(S.hits+S.hr)+'本・ベスト '+S.best+'m。獲得 '+S.coinsEarned+'コイン。';
+  else if(S.best>0)line='ベスト '+S.best+'m。獲得 '+S.coinsEarned+'コイン。';
+  else line='全て空振り／見逃し。白い枠の真ん中で振ってみよう。';
+  $('finalLine').textContent=line;
+  $('finalBox').classList.add('show');
+  setStatus(G.mode==='practice'?'練習終了':'10球終了');
+}
+function syncScoreboard(){
+  $('hrCount').textContent=S.hr; $('bestDist').textContent=S.best; $('hitCount').textContent=S.hits; $('scoreVal').textContent=S.score;
+}
+function renderLog(){
+  var tb=$('logBody'); tb.innerHTML='';
+  $('logEmpty').style.display=S.results.length?'none':'block';
+  $('logTable').style.display=S.results.length?'table':'none';
+  var rows=S.results.slice(-30);
+  var off=S.results.length-rows.length;
+  rows.forEach(function(r,i){
+    var tr=document.createElement('tr');
+    var td1=document.createElement('td'); td1.textContent=off+i+1;
+    var td2=document.createElement('td'); td2.textContent=r.type;
+    var td3=document.createElement('td'); td3.textContent=r.label;
+    var td4=document.createElement('td'); td4.className='num'; td4.textContent=r.dist?r.dist+'m':'—';
+    var td5=document.createElement('td'); td5.className='num'; td5.textContent=r.pts;
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
+    tb.appendChild(tr);
+  });
+}
+function updateGunyaMeter(){ $('gunyaMeter').style.width=S.gunya+'%'; }
+function resetAll(){
+  finish._done=false;
+  if(M&&M.defTimer)clearTimeout(M.defTimer);
+  swingBtn.disabled=false;
+  S=freshState();
+  if(G.mode==='match'){ M=newMatch(); S.total=999; renderMatch(); }
+  ball.x=PITCHER_X; ball.y=GROUND-116; ball.vx=0; ball.vy=0; ball.active=false; ball.trail=[];
+  bat.swingT=-1; bat.fall=0; bat.fallV=0; bat._pendingQ=null;
+  particles=[]; pitchPlan=null;
+  $('finalBox').classList.remove('show');
+  pitchBtn.disabled=false;
+  timingWord.textContent='—';
+  syncScoreboard(); renderDots(); renderLog(); updateGunyaMeter(); updateLabel();
+  setStatus('「投球」でスタート');
+}
+function setMode(m){
+  G.mode=m;
+  $('tabChallenge').classList.toggle('on',m==='challenge');
+  $('tabPractice').classList.toggle('on',m==='practice');
+  $('tabMatch').classList.toggle('on',m==='match');
+  $('matchBar').classList.toggle('show',m==='match');
+  if(m!=='match'){ var ml=$('matchLog'); ml.classList.remove('show'); ml.innerHTML=''; }
+  pitchBtn.textContent=(m==='practice')?'▶ 投球（練習）':'▶ 投球';
+  M=(m==='match')?newMatch():null;
+  resetAll();
+  if(m==='match'){ S.total=999; renderMatch(); updateLabel(); }
+}
+$('tabChallenge').addEventListener('click',function(){ if(G.mode!=='challenge')setMode('challenge'); });
+$('tabPractice').addEventListener('click',function(){ if(G.mode!=='practice')setMode('practice'); });
+$('tabMatch').addEventListener('click',function(){ if(G.mode!=='match')setMode('match'); });
+
+/* ---------- update ---------- */
+var last=performance.now();
+function update(dt){
+  S.t+=dt;
+  pit.wob=Math.sin(S.t*3)*0.04;
+  if(pit.throwing){
+    pit.armT+=dt/(0.75*(1.25-MOT.arm/100*0.6));
+    if(pit.armT>=0.62&&!ball.active&&S.phase==='windup')releaseBall();
+    if(pit.armT>=1){pit.throwing=false; pit.armT=0;}
+  }
+  if(bat.swingT>=0){
+    bat.swingT+=dt/(0.26*(1.3-MOT.swing/100*0.65));
+    if(bat.swingT>=0.42&&!bat.contactDone){ bat.contactDone=true; applyContact(); }
+    if(bat.swingT>=1){ bat.swingT=-1; }
+  }
+  var loose=1+S.gunya/45;
+  var r=spring(bat.torso,bat.torsoV,(bat.swingT>=0? -0.5:Math.sin(S.t*1.7)*0.03)*loose,0.06,0.86); bat.torso=r[0]; bat.torsoV=r[1];
+  r=spring(bat.head,bat.headV,-bat.torso*0.9+Math.sin(S.t*2.3)*0.05*loose,0.05,0.82); bat.head=r[0]; bat.headV=r[1];
+  r=spring(bat.armLag,bat.armLagV,0,0.09,0.80); bat.armLag=r[0]; bat.armLagV=r[1];
+  if(S.phase==='fall'){
+    bat.fallV+=dt*3; bat.fall=Math.min(1.35,bat.fall+bat.fallV*dt);
+  }
+  if(S.phase==='pitch'&&ball.active){
+    var bm=pitchPlan._brkM||1;
+    ball.vx+=pitchPlan.ax*bm*dt; ball.vy+=pitchPlan.ay*bm*dt;
+    ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
+    ball.trail.push({x:ball.x,y:ball.y}); if(ball.trail.length>10)ball.trail.shift();
+    if(ball.y>=GROUND-6&&ball.x>PLATE_X-30){
+      ball.active=false;
+      showBanner('ボール','ワンバウンド',900);
+      recordResult({kind:'out',label:'ボール',dist:0,pts:0,type:pitchPlan.name});
+    } else if(ball.x<PLATE_X-40){
+      ball.active=false;
+      if(bat._wasSwing){
+        showBanner('空振り','',900);
+        recordResult({kind:'out',label:'空振り',dist:0,pts:0,type:pitchPlan.name});
+      } else {
+        showBanner('見逃し','ストライク',900); tone(220,0.15,'sine',0.1);
+        recordResult({kind:'out',label:'見逃し',dist:0,pts:0,type:pitchPlan.name});
+      }
+    }
+    var p=(PITCHER_X-ball.x)/(PITCHER_X-(PLATE_X-60));
+    timingMarker.style.left=(Math.max(0,Math.min(1,p))*100)+'%';
+  }
+  if(S.phase==='flight'){
+    ball.vy+=980*dt;
+    ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
+    ball.trail.push({x:ball.x,y:ball.y}); if(ball.trail.length>22)ball.trail.shift();
+    var target=Math.max(0,ball.x-300);
+    S.camX+=(target-S.camX)*Math.min(1,dt*4);
+    var nf=null,nd=1e9;
+    FIELDERS.forEach(function(f){ var d=Math.abs(f.x-ball.x); if(d<nd){nd=d;nf=f;} });
+    if(nf&&ball.vy>-200){ var dir=ball.x-nf.x; var step=(dir===0?0:(dir>0?1:-1))*Math.min(Math.abs(dir),320*dt); nf.x+=step; nf.move=step!==0?(dir>0?1:-1):0; }
+    if(ball.y>=GROUND-8){
+      ball.y=GROUND-8;
+      var distM=Math.max(0,Math.round((ball.x-PLATE_X)/PPM));
+      var dr=null;
+      if(ball._foul||ball.vx<0){
+        showBanner('ファウル','',1100);
+        recordResult({kind:'foul',label:'ファウル',dist:0,pts:5,type:pitchPlan.name});
+      } else if(G.mode==='match'&&distM<FENCE_M&&(dr=defenseResult(distM,nd))){
+        showBanner(dr==='catch'?'捕球！アウト':'ゴロアウト',nf.role+'が処理 '+distM+'m',1500);
+        recordResult({kind:'out',label:dr==='catch'?'フライ捕球':'ゴロアウト',dist:distM,pts:0,type:pitchPlan.name});
+      } else if(distM>=FENCE_M){
+        var pts=300+distM+(S.combo*40);
+        showBanner('ホームラン！',distM+'m',2200); sndCrowd();
+        burst(ball.x,ball.y,30,['#f5b921','#fff','#e8442e'],380,true);
+        recordResult({kind:'hr',label:'ホームラン',dist:distM,pts:pts,type:pitchPlan.name});
+      } else if(distM>=55){
+        showBanner('ヒット！',distM+'m',1600);
+        recordResult({kind:'hit',label:'長打',dist:distM,pts:120+distM,type:pitchPlan.name});
+      } else if(distM>=18){
+        showBanner('ヒット',distM+'m',1300);
+        recordResult({kind:'hit',label:'ヒット',dist:distM,pts:60+distM,type:pitchPlan.name});
+      } else {
+        showBanner('内野ゴロ',distM+'m',1200);
+        recordResult({kind:'out',label:'ゴロ',dist:distM,pts:10,type:pitchPlan.name});
+      }
+    }
+  }
+  for(var i=particles.length-1;i>=0;i--){ var pp=particles[i]; pp.t+=dt; pp.x+=pp.vx*dt; pp.y+=pp.vy*dt; pp.vy+=500*dt; if(pp.t>pp.life)particles.splice(i,1); }
+  if(S.shake>0)S.shake=Math.max(0,S.shake-dt*26);
+}
+
+/* ---------- drawing : pro-style proportions & stadium ---------- */
+function shadow(x,y,w){ ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(x,y,w,w*0.22,0,0,7); ctx.fill(); }
+function quad(x1,y1,x2,y2,w,fill){ var dx=x2-x1,dy=y2-y1,L=Math.sqrt(dx*dx+dy*dy)||1,nx=-dy/L*w,ny=dx/L*w; ctx.fillStyle=fill; ctx.beginPath(); ctx.moveTo(x1+nx,y1+ny); ctx.lineTo(x2+nx,y2+ny); ctx.lineTo(x2-nx,y2-ny); ctx.lineTo(x1-nx,y1-ny); ctx.closePath(); ctx.fill(); return [nx,ny]; }
+function stripesOn(x1,y1,x2,y2,w,color,n){ ctx.save(); var dx=x2-x1,dy=y2-y1,L=Math.sqrt(dx*dx+dy*dy)||1,nx=-dy/L,ny=dx/L,ux=dx/L,uy=dy/L; ctx.strokeStyle=color; ctx.lineWidth=1.1; for(var i=0;i<n;i++){ var off=-w+w*2*i/(n-1); ctx.beginPath(); ctx.moveTo(x1+nx*off+ux*2,y1+ny*off+uy*2); ctx.lineTo(x2+nx*off-ux*2,y2+ny*off-uy*2); ctx.stroke(); } ctx.restore(); }
+function cleat(x,y,flip){ ctx.save(); ctx.translate(x,y); ctx.scale(flip||1,1); ctx.fillStyle='#14161a'; ctx.beginPath(); ctx.moveTo(-9,-3); ctx.lineTo(10,-3); ctx.lineTo(13,1); ctx.lineTo(13,4); ctx.lineTo(-9,4); ctx.closePath(); ctx.fill(); ctx.fillStyle='#e8e8e8'; [-6,0,7].forEach(function(o){ ctx.fillRect(o,4,3,2); }); ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fillRect(-8,-3,16,1.4); ctx.restore(); }
+function legPro(hipX,hipY,kneeX,kneeY,ankX,ankY,pants,sock){ limb(hipX,hipY,kneeX,kneeY,11,pants); limb(kneeX,kneeY,ankX,ankY-5,8,pants); limb(ankX,ankY-13,ankX,ankY-4,8.5,sock); cleat(ankX+2,ankY-3,1); }
+function headPro(hx,hy,r,skin){ ctx.fillStyle=skin; ctx.beginPath(); ctx.arc(hx,hy,r,0,7); ctx.fill(); ctx.fillStyle='rgba(0,0,0,0.08)'; ctx.beginPath(); ctx.arc(hx+r*0.25,hy+r*0.35,r*0.7,0,7); ctx.fill(); }
+function draw(){
+  ctx.save(); ctx.clearRect(0,0,W,H);
+  var shx=S.shake?(Math.random()-0.5)*S.shake:0, shy=S.shake?(Math.random()-0.5)*S.shake:0;
+  ctx.translate(shx,shy);
+  var cam=S.camX;
+  // sky + light towers
+  var sky=ctx.createLinearGradient(0,0,0,300); sky.addColorStop(0,'#060d24'); sky.addColorStop(0.6,'#10294f'); sky.addColorStop(1,'#1d4470');
+  ctx.fillStyle=sky; ctx.fillRect(-20,-20,W+40,320);
+  [-140,260,660,1060].forEach(function(lx){ var sx=lx-cam*0.22; if(sx<-90||sx>W+90)return;
+    ctx.fillStyle='#26364d'; ctx.fillRect(sx-3,58,6,86);
+    ctx.fillStyle='#31465f'; ctx.fillRect(sx-30,26,60,34);
+    var glow=ctx.createRadialGradient(sx,43,4,sx,43,62); glow.addColorStop(0,'rgba(255,246,200,0.55)'); glow.addColorStop(1,'rgba(255,246,200,0)'); ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(sx,43,62,0,7); ctx.fill();
+    ctx.fillStyle='#fff6c8'; for(var a=0;a<4;a++)for(var b=0;b<2;b++){ ctx.beginPath(); ctx.arc(sx-21+a*14,35+b*15,5.2,0,7); ctx.fill(); }
+  });
+  // upper deck + suites + lower stands with tiers/railings
+  ctx.fillStyle='#1a2a42'; ctx.fillRect(-20,104,W+40,34);
+  ctx.fillStyle='#2b3f5c'; ctx.fillRect(-20,104,W+40,5);
+  ctx.fillStyle='rgba(170,210,255,0.75)'; for(var wi=0;wi<16;wi++){ var wx2=((wi*64 - (cam*0.35%64))+1000)%1000-20; ctx.fillRect(wx2,115,38,13); }
+  ctx.fillStyle='#101c30'; ctx.fillRect(-20,138,W+40,6);
+  var tiers=['#243750','#2a405c','#243750','#2f4a68'];
+  for(var tr=0;tr<4;tr++){ ctx.fillStyle=tiers[tr]; ctx.fillRect(-20,144+tr*24,W+40,24); ctx.fillStyle='rgba(255,255,255,0.16)'; ctx.fillRect(-20,144+tr*24,W+40,2); }
+  var seed=1234; function rnd(){ seed=(seed*16807)%2147483647; return seed/2147483647; }
+  for(var i=0;i<520;i++){ var cxp=rnd()*1000-20-((cam*0.45)%14), cyp=148+rnd()*88; ctx.fillStyle=['#e8c39a','#8fb4d9','#d96a5a','#f0ead8','#6f9e7a','#e6b93d'][Math.floor(rnd()*6)]; ctx.fillRect(cxp,cyp,4.4,4.4); if(rnd()>0.6){ ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.fillRect(cxp,cyp-2,4.4,1.6); } }
+  // scoreboard center
+  var sbx=W/2-((cam*0.35)%40);
+  ctx.fillStyle='#0a1424'; roundRect(sbx-118,150,236,66,6); ctx.fill(); ctx.strokeStyle='#3f5f86'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#ffd94d'; ctx.font='900 17px Archivo,sans-serif'; ctx.textAlign='center'; ctx.fillText('GUNYA  STADIUM',sbx,174);
+  ctx.fillStyle='#dbeafe'; ctx.font='800 11px "M PLUS Rounded 1c",sans-serif'; ctx.fillText('ナイター  •  プロスピ風デモ  •  守備オート',sbx,194);
+  ctx.fillStyle='#7ef0a0'; ctx.font='900 11px Archivo,sans-serif'; ctx.fillText('● LIVE',sbx+86,166);
+  // outfield wall: padded panels + ads + distance
+  ctx.fillStyle='#123f6e'; ctx.fillRect(-20,240,W+40,38);
+  ctx.fillStyle='#0d3056'; for(var px2=-20;px2<W+40;px2+=78){ ctx.fillRect(px2,240,3,38); }
+  ctx.fillStyle='#ffcf3f'; ctx.fillRect(-20,240,W+40,4);
+  ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.font='900 12px Archivo,sans-serif';
+  ctx.fillText('GUNYA COLA',150-((cam*0.5)%300),264); ctx.fillText('KANSETSU OIL GX',480-((cam*0.5)%300),264); ctx.fillText('PROTEIN BAT',790-((cam*0.5)%300),264);
+  ctx.fillStyle='#fff'; ctx.font='900 13px Archivo,sans-serif'; ctx.fillText('115m',sbx,232);
+  // grass: checker mow pattern
+  var gr=ctx.createLinearGradient(0,278,0,H); gr.addColorStop(0,'#35a355'); gr.addColorStop(1,'#176534'); ctx.fillStyle=gr; ctx.fillRect(-20,278,W+40,H-278+20);
+  for(var gx=-240;gx<6200;gx+=92){ var gsx=gx-cam; if(gsx<-120||gsx>W+120)continue; var colIdx=Math.round((gx+cam)/92); ctx.fillStyle=(colIdx%2===0)?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.05)'; ctx.fillRect(gsx,278,46,H-278); ctx.fillRect(gsx,278+((colIdx%2)*46),92,46); }
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='700 11px Archivo,sans-serif';
+  for(var m=60;m<=220;m+=20){ var mx=PLATE_X+m*PPM-cam; if(mx>-30&&mx<W+30){ ctx.fillRect(mx,GROUND+2,2,22); ctx.fillText(m+'m',mx,GROUND+40); } }
+  // foul pole
+  var fx=PLATE_X+FENCE_M*PPM-cam;
+  if(fx>-60&&fx<W+60){ ctx.fillStyle='#ffcf3f'; ctx.fillRect(fx-3,196,6,256); ctx.fillStyle='#ffe98a'; ctx.fillRect(fx-3,196,6,10); ctx.save(); ctx.translate(fx,182); ctx.fillStyle='#fff'; ctx.font='900 14px Archivo,sans-serif'; ctx.fillText(FENCE_M+'m',0,0); ctx.restore(); }
+  // dirt: plate + mound with speckles
+  ctx.fillStyle='#b87a45'; ctx.beginPath(); ctx.ellipse(PLATE_X-cam,GROUND+14,92,21,0,0,7); ctx.fill();
+  ctx.fillStyle='#a56838'; ctx.beginPath(); ctx.ellipse(PITCHER_X-cam,GROUND+12,60,16,0,0,7); ctx.fill();
+  ctx.fillStyle='rgba(70,40,15,0.35)'; for(var di=0;di<36;di++){ var dx2=(rnd()*170-85)+PLATE_X-cam, dy2=GROUND+6+rnd()*16; ctx.fillRect(dx2,dy2,2.4,1.6); }
+  ctx.fillStyle='#f5f2ea'; ctx.beginPath(); var hpx=PLATE_X-cam; ctx.moveTo(hpx-9,GROUND+8); ctx.lineTo(hpx+9,GROUND+8); ctx.lineTo(hpx+9,GROUND+14); ctx.lineTo(hpx,GROUND+19); ctx.lineTo(hpx-9,GROUND+14); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.fillRect(PITCHER_X-cam-13,GROUND+2,26,4);
+  ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(PLATE_X-cam-70,GROUND+26); ctx.lineTo(PLATE_X-cam+240,GROUND+26); ctx.stroke();
+  if(S.phase==='pitch'||S.phase==='windup'){ ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2; ctx.setLineDash([6,5]); ctx.strokeRect(CONTACT_X-17-cam,GROUND-142,36,80); ctx.setLineDash([]); }
+  drawFielders(cam); drawPitcher(PITCHER_X-cam,GROUND); drawBatter(PLATE_X-cam,GROUND);
+  if(ball.trail.length){ ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=3; ctx.beginPath(); ball.trail.forEach(function(tp,i){ var tx=tp.x-cam; if(i===0)ctx.moveTo(tx,tp.y); else ctx.lineTo(tx,tp.y); }); ctx.stroke(); }
+  if((S.phase==='pitch'&&ball.active)||S.phase==='flight'||S.phase==='windup'){ var bx=ball.x-cam; ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(bx+3,ball.y+4,ball.r,ball.r*0.6,0,0,7); ctx.fill(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(bx,ball.y,ball.r,0,7); ctx.fill(); ctx.strokeStyle='#d92c1c'; ctx.lineWidth=1.8; ctx.beginPath(); ctx.arc(bx,ball.y,ball.r-2,0.4,2.2); ctx.stroke(); ctx.beginPath(); ctx.arc(bx,ball.y,ball.r-2,3.5,5.3); ctx.stroke(); }
+  particles.forEach(function(p){ ctx.globalAlpha=1-p.t/p.life; ctx.fillStyle=p.c; var px3=p.world? p.x-cam : p.x; ctx.beginPath(); ctx.arc(px3,p.y,p.r,0,7); ctx.fill(); ctx.globalAlpha=1; });
+  if(S.phase==='flight'){ var dm=Math.max(0,Math.round((ball.x-PLATE_X)/PPM)); ctx.fillStyle='rgba(5,12,24,0.72)'; roundRect(W-168,16,150,46,10); ctx.fill(); ctx.strokeStyle='rgba(255,217,77,0.7)'; ctx.lineWidth=1.5; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='900 26px Archivo,sans-serif'; ctx.textAlign='center'; ctx.fillText(dm+' m',W-93,49); }
+  ctx.restore();
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function limb(x1,y1,x2,y2,w,c){ ctx.strokeStyle=c; ctx.lineWidth=w; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+function drawFielders(cam){
+  FIELDERS.forEach(function(f,idx){
+    var x=f.x-cam; if(x<-50||x>W+50)return;
+    var s=0.78+idx*0.05, gy=GROUND+2;
+    ctx.save(); ctx.translate(x,gy); ctx.scale(s,s);
+    shadow(0,2,26);
+    var run=f.move!==0? Math.sin(S.t*15+idx*2)*9 : 0;
+    legPro(0,-78,-11-run,-40,-13-run,-2,'#e9edf2','#173d2a');
+    legPro(0,-78,10+run,-40,13+run,-2,'#dfe5ec','#173d2a');
+    quad(0,-78,1,-128,15,'#14532d'); stripesOn(0,-78,1,-128,13,'rgba(255,255,255,0.35)',4);
+    ctx.fillStyle='#0b2416'; ctx.fillRect(-10,-82,22,6);
+    ctx.fillStyle='#fff'; ctx.font='900 13px Archivo,sans-serif'; ctx.textAlign='center'; ctx.fillText(String(12+idx*7),1,-96);
+    limb(1,-124,-17,-98,7,'#14532d'); limb(-17,-98,-21,-80,6,'#e8b57e');
+    ctx.fillStyle='#7c4a1e'; ctx.beginPath(); ctx.arc(-22,-74,9,0,7); ctx.fill(); ctx.strokeStyle='#a9713a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(-22,-74,6,0.5,2.6); ctx.stroke();
+    limb(1,-124,15,-100,7,'#14532d'); limb(15,-100,18,-84,6,'#e8b57e');
+    headPro(2,-141,8.6,'#eec39b');
+    ctx.fillStyle='#0d3a20'; ctx.beginPath(); ctx.arc(2,-143.5,8.8,Math.PI,0); ctx.fill(); ctx.fillRect(2,-144.5,15,3.6); ctx.fillStyle='#fff'; ctx.font='900 6px Archivo,sans-serif'; ctx.fillText('G',4,-144);
+    ctx.restore();
+  });
+}
+function drawPitcher(x,gy){
+  var hipY=gy-90, shY=gy-150;
+  ctx.save(); ctx.translate(x,0); ctx.rotate(pit.wob);
+  shadow(0,gy+2,32);
+  var stride=pit.throwing? easeOut(pit.armT)*14 : 0;
+  legPro(-2,hipY,-16-stride*0.3,gy-44,-19,gy-2,'#eef1f5','#1c3f7c');
+  legPro(4,hipY,13+stride,gy-46,22+stride,gy-2,'#e6ebf1','#1c3f7c');
+  quad(0,hipY,2,shY,16,'#2456a6'); stripesOn(0,hipY,2,shY,14,'rgba(255,255,255,0.4)',4);
+  ctx.strokeStyle='#fff'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(2,hipY-2); ctx.lineTo(3,shY+4); ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font='900 17px Archivo,sans-serif'; ctx.textAlign='center'; ctx.fillText('18',2,(hipY+shY)/2+6);
+  ctx.fillStyle='#12294f'; ctx.fillRect(-10,hipY-4,22,6);
+  var ang=-2.5+(pit.throwing? easeOut(pit.armT)*3.9 : Math.sin(S.t*2)*0.08);
+  var ex=2+Math.cos(ang)*27, ey=shY+Math.sin(ang)*27;
+  limb(2,shY,ex,ey,8,'#2456a6'); var hx=ex+Math.cos(ang)*21, hy=ey+Math.sin(ang)*21; limb(ex,ey,hx,hy,6.5,'#eec39b');
+  limb(2,shY,-18,shY+30,8,'#2456a6'); limb(-18,shY+30,-13,shY+50,6.5,'#eec39b');
+  ctx.fillStyle='#7c4a1e'; ctx.beginPath(); ctx.arc(-13,shY+57,9.5,0,7); ctx.fill(); ctx.strokeStyle='#c99a5e'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(-13,shY+57,6.5,0.4,2.8); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-19,shY+52); ctx.lineTo(-7,shY+62); ctx.stroke();
+  headPro(4,shY-16,9,'#eec39b');
+  ctx.fillStyle='#1c3f7c'; ctx.beginPath(); ctx.arc(4,shY-19,9.4,Math.PI,0); ctx.fill(); ctx.fillRect(4,shY-20,17,4.2);
+  ctx.fillStyle='#fff'; ctx.font='900 7px Archivo,sans-serif'; ctx.fillText('G',5,shY-19);
+  ctx.fillStyle='#3a2415'; ctx.beginPath(); ctx.arc(8,shY-15,1.6,0,7); ctx.fill();
+  if(S.phase==='windup'&&pit.throwing&&pit.armT<0.62){ ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(hx,hy,6.5,0,7); ctx.fill(); ctx.strokeStyle='#d92c1c'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.arc(hx,hy,4.5,0.4,2.4); ctx.stroke(); }
+  ctx.restore();
+}
+function easeOut(t){ return 1-Math.pow(1-Math.min(1,t),3); }
+function easeInOut(t){ return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
+function drawBatter(x,gy){
+  var pose=POSES[G.pose];
+  ctx.save(); ctx.translate(x,gy);
+  if(bat.fall>0){ ctx.rotate(-bat.fall*0.9); ctx.translate(0,-Math.sin(bat.fall)*6); }
+  shadow(2,3,36);
+  var loose=1+S.gunya/50;
+  var wob=Math.sin(S.t*2.6)*0.045*loose;
+  var hipX=0, hipY=-94+Math.sin(S.t*3)*1.6*loose;
+  var kneeSpread=pose.spread+6+Math.sin(S.t*2.2)*3.5*loose + S.gunya*0.12;
+  // legs: white pants, red stirrups, black cleats -- athletic long legs
+  legPro(hipX,hipY,-kneeSpread,-46,-15,-2,'#f4f5f2','#c0271a');
+  if(G.pose==='ichi'&&bat.swingT<0&&S.phase!=='fall'){
+    legPro(hipX,hipY,16,-58,30,-30,'#eef0ec','#c0271a');
+  } else {
+    legPro(hipX,hipY,kneeSpread*0.82,-48,17,-2,'#eef0ec','#c0271a');
+  }
+  var shX=hipX+Math.sin(bat.torso)*46, shY=hipY-Math.cos(bat.torso)*54;
+  quad(hipX,hipY,shX,shY,15,'#f7f7f4'); stripesOn(hipX,hipY,shX,shY,13,'rgba(23,58,107,0.55)',5);
+  ctx.save(); ctx.translate((hipX+shX)/2,(hipY+shY)/2); ctx.rotate(bat.torso);
+  ctx.strokeStyle='#c0271a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(13,-24); ctx.lineTo(13,24); ctx.stroke();
+  ctx.fillStyle='#c0271a'; ctx.font='900 21px Archivo,sans-serif'; ctx.textAlign='center'; ctx.fillText('7',-2,8);
+  ctx.restore();
+  ctx.fillStyle='#191c20'; ctx.fillRect(hipX-11,hipY-5,22,6); ctx.fillStyle='#d8b93a'; ctx.fillRect(-3,hipY-5,6,6);
+  var hx=shX+Math.sin(bat.torso+bat.head)*17, hy=shY-17+bat.head*6;
+  ctx.save(); ctx.translate(hx,hy); ctx.rotate(bat.head*0.7+wob);
+  headPro(0,0,9,'#eec39b');
+  // glossy batting helmet with ear flap + brim + highlight
+  ctx.fillStyle='#142f57'; ctx.beginPath(); ctx.arc(-1,-2,10.4,Math.PI*0.88,Math.PI*2.08); ctx.fill();
+  ctx.beginPath(); ctx.arc(-5,3,5.6,0,7); ctx.fill();
+  ctx.fillRect(0,-5.5,18,4.6);
+  ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(-2,-3,7.6,Math.PI*1.15,Math.PI*1.65); ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font='900 7px Archivo,sans-serif'; ctx.textAlign='center'; ctx.fillText('G',-4,-4);
+  ctx.fillStyle='#222';
+  if(S.gunya>=55||S.phase==='fall'){ ctx.font='900 10px sans-serif'; ctx.fillText('×',5,3); } else { ctx.beginPath(); ctx.arc(5.5,0,1.7,0,7); ctx.fill(); ctx.fillStyle='rgba(160,60,40,0.6)'; ctx.fillRect(3,5,5,1.4); }
+  ctx.restore();
+  var restAng=pose.batRest, batAng;
+  if(bat.swingT>=0){ if(bat.swingT<=0.42){ batAng=lerp(restAng,-0.12,easeOut(bat.swingT/0.42))+bat.armLag*0.08; } else { batAng=lerp(-0.12,1.35,easeInOut(Math.min(1,(bat.swingT-0.42)/0.58)))+bat.armLag*0.08; } }
+  else { batAng=restAng+Math.sin(S.t*2.4)*0.06*loose+bat.armLag*0.1; }
+  var elbowBend=0.55+bat.armLag*0.06+Math.sin(S.t*3)*0.05*loose;
+  var a1=batAng+0.15;
+  var ex=shX+Math.cos(a1)*25, ey=shY+Math.sin(a1)*25+20;
+  var a2=a1+elbowBend;
+  var wx=ex+Math.cos(a2)*22, wy=ey+Math.sin(a2)*22;
+  limb(shX,shY,ex,ey,8.5,'#c0271a'); limb(ex,ey,wx,wy,6.5,'#eec39b'); ctx.fillStyle='#f2f2f2'; ctx.beginPath(); ctx.arc(wx,wy,5.4,0,7); ctx.fill();
+  limb(shX,shY,ex+3,ey+4,8.5,'#a81f14'); limb(ex+3,ey+8,wx-2,wy+5,6.5,'#e2af7d'); ctx.fillStyle='#e8e8e8'; ctx.beginPath(); ctx.arc(wx-2,wy+5,5,0,7); ctx.fill();
+  // wooden bat: thin handle -> thick barrel with grain + highlight
+  var bl=82;
+  var bx2=wx+Math.cos(batAng)*bl, by2=wy+Math.sin(batAng)*bl;
+  ctx.lineCap='round';
+  ctx.strokeStyle='#5f3a17'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(wx-Math.cos(batAng)*10,wy-Math.sin(batAng)*10); ctx.lineTo(wx+Math.cos(batAng)*30,wy+Math.sin(batAng)*30); ctx.stroke();
+  ctx.strokeStyle='#9c6a2f'; ctx.lineWidth=9; ctx.beginPath(); ctx.moveTo(wx+Math.cos(batAng)*28,wy+Math.sin(batAng)*28); ctx.lineTo(bx2,by2); ctx.stroke();
+  ctx.strokeStyle='rgba(255,235,190,0.65)'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(wx+Math.cos(batAng)*34,wy+Math.sin(batAng)*34-2); ctx.lineTo(bx2-3,by2-2); ctx.stroke();
+  ctx.fillStyle='#3a2410'; ctx.beginPath(); ctx.arc(wx-Math.cos(batAng)*11,wy-Math.sin(batAng)*11,4,0,7); ctx.fill();
+  if(S.phase==='fall'){ ctx.fillStyle='#ffd34d'; ctx.font='16px sans-serif'; ctx.textAlign='center'; for(var i=0;i<3;i++){ var sa=S.t*3+i*2.1; ctx.fillText('✦',hx+Math.cos(sa)*22,hy-22+Math.sin(sa)*6); } }
+  ctx.restore();
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+/* ================= app-scale layer: players / league / scout / missions ================= */
+var PLAYERS=[
+  {id:'go',name:'轟 雷太',rarity:'SSR',pos:'外野',meet:88,pow:97,pit:30,face:'轟'},
+  {id:'kurogane',name:'黒鉄 剛',rarity:'SSR',pos:'投手',meet:40,pow:45,pit:96,face:'黒'},
+  {id:'hayate',name:'疾風 駿',rarity:'SR',pos:'内野',meet:93,pow:76,pit:35,face:'疾'},
+  {id:'maru',name:'丸藤 力',rarity:'SR',pos:'捕手',meet:80,pow:90,pit:40,face:'丸'},
+  {id:'ginji',name:'銀次 翔',rarity:'SR',pos:'投手',meet:45,pow:40,pit:88,face:'銀'},
+  {id:'taiga',name:'大河 蓮',rarity:'R',pos:'外野',meet:78,pow:82,pit:30,face:'大'},
+  {id:'sora',name:'空野 蒼',rarity:'R',pos:'内野',meet:84,pow:68,pit:30,face:'空'},
+  {id:'riku',name:'陸奥 陸',rarity:'R',pos:'投手',meet:40,pow:38,pit:80,face:'陸'},
+  {id:'hana',name:'花咲 凛',rarity:'R',pos:'外野',meet:82,pow:70,pit:28,face:'花'},
+  {id:'kenji',name:'剣持 心',rarity:'R',pos:'内野',meet:76,pow:74,pit:30,face:'剣'},
+  {id:'ponta',name:'ぽん太',rarity:'N',pos:'内野',meet:66,pow:62,pit:25,face:'ぽ'},
+  {id:'goro',name:'吾郎',rarity:'N',pos:'外野',meet:60,pow:70,pit:22,face:'吾'},
+  {id:'kenta',name:'健太',rarity:'N',pos:'捕手',meet:64,pow:60,pit:20,face:'健'},
+  {id:'yuji',name:'勇二',rarity:'N',pos:'投手',meet:35,pow:30,pit:64,face:'勇'},
+  {id:'saburo',name:'三郎',rarity:'N',pos:'内野',meet:62,pow:58,pit:20,face:'三'},
+  {id:'jiro',name:'次郎',rarity:'N',pos:'外野',meet:58,pow:64,pit:18,face:'次'},
+  {id:'heita',name:'平太',rarity:'N',pos:'投手',meet:30,pow:28,pit:58,face:'平'}
+];
+function pDef(id){ for(var i=0;i<PLAYERS.length;i++)if(PLAYERS[i].id===id)return PLAYERS[i]; return null; }
+var OPP_TEAMS=[
+  {name:'港北シーガルズ',pow:58},{name:'城南ライオンズ',pow:64},{name:'高原イーグルス',pow:68},
+  {name:'港東シャークス',pow:72},{name:'帝都ウルブズ',pow:76},{name:'北辰ベアーズ',pow:80},{name:'皇都ドラゴンズ',pow:85}
+];
+function defaultTable(){ var t={}; t['YOU']={w:0,l:0,d:0}; OPP_TEAMS.forEach(function(o){ t[o.name]={w:0,l:0,d:0}; }); return t; }
+function defaultApp(){
+  return {
+    players:{ponta:1,goro:1,kenta:1,yuji:1,saburo:1,jiro:1},
+    lineup:['ponta','goro','kenta','yuji','saburo','jiro'],
+    tickets:0, scoutCount:0,
+    league:{season:1,stage:0,results:[],table:defaultTable(),finished:false,rewardClaimed:false},
+    missions:{}, daily:{date:'',hr:0,hits:0,plays:0,claimed:{}},
+    login:{last:'',total:0},
+    settings:{sound:true,teamName:'ぐにゃスターズ'}
+  };
+}
+var APP=defaultApp();
+function mergeApp(d){
+  var a=defaultApp();
+  if(!isPlainObj(d)){ APP=a; return; }
+  if(isPlainObj(d.players)){ var pl={}; for(var pk in d.players){ if(pDef(pk)){ var lv=numOr(d.players[pk],0); if(lv>0)pl[pk]=Math.max(1,Math.min(20,Math.floor(lv))); } } a.players=pl; }
+  if(Array.isArray(d.lineup))a.lineup=d.lineup.filter(function(id){ return pDef(id)&&a.players[id]; });
+  a.tickets=Math.max(0,Math.floor(numOr(d.tickets,0)));
+  a.scoutCount=Math.max(0,Math.floor(numOr(d.scoutCount,0)));
+  if(isPlainObj(d.league)){
+    a.league.season=Math.max(1,Math.floor(numOr(d.league.season,1)));
+    a.league.stage=Math.max(0,Math.min(OPP_TEAMS.length,Math.floor(numOr(d.league.stage,0))));
+    if(Array.isArray(d.league.results))a.league.results=d.league.results.filter(function(r){ return isPlainObj(r)&&typeof r.opp==='string'&&(r.res==='win'||r.res==='loss'||r.res==='draw'); }).slice(0,OPP_TEAMS.length);
+    if(isPlainObj(d.league.table)){ for(var tk in a.league.table){ var row=d.league.table[tk]; if(isPlainObj(row))a.league.table[tk]={w:Math.max(0,Math.floor(numOr(row.w,0))),l:Math.max(0,Math.floor(numOr(row.l,0))),d:Math.max(0,Math.floor(numOr(row.d,0)))}; } }
+    a.league.finished=d.league.finished===true||a.league.stage>=OPP_TEAMS.length;
+    a.league.rewardClaimed=d.league.rewardClaimed===true;
+  }
+  if(isPlainObj(d.missions)){ var ms={}; for(var mk in d.missions)if(d.missions[mk]===true)ms[mk]=true; a.missions=ms; }
+  if(isPlainObj(d.daily))a.daily={ date:(typeof d.daily.date==='string'?d.daily.date:''), hr:Math.max(0,Math.floor(numOr(d.daily.hr,0))), hits:Math.max(0,Math.floor(numOr(d.daily.hits,0))), plays:Math.max(0,Math.floor(numOr(d.daily.plays,0))), claimed:(isPlainObj(d.daily.claimed)?d.daily.claimed:{}) };
+  if(isPlainObj(d.login))a.login={ last:(typeof d.login.last==='string'?d.login.last:''), total:Math.max(0,Math.floor(numOr(d.login.total,0))) };
+  if(isPlainObj(d.settings))a.settings={ sound:d.settings.sound!==false, teamName:(typeof d.settings.teamName==='string'&&d.settings.teamName.trim())?d.settings.teamName:'ぐにゃスターズ' };
+  APP=a;
+}
+function resetAppData(){ APP=defaultApp(); }
+function effStats(id){ var p=pDef(id), lv=APP.players[id]||1, g=(lv-1)*2; return {meet:p.meet+g, pow:p.pow+g, pit:p.pit+g, lv:lv}; }
+function lineupPlayers(){ return APP.lineup.filter(function(id){ return APP.players[id]; }); }
+function teamAvgs(){ var ids=lineupPlayers(); if(!ids.length)return{meet:0,pow:0,pit:0}; var m=0,pw=0,pt=0; ids.forEach(function(id){ var s=effStats(id); m+=s.meet; pw+=s.pow; pt=Math.max(pt,s.pit); }); return {meet:m/ids.length, pow:pw/ids.length, pit:pt}; }
+function teamPower(){ var ids=lineupPlayers(), t=0; ids.forEach(function(id){ var s=effStats(id); t+=Math.round((s.meet+s.pow+s.pit)/3); }); return t; }
+function teamMeetFactor(){ var a=teamAvgs(); return 1+Math.max(0,a.meet-60)/260; }
+function teamPowFactor(){ var a=teamAvgs(); return 1+Math.max(0,a.pow-60)/300; }
+function currentOpp(){ var st=APP.league.stage; if(st>=OPP_TEAMS.length)return null; var o=OPP_TEAMS[st]; return {name:o.name, pow:o.pow+(APP.league.season-1)*4}; }
+function oppHitBias(){ var o=currentOpp(); if(!o||G.mode!=='match')return 0; var a=teamAvgs(); var b=(o.pow-72)/300-(a.pit-64)/500; return Math.max(-0.12,Math.min(0.12,b)); }
+function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function ensureDaily(){ if(APP.daily.date!==todayStr()){ APP.daily={date:todayStr(),hr:0,hits:0,plays:0,claimed:{}}; } }
+function trackDaily(r){ ensureDaily(); if(r.kind==='hr'){ APP.daily.hr++; APP.daily.hits++; } else if(r.kind==='hit'){ APP.daily.hits++; } }
+function leagueWins(){ return APP.league.results.filter(function(r){return r.res==='win';}).length; }
+function myRank(){ var rows=standingsRows(); for(var i=0;i<rows.length;i++)if(rows[i].name==='YOU')return i+1; return rows.length; }
+function standingsRows(){ var t=APP.league.table, rows=[]; for(var k in t){ rows.push({name:k,w:t[k].w,l:t[k].l,d:t[k].d,pts:t[k].w*3+t[k].d}); } rows.sort(function(a,b){ return b.pts-a.pts||b.w-a.w; }); return rows; }
+function onLeagueMatchEnd(){
+  ensureDaily(); APP.daily.plays++;
+  if(G.mode!=='match'||!M){ renderAllApp(); return; }
+  var opp=currentOpp(); if(!opp){ renderAllApp(); return; }
+  var res=M.runs>M.opp?'win':(M.runs===M.opp?'draw':'loss');
+  var t=APP.league.table;
+  t['YOU'][res==='win'?'w':(res==='draw'?'d':'l')]++;
+  if(t[opp.name])t[opp.name][res==='win'?'l':(res==='draw'?'d':'w')]++;
+  var others=OPP_TEAMS.map(function(o){return o.name;}).filter(function(n){return n!==opp.name;});
+  for(var i=0;i+1<others.length;i+=2){ var win=Math.random()<0.5?others[i]:others[i+1]; var lose=win===others[i]?others[i+1]:others[i]; t[win].w++; t[lose].l++; }
+  APP.league.results.push({opp:opp.name,score:M.runs+'−'+M.opp,res:res});
+  APP.league.stage++;
+  if(APP.league.stage>=OPP_TEAMS.length)APP.league.finished=true;
+  var reward=res==='win'?150:(res==='draw'?60:30);
+  E.coins+=reward; RECORDS.totalCoins+=reward; syncCoins();
+  saveGame(); renderAllApp();
+}
+/* ----- missions ----- */
+function totalLevelSum(){ var s=0; for(var k in APP.players)s+=APP.players[k]; return s; }
+var MISSIONS=[
+  {id:'hr1',t:'初ホームラン',d:'通算ホームラン1本',target:1,reward:100,prog:function(){return RECORDS.totalHR;}},
+  {id:'hr5',t:'ホームラン通算5本',d:'通算ホームラン5本',target:5,reward:300,prog:function(){return RECORDS.totalHR;}},
+  {id:'hr20',t:'ホームラン通算20本',d:'通算ホームラン20本',target:20,reward:800,prog:function(){return RECORDS.totalHR;}},
+  {id:'hit10',t:'ヒット通算10本',d:'ヒット＋ホームラン10本',target:10,reward:150,prog:function(){return RECORDS.totalHits+RECORDS.totalHR;}},
+  {id:'hit50',t:'ヒット通算50本',d:'ヒット＋ホームラン50本',target:50,reward:500,prog:function(){return RECORDS.totalHits+RECORDS.totalHR;}},
+  {id:'game5',t:'5回プレイ',d:'チャレンジ／試合／練習を5回完了',target:5,reward:200,prog:function(){return RECORDS.games;}},
+  {id:'game20',t:'20回プレイ',d:'通算20回完了',target:20,reward:600,prog:function(){return RECORDS.games;}},
+  {id:'dist100',t:'飛距離100m',d:'最長飛距離100m到達',target:100,reward:250,prog:function(){return RECORDS.bestDist;}},
+  {id:'dist115',t:'フェンス越え',d:'最長飛距離115m（ホームラン級）',target:115,reward:400,prog:function(){return RECORDS.bestDist;}},
+  {id:'lg1',t:'リーグ初勝利',d:'リーグ戦で1勝',target:1,reward:200,prog:function(){return leagueWins();}},
+  {id:'lg3',t:'リーグ3勝',d:'リーグ戦で通算3勝',target:3,reward:500,prog:function(){return leagueWins();}},
+  {id:'sc1',t:'初スカウト',d:'スカウトを1回引く',target:1,reward:100,prog:function(){return APP.scoutCount;}},
+  {id:'sc10',t:'スカウト10回',d:'スカウトを10回引く',target:10,reward:400,prog:function(){return APP.scoutCount;}},
+  {id:'coin2000',t:'コイン収集家',d:'累計2,000コイン獲得',target:2000,reward:300,prog:function(){return RECORDS.totalCoins;}},
+  {id:'lv20',t:'育成の成果',d:'所持選手の合計レベル20',target:20,reward:300,prog:function(){return totalLevelSum();}}
+];
+var DAILY=[
+  {id:'d_play',t:'今日1回プレイ完了',d:'チャレンジ／試合／練習を今日1回完了する',target:1,reward:50,prog:function(){return APP.daily.plays;}},
+  {id:'d_hit',t:'今日ヒット3本',d:'今日ヒット（ホームラン含む）を3本打つ',target:3,reward:60,prog:function(){return APP.daily.hits;}},
+  {id:'d_hr',t:'今日ホームラン1本',d:'今日ホームランを1本打つ',target:1,reward:100,prog:function(){return APP.daily.hr;}}
+];
+function claimableCount(){ ensureDaily(); var n=0; MISSIONS.forEach(function(m){ if(!APP.missions[m.id]&&m.prog()>=m.target)n++; }); DAILY.forEach(function(m){ if(!APP.daily.claimed[m.id]&&m.prog()>=m.target)n++; }); return n; }
+var LOGIN_REWARDS=[50,80,100,150,200,300,500];
+/* ----- rendering ----- */
+function el(tag,cls,txt){ var e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; }
+function playerCard(id,opts){
+  opts=opts||{}; var p=pDef(id), s=effStats(id);
+  var card=el('div','pcard'+(opts.inLineup?' in':''));
+  var top=el('div'); top.appendChild(el('span','rar rar-'+p.rarity,p.rarity+' ★')); top.appendChild(el('span','ppos','　'+p.pos+' ／ Lv.'+s.lv+(opts.inLineup?' ／ 先発':'')));
+  card.appendChild(top);
+  card.appendChild(el('div','pnm',p.name));
+  var face=el('div','face face-'+p.rarity,p.face); card.appendChild(face);
+  [['ミート',s.meet],['パワー',s.pow],['投球',s.pit]].forEach(function(pair){
+    var st=el('div','stat'); var r=el('div','sr2'); r.appendChild(el('span',null,pair[0])); r.appendChild(el('span',null,String(pair[1])));
+    var bar=el('div','bar'); var fill=el('div'); fill.style.width=Math.min(100,pair[1])+'%'; bar.appendChild(fill);
+    st.appendChild(r); st.appendChild(bar); card.appendChild(st);
+  });
+  if(opts.buttons){
+    var row=el('div','prow');
+    var lvBtn=el('button','mini goldb', s.lv>=20?'Lv.MAX':'強化 '+30*s.lv+'C');
+    lvBtn.type='button'; lvBtn.disabled=s.lv>=20||E.coins<30*s.lv;
+    lvBtn.addEventListener('click',function(){ var cost=30*effStats(id).lv; if(E.coins<cost||APP.players[id]>=20)return; E.coins-=cost; APP.players[id]++; saveGame(); renderAllApp(); });
+    var tg=el('button','mini', opts.inLineup?'先発を外す':'先発に入れる'); tg.type='button';
+    tg.addEventListener('click',function(){
+      var ix=APP.lineup.indexOf(id);
+      if(ix>=0)APP.lineup.splice(ix,1);
+      else { if(APP.lineup.length>=9){ setStatus('先発は9人まで'); return; } APP.lineup.push(id); }
+      saveGame(); renderAllApp();
+    });
+    row.appendChild(lvBtn); row.appendChild(tg); card.appendChild(row);
+  }
+  return card;
+}
+function renderHome(){
+  $('homeTeamName').textContent=APP.settings.teamName;
+  $('homeSeasonLine').textContent='シーズン'+APP.league.season+' ・ '+(APP.league.finished?'全節終了':('第'+(APP.league.stage+1)+'節'))+' ／ '+leagueWins()+'勝 '+APP.league.results.filter(function(r){return r.res==='loss';}).length+'敗';
+  $('homeRank').textContent=APP.league.results.length? myRank()+'位':'-';
+  $('homePower').textContent=teamPower();
+  $('homePlayers').textContent=Object.keys(APP.players).length;
+  var opp=currentOpp();
+  if(opp){ $('homeNextOpp').textContent='vs '+opp.name; $('homeNextOppSub').textContent='相手総合力 '+opp.pow+' ／ 勝利報酬 150コイン'; $('homeNextForm').textContent='第'+(APP.league.stage+1)+'節'; }
+  else { $('homeNextOpp').textContent='シーズン終了'; $('homeNextOppSub').textContent='リーグ画面で順位報酬を受け取れます'; $('homeNextForm').textContent='終了'; }
+  $('homeMissionCount').textContent=claimableCount();
+  var rec=$('homeRecords'); rec.innerHTML='';
+  [['通算ベストスコア',RECORDS.bestScore+'点'],['最長飛距離',RECORDS.bestDist+'m'],['通算ホームラン',RECORDS.totalHR+'本'],['通算ヒット',RECORDS.totalHits+'本'],['プレイ回数',RECORDS.games+'回'],['リーグ勝利',leagueWins()+'勝'],['スカウト回数',APP.scoutCount+'回']].forEach(function(pair){
+    var kv=el('div','kv'); kv.appendChild(el('span',null,pair[0])); var b=el('b',null,pair[1]); kv.appendChild(b); rec.appendChild(kv);
+  });
+  renderLogin();
+}
+function renderLogin(){
+  ensureDaily();
+  var cal=$('loginCal'); cal.innerHTML='';
+  var claimedToday=APP.login.last===todayStr();
+  var idx=APP.login.total%7;
+  for(var i=0;i<7;i++){
+    var d=el('div','d'+(i<idx||(claimedToday&&i===idx)?' done':'')+(i===idx&&!claimedToday?' today':''));
+    d.appendChild(document.createTextNode((i+1)+'日目')); var b=el('b',null,LOGIN_REWARDS[i]+'C'); d.appendChild(b);
+    cal.appendChild(d);
+  }
+  var btn=$('loginClaimBtn');
+  btn.disabled=claimedToday;
+  btn.textContent=claimedToday?'本日分は受取済み':'今日のボーナスを受け取る（'+LOGIN_REWARDS[idx]+'コイン）';
+  $('loginState').textContent='累計ログイン '+APP.login.total+'日'+(claimedToday?' ／ 明日また受け取れます':'');
+}
+function renderLeague(){
+  $('leagueSeasonTag').textContent='シーズン'+APP.league.season;
+  var wrap=$('leagueTable'); wrap.innerHTML='';
+  var tb=el('table','lg'); var thead=el('tr'); ['順位','チーム','勝','敗','分','勝点'].forEach(function(h,i){ var th=el('th',i>=2?'num':'',h); thead.appendChild(th); }); tb.appendChild(thead);
+  standingsRows().forEach(function(r,i){
+    var tr=el('tr',r.name==='YOU'?'me':'');
+    [String(i+1), r.name==='YOU'?APP.settings.teamName:r.name, String(r.w), String(r.l), String(r.d), String(r.pts)].forEach(function(v,j){ tr.appendChild(el('td',j>=2?'num':'',v)); });
+    tb.appendChild(tr);
+  });
+  wrap.appendChild(tb);
+  var fl=$('fixtureList'); fl.innerHTML='';
+  OPP_TEAMS.forEach(function(o,i){
+    var f=el('div','fix'); var left=el('div');
+    left.appendChild(el('div','on2','第'+(i+1)+'節 vs '+o.name));
+    left.appendChild(el('div','od','相手総合力 '+(o.pow+(APP.league.season-1)*4)));
+    f.appendChild(left);
+    var res=APP.league.results[i];
+    var rs=el('span','res'+(res?(res.res==='win'?' w':(res.res==='loss'?' l':'')):''));
+    rs.textContent=res? (res.res==='win'?'勝利 ':res.res==='loss'?'敗戦 ':'引分 ')+res.score : (i===APP.league.stage?'次の試合':'未対戦');
+    f.appendChild(rs); fl.appendChild(f);
+  });
+  var box=$('seasonEndBox'); box.innerHTML='';
+  $('leaguePlayBtn').style.display=APP.league.finished?'none':'';
+  if(APP.league.finished){
+    var rank=myRank();
+    var reward=rank===1?800:(rank===2?500:(rank===3?350:200));
+    if(!APP.league.rewardClaimed){
+      var b=el('button','bigbtn goldb','シーズン終了： '+rank+'位報酬 '+reward+'コインを受け取る'); b.type='button';
+      b.addEventListener('click',function(){ APP.league.rewardClaimed=true; addCoins(reward,'順位報酬'); saveGame(); renderAllApp(); });
+      box.appendChild(b);
+    } else {
+      var nb=el('button','bigbtn','次のシーズンへ（シーズン'+(APP.league.season+1)+'・相手強化）'); nb.type='button';
+      nb.addEventListener('click',function(){ APP.league={season:APP.league.season+1,stage:0,results:[],table:defaultTable(),finished:false,rewardClaimed:false}; saveGame(); renderAllApp(); });
+      box.appendChild(nb);
+    }
+  }
+}
+function renderTeam(){
+  $('teamPower').textContent=teamPower();
+  var a=teamAvgs();
+  $('teamBatFx').textContent='ミート平均'+Math.round(a.meet)+'（芯 ×'+teamMeetFactor().toFixed(2)+'）／ パワー平均'+Math.round(a.pow)+'（飛距離 ×'+teamPowFactor().toFixed(2)+'）';
+  $('teamPitFx').textContent='エース投球 '+a.pit;
+  var lg=$('lineupGrid'); lg.innerHTML='';
+  var ids=lineupPlayers();
+  var le=$('lineupEmpty'); le.hidden=ids.length>0; le.style.display=ids.length?'none':'block'; le.textContent=ids.length?'':'先発が未設定です。下の選手一覧から「先発に入れる」を押してください。';
+  ids.forEach(function(id){ lg.appendChild(playerCard(id,{inLineup:true})); });
+  var rg=$('rosterGrid'); rg.innerHTML='';
+  var re=$('rosterEmpty'); if(re)re.style.display=Object.keys(APP.players).length?'none':'block';
+  var order={SSR:0,SR:1,R:2,N:3};
+  Object.keys(APP.players).sort(function(x,y){ return order[pDef(x).rarity]-order[pDef(y).rarity]||pDef(y).pow-pDef(x).pow; }).forEach(function(id){
+    rg.appendChild(playerCard(id,{inLineup:APP.lineup.indexOf(id)>=0,buttons:true}));
+  });
+}
+function renderScout(){
+  $('ticketVal').textContent=APP.tickets;
+  $('scoutCountVal').textContent=APP.scoutCount;
+  $('scout1Btn').textContent=APP.tickets>0?'1回スカウト（チケット1枚で無料）':'1回スカウト（100コイン）';
+  $('scout1Btn').disabled=APP.tickets<=0&&E.coins<100;
+  $('scout10Btn').disabled=E.coins<900;
+  var pg=$('pickupGrid'); pg.innerHTML='';
+  ['go','kurogane','hayate'].forEach(function(id){ var c=playerCard(id,{}); if(!APP.players[id]){ c.style.opacity='0.75'; } pg.appendChild(c); });
+}
+function buildMissionRow(m,claimed,progVal,onClaim){
+  var row=el('div','miss'); var left=el('div');
+  left.appendChild(el('div','mt',m.t));
+  left.appendChild(el('div','md',m.d+' ／ 報酬 '+m.reward+'コイン'));
+  var pr=el('div','prog'); var fill=el('div'); fill.style.width=Math.min(100,progVal/m.target*100)+'%'; pr.appendChild(fill); left.appendChild(pr);
+  left.appendChild(el('div','md',Math.min(progVal,m.target)+' / '+m.target));
+  row.appendChild(left);
+  var b=el('button','mini goldb claim', claimed?'受取済み':'受け取る'); b.type='button'; b.style.minWidth='76px';
+  b.disabled=claimed||progVal<m.target;
+  b.addEventListener('click',onClaim);
+  row.appendChild(b);
+  return row;
+}
+function renderMissions(){
+  ensureDaily();
+  var ml=$('missionList'); ml.innerHTML='';
+  MISSIONS.forEach(function(m){
+    ml.appendChild(buildMissionRow(m,!!APP.missions[m.id],m.prog(),function(){ if(APP.missions[m.id]||m.prog()<m.target)return; APP.missions[m.id]=true; addCoins(m.reward,'ミッション報酬'); saveGame(); renderAllApp(); }));
+  });
+  var dl=$('dailyList'); dl.innerHTML='';
+  DAILY.forEach(function(m){
+    dl.appendChild(buildMissionRow(m,!!APP.daily.claimed[m.id],m.prog(),function(){ if(APP.daily.claimed[m.id]||m.prog()<m.target)return; APP.daily.claimed[m.id]=true; addCoins(m.reward,'デイリー報酬'); saveGame(); renderAllApp(); }));
+  });
+  var n=claimableCount(), bdg=$('missionBdg');
+  bdg.style.display=n?'':'none'; bdg.textContent=n;
+}
+function renderShopScreen(){
+  var list=$('shopPackList'); list.innerHTML='';
+  [{c:100,y:'¥120'},{c:550,y:'¥610'},{c:1400,y:'¥1,220'},{c:3000,y:'¥2,580'}].forEach(function(pk){
+    var b=el('button','pack'); b.type='button';
+    b.appendChild(el('span','amt',String(pk.c))); b.appendChild(el('span',null,'コイン'));
+    var y=el('span','yen',pk.y+'（デモ）'); b.appendChild(y);
+    b.addEventListener('click',function(){ addCoins(pk.c,'デモ購入'); renderAllApp(); });
+    list.appendChild(b);
+  });
+  var il=$('shopItemList'); il.innerHTML='';
+  function itemRow(nm,ds,btnTxt,disabled,fn){
+    var d=el('div','shopitem'); var left=el('div'); left.appendChild(el('div','nm',nm)); left.appendChild(el('div','ds',ds)); d.appendChild(left);
+    var b=el('button','buy',btnTxt); b.type='button'; b.disabled=disabled; b.addEventListener('click',fn); d.appendChild(b); il.appendChild(d);
+  }
+  itemRow('プレミアムパス','広告オフ＋設定変更が即反映（デモ購入）', E.premium?'有効':'¥480（デモ）', E.premium, function(){ E.premium=true; afterEconomyChange(); renderAllApp(); });
+  itemRow('スカウトチケット','1回スカウトが無料になる（所持 '+APP.tickets+'枚）','300コイン', E.coins<300, function(){ if(E.coins<300)return; E.coins-=300; APP.tickets++; saveGame(); renderAllApp(); });
+  itemRow('特訓ドリンク','所持選手のうち1人がランダムでLv+1','150コイン', E.coins<150, function(){
+    if(E.coins<150)return;
+    var cand=Object.keys(APP.players).filter(function(id){return APP.players[id]<20;});
+    if(!cand.length){ setStatus('全選手Lv.MAX'); return; }
+    E.coins-=150; var pick=cand[Math.floor(Math.random()*cand.length)]; APP.players[pick]++;
+    saveGame(); renderAllApp(); alert0(pDef(pick).name+' がLv.'+APP.players[pick]+'に上がった');
+  });
+}
+function alert0(t){ showBanner('特訓成功',t,1500); }
+function renderSettings(){
+  $('premiumStateText').textContent=E.premium?'有効（広告オフ）':'未購入（広告あり）';
+  $('soundToggleBtn').textContent=APP.settings.sound?'オン':'オフ';
+  var rec=$('settingsRecords'); rec.innerHTML='';
+  [['チーム名',APP.settings.teamName],['シーズン',String(APP.league.season)],['所持選手',Object.keys(APP.players).length+'人'],['選手合計レベル',String(totalLevelSum())],['累計ログイン',APP.login.total+'日'],['セーブ先','この端末（自動保存）']].forEach(function(pair){
+    var kv=el('div','kv'); kv.appendChild(el('span',null,pair[0])); kv.appendChild(el('b',null,pair[1])); rec.appendChild(kv);
+  });
+}
+function renderAllApp(){ renderHome(); renderLeague(); renderTeam(); renderScout(); renderShopScreen(); renderMissions(); renderSettings(); syncCoins(); }
+/* ----- navigation ----- */
+var SCREENS={home:'screenHome',league:'screenLeague',play:'screenPlay',team:'screenTeam',scout:'screenScout',shop:'screenShop',missions:'screenMissions',settings:'screenSettings'};
+function showScreen(name){
+  if(!SCREENS[name])name='home'; // unknown screen request falls back to home
+  for(var k in SCREENS){ var s=$(SCREENS[k]); if(s)s.hidden=(k!==name); }
+  var btns=document.querySelectorAll('.navbtn');
+  for(var i=0;i<btns.length;i++)btns[i].classList.toggle('on',btns[i].getAttribute('data-nav')===name);
+  var sc=$('appScroll'); if(sc)sc.scrollTop=0; window.scrollTo(0,0);
+  renderAllApp();
+}
+document.querySelectorAll('.navbtn').forEach(function(b){ b.addEventListener('click',function(){ showScreen(b.getAttribute('data-nav')); }); });
+document.querySelectorAll('.goBtn').forEach(function(b){ b.addEventListener('click',function(){
+  var to=b.getAttribute('data-to');
+  if(b.getAttribute('data-match')&&G.mode!=='match')setMode('match');
+  showScreen(to);
+}); });
+/* ----- scout ----- */
+function scoutRoll(guarantee){
+  var r=Math.random()*100, rar;
+  if(r<3)rar='SSR'; else if(r<20)rar='SR'; else if(r<50)rar='R'; else rar='N';
+  if(guarantee&&(rar==='N'||rar==='R'))rar='SR';
+  var pool=PLAYERS.filter(function(p){return p.rarity===rar;});
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function pullScout(n){
+  var useTicket=n===1&&APP.tickets>0;
+  var cost=useTicket?0:(n===10?900:100);
+  if(E.coins<cost){ var sn=$('scoutNote'); if(sn)sn.textContent='コイン不足です（必要 '+cost+' ／ 所持 '+E.coins+'）。ミッション・ログインボーナス・広告で貯められます。'; setStatus('コイン不足：ミッションや広告で貯めよう'); return; }
+  var sn2=$('scoutNote'); if(sn2)sn2.textContent='';
+  E.coins-=cost; if(useTicket)APP.tickets--;
+  APP.scoutCount+=n;
+  var resWrap=$('scoutResult'); resWrap.innerHTML='';
+  var gotSR=false;
+  for(var i=0;i<n;i++){
+    var p=scoutRoll(n===10&&i===n-1&&!gotSR);
+    if(p.rarity==='SSR'||p.rarity==='SR')gotSR=true;
+    var isNew=!APP.players[p.id];
+    if(isNew)APP.players[p.id]=1; else APP.players[p.id]=Math.min(20,APP.players[p.id]+1);
+    if(APP.lineup.length<9&&APP.lineup.indexOf(p.id)<0&&p.pos!=='投手')APP.lineup.push(p.id);
+    var c=playerCard(p.id,{});
+    c.appendChild(el('div','ppos', isNew?'★ NEW！':'重複 → Lv.'+APP.players[p.id]+'にアップ'));
+    resWrap.appendChild(c);
+  }
+  $('scoutResultCard').style.display='block';
+  sndCoin(); saveGame(); renderAllApp();
+  $('scoutResultCard').style.display='block';
+}
+$('scout1Btn').addEventListener('click',function(){ pullScout(1); });
+$('scout10Btn').addEventListener('click',function(){ pullScout(10); });
+/* ----- misc wiring ----- */
+$('loginClaimBtn').addEventListener('click',function(){
+  ensureDaily();
+  if(APP.login.last===todayStr())return;
+  var reward=LOGIN_REWARDS[APP.login.total%7];
+  APP.login.total++; APP.login.last=todayStr();
+  addCoins(reward,'ログインボーナス'); saveGame(); renderAllApp();
+});
+$('autoLineupBtn').addEventListener('click',function(){
+  var ids=Object.keys(APP.players).sort(function(a,b){ var sa=effStats(a),sb=effStats(b); return (sb.meet+sb.pow+sb.pit)-(sa.meet+sa.pow+sa.pit); }).slice(0,9);
+  APP.lineup=ids; saveGame(); renderAllApp();
+});
+$('soundToggleBtn').addEventListener('click',function(){ APP.settings.sound=!APP.settings.sound; window.__sndOff=!APP.settings.sound; saveGame(); renderAllApp(); });
+$('saveTeamNameBtn').addEventListener('click',function(){ var v=$('teamNameInput').value.trim(); if(v){ APP.settings.teamName=v; saveGame(); renderAllApp(); } });
+$('settingsPremiumBtn').addEventListener('click',function(){ openOverlay('kakinOverlay'); });
+$('shopScreenOpenBtn').addEventListener('click',function(){ renderShop(); openOverlay('shopOverlay'); });
+$('shopScreenRewardBtn').addEventListener('click',function(){ playAd({reward:30,reason:'リワード広告'}); });
+$('settingsWipeBtn').addEventListener('click',function(){ $('wipeSaveBtn').click(); showScreen('settings'); });
+function initApp(){
+  window.__sndOff=!APP.settings.sound;
+  $('teamNameInput').value=APP.settings.teamName;
+  ensureDaily();
+  renderAllApp();
+  showScreen('home');
+}
+
+/* ---------- loop / inputs / init ---------- */
+function frame(now){
+  var dt=Math.min(0.033,(now-last)/1000); last=now;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+pitchBtn.addEventListener('click',startPitch);
+swingBtn.addEventListener('click',doSwing);
+resetBtn.addEventListener('click',resetAll);
+againBtn.addEventListener('click',function(){ resetAll(); startPitch(); });
+cv.addEventListener('pointerdown',function(e){ e.preventDefault(); if(S.phase==='pitch'||S.phase==='windup')doSwing(); else if(S.phase==='idle')startPitch(); });
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'){ e.preventDefault(); if(S.phase==='pitch'||S.phase==='windup')doSwing(); else if(S.phase==='idle')startPitch(); }
+});
+loadGame();
+['motArm','motRel','motFol','motSwing','motTake','motBatFol'].forEach(function(id){ var el=$(id); if(el){ var key={motArm:'arm',motRel:'rel',motFol:'fol',motSwing:'swing',motTake:'take',motBatFol:'batFol'}[id]; el.value=MOT[key]; $(id+'Val').textContent=MOT[key]; } });
+renderPitchOptions(); renderPoseList(); syncCoins(); renderLife();
+$('premiumMark').style.display=E.premium?'block':'none';
+if(E.premium){ $('applyNote').textContent='プレミアム：広告なしで即反映'; }
+var wb=$('wipeSaveBtn'); if(wb)wb.addEventListener('click',function(){ try{localStorage.removeItem(SAVE_KEY); localStorage.removeItem(SAVE_BAK); localStorage.removeItem(SAVE_CORRUPT);}catch(e){} E.coins=100; E.ownedPitch={straight:true}; E.ownedPose={square:true}; E.premium=false; G.pose='square'; G.selPitch='straight'; RECORDS={bestScore:0,bestDist:0,totalHR:0,totalHits:0,games:0,totalCoins:0}; resetAppData(); afterEconomyChange(); resetAll(); renderAllApp(); setStatus('記録をリセットしました'); });
+renderDots(); syncScoreboard(); updateLabel();
+initApp();
+setTimeout(function(){ if(S.phase==='idle'&&S.pitchNo===0)startPitch(); },900);
+})();
+</script>
+</body>
+</html>

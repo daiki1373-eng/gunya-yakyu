@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ぐにゃ野球 画面シェル</title>
+<style>
+/* ===== デザイントークン（プロ野球ゲーム調：ナイター紺＋芝＋白ライン＋金。紫グラデ・絵文字は使わない） ===== */
+:root{
+  --bg:#0b1526; --panel:#13233b; --panel-2:#1a2f4d; --line:#2a4466; --text:#f2f5f9; --sub:#9fb3cc;
+  --turf:#1f6b3a; --dirt:#a86a3c; --accent:#e8b923; --red:#d6343b; --blue:#2f7de1; --ok:#38b26b;
+  --rN:#8a96a6; --rR:#3d8fd6; --rSR:#e8b923; --rSS:#e04848;
+  --num:"Oswald","Bebas Neue","Arial Narrow",system-ui,sans-serif;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+#app{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
+#screen{flex:1;padding:12px 16px calc(80px + var(--safe-b))}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+/* ヘッダー：所持コイン常時表示 */
+.hud{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(#0f1e33,#0b1526);border-bottom:2px solid var(--accent);position:sticky;top:0;z-index:5}
+.hud .team{font-weight:800;letter-spacing:.05em}
+.coin{display:flex;align-items:center;gap:6px;background:#06101e;border:1px solid var(--line);border-radius:4px;padding:4px 10px}
+.coin i{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:inset 0 0 0 2px #b8860b}
+/* タブバー */
+.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;background:#07101d;border-top:1px solid var(--line);padding-bottom:var(--safe-b);z-index:5}
+.tabs nav{display:grid;grid-template-columns:repeat(5,1fr);width:100%;max-width:480px}
+.tabs a{color:var(--sub);text-decoration:none;font-size:12px;font-weight:700;text-align:center;padding:10px 0 12px;border-top:3px solid transparent}
+.tabs a.on{color:var(--text);border-top-color:var(--accent)}
+.tabs[hidden]{display:none}
+/* 共通 */
+h2{font-size:15px;letter-spacing:.08em;color:var(--sub);margin:16px 0 8px;border-left:4px solid var(--accent);padding-left:8px}
+.btn{display:block;width:100%;text-align:center;text-decoration:none;border:0;border-radius:6px;padding:14px;font-weight:800;font-size:16px;color:#111;background:var(--accent);min-height:48px}
+.btn.sub{background:var(--panel-2);color:var(--text);border:1px solid var(--line)}
+.btn:disabled{opacity:.4}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+.empty{color:var(--sub);text-align:center;padding:24px 8px;border:1px dashed var(--line);border-radius:8px}
+#toasts{position:fixed;left:50%;top:60px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:20;width:max-content;max-width:90%}
+.toast{background:#06101e;border:1px solid var(--accent);padding:10px 14px;border-radius:6px}
+/* 次の試合カード（スコアボード風） */
+.match{background:#0a1a10;border:2px solid #2d5a3c;border-radius:8px;padding:12px;background-image:repeating-linear-gradient(90deg,transparent 0 22px,rgba(255,255,255,.03) 22px 44px)}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;text-align:center;gap:8px;margin:8px 0}
+.emb{width:52px;height:52px;margin:0 auto 4px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:22px;border:3px solid #fff}
+.ovr{font-size:13px;color:var(--sub)}
+/* 順位表 */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--sub);font-weight:600;text-align:right;padding:6px 4px;border-bottom:1px solid var(--line)}
+td{text-align:right;padding:7px 4px;border-bottom:1px solid #1c2f4a}
+th:nth-child(2),td:nth-child(2){text-align:left}
+tr.me td{background:rgba(232,185,35,.12);font-weight:700}
+/* 選手カード：カードと数値が主役 */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card{position:relative;background:linear-gradient(160deg,#20395c,#102037);border:2px solid var(--rc,var(--rN));border-radius:8px;padding:10px 10px 8px;overflow:hidden}
+.card .rar{position:absolute;top:0;right:0;background:var(--rc);color:#111;font-weight:900;font-size:11px;padding:2px 8px;border-bottom-left-radius:6px}
+.card .pos{font-weight:900;font-size:12px;color:var(--rc)}
+.card .nm{font-weight:800;font-size:14px;margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .big{font-size:34px;line-height:1}
+.card .lv{font-size:11px;color:var(--sub)}
+.ab{display:grid;grid-template-columns:3.4em 1.2em 1fr 2em;white-space:nowrap;align-items:center;gap:4px;font-size:11px;margin-top:3px}
+.ab b{font-family:var(--num);font-size:14px;text-align:center}
+.bar{height:5px;background:#0a1525;border-radius:3px;overflow:hidden}.bar i{display:block;height:100%}
+.gS{color:#ff5a5a}.gA{color:#ff9a3c}.gB{color:#ffd23c}.gC{color:#c9e14b}.gD{color:#6fd36f}.gE{color:#4fb3e8}.gF,.gG{color:#8a96a6}
+.card.sel{box-shadow:0 0 0 3px #fff inset}
+.card.sel::after{content:'スタメン';position:absolute;left:0;bottom:0;background:#fff;color:#0b1526;font-size:10px;font-weight:900;padding:1px 6px;border-top-right-radius:6px}
+/* 広告オーバーレイ（既存のデモ広告が無い時のフォールバック表示） */
+.ad{position:fixed;inset:0;background:rgba(0,0,0,.85);display:grid;place-items:center;z-index:30;color:#fff;text-align:center}
+.ad .box{background:#1a1a1a;border:1px solid #555;padding:24px;border-radius:8px;width:80%}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="hud"><span class="team" id="hud-team"></span><span class="coin"><i></i><span class="num" id="hud-coin">0</span></span></header>
+  <main id="screen" aria-live="polite"></main>
+  <div class="tabs" id="tabs"><nav>
+    <a href="#/home" data-r="home">ホーム</a><a href="#/league" data-r="league">試合</a><a href="#/roster" data-r="roster">編成</a><a href="#/scout" data-r="scout">スカウト</a><a href="#/shop" data-r="shop">ショップ</a>
+  </nav></div>
+</div>
+<!-- 既存ゲームのDOMはここに“駐車”し、ルーターが画面に移設する（破棄しない） -->
+<div id="legacy-park" hidden><div id="legacy-game"><div class="panel">［既存ゲーム canvas ／ 練習・10球・試合・ショップ・設定UIがここに入る］</div></div></div>
+
+<script src="gunya-core-draft.js"></script>
+<script>
+(function(){
+'use strict';
+const { App, Bus, Router: _r, Roster, League, Gacha, Missions, Login, AdGate, Economy, Flow, Util: U } = GNY;
+const $ = (s, el = document) => el.querySelector(s);
+const h = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content; };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+function toast(msg){ let box=document.getElementById('toasts'); if(!box){ box=document.createElement('div'); box.id='toasts'; document.body.appendChild(box); } const d=document.createElement('div'); d.className='toast'; d.textContent=msg; box.appendChild(d); setTimeout(()=>d.remove(),2200); }
+
+/* ---------- Router（hash方式・画面ライフサイクル・離脱ガード） ---------- */
+GNY.Router = (() => {
+  const screens = new Map(); let cur = null, curName = null, busy = false, skipHash = false;
+  const rootEl = $('#screen');
+  const register = (name, def) => screens.set(name, def);
+  function parse(){ const [n, q=''] = location.hash.replace(/^#\/?/, '').split('?'); return { name: n || 'home', params: Object.fromEntries(new URLSearchParams(q)) }; }
+  async function go(name, params = {}, { replace = false } = {}){
+    if (busy) return false;
+    if (!screens.has(name)) { name = 'home'; replace = true; }               // 不明ルート → ホーム
+    busy = true;
+    try {
+      if (cur && cur.canLeave && !(await cur.canLeave())) { setHash(curName, {}, true); return false; } // 試合中ガード
+      try { cur && cur.unmount && cur.unmount(); } catch(e){ console.error(e); }
+      rootEl.replaceChildren();
+      const def = screens.get(name);
+      const el = document.createElement('section'); el.className = 'scr scr-' + name; rootEl.appendChild(el);
+      cur = def; curName = name;
+      $('#tabs').hidden = !!def.fullscreen;
+      document.querySelectorAll('#tabs a').forEach((a) => a.classList.toggle('on', a.dataset.r === (def.tab || name)));
+      try { await def.mount(el, params); }
+      catch(e){ console.error(e); el.replaceChildren(h(`<div class="empty">画面の表示に失敗しました。<br><button class="btn sub" style="margin-top:12px" onclick="location.hash='#/home'">ホームに戻る</button></div>`)); }
+      setHash(name, params, replace);
+      Bus.emit('route:changed', { name, params });
+      return true;
+    } finally { busy = false; }
+  }
+  function setHash(name, params, replace){
+    const q = new URLSearchParams(params).toString(); const hh = '#/' + name + (q ? '?' + q : '');
+    if (location.hash === hh) return;
+    if (replace) history.replaceState(null, '', hh); else { skipHash = true; location.hash = hh; }
+  }
+  addEventListener('hashchange', () => { if (skipHash) { skipHash = false; return; } const p = parse(); go(p.name, p.params); });
+  const refresh = () => curName && go(curName, {}, { replace: true });
+  return { register, go, start(){ const p = parse(); go(p.name, p.params, { replace: true }); }, refresh, current: () => curName };
+})();
+const R = GNY.Router;
+
+/* ---------- 部品 ---------- */
+function cardHTML(id, sel){
+  const s = App.get(), c = s.roster.cards[id], d = Roster.DEFS[id], st = Roster.stats(c), ovr = Roster.overall(c);
+  const labels = d.pos === 'P' ? [['velocity','球速'],['control','制球'],['stamina','スタ'],['breaking','変化']] : [['contact','ミート'],['power','パワー'],['speed','走力'],['arm','肩力'],['field','守備']];
+  const rc = `var(--r${d.rarity})`;
+  const rows = labels.map(([k, l]) => {
+    if (k === 'velocity') return `<div class="ab"><span>${l}</span><span></span><b class="num" style="grid-column:span 2;text-align:left">${st[k]}<small>km/h</small></b></div>`;
+    const g = Roster.grade(st[k]);
+    return `<div class="ab"><span>${l}</span><b class="g${g}">${g}</b><span class="bar"><i class="g${g}" style="width:${st[k]}%;background:currentColor"></i></span><span class="num">${st[k]}</span></div>`;
+  }).join('');
+  return `<div class="card${sel ? ' sel' : ''}" data-id="${id}" style="--rc:${rc}"><span class="rar">${d.rarity}</span>
+    <div class="pos">${d.pos === 'P' ? '投手' : d.pos}</div><div class="nm">${esc(d.name)}</div>
+    <div style="display:flex;align-items:baseline;gap:8px"><span class="big num">${ovr}</span><span class="lv num">Lv.${c.lv}/${Roster.maxLv(c)}${c.lb ? ' ・突破' + c.lb : ''}</span></div>${rows}</div>`;
+}
+const emb = (t) => `<div class="emb" style="background:${t.color}">${esc(t.short || t.name[0])}</div>`;
+
+/* ---------- 画面 ---------- */
+R.register('home', { mount(el){
+  const s = App.get(); const lg = s.league; const g = lg && lg.status === 'active' ? League.playerGame(lg) : null;
+  let next = '<div class="empty">リーグはまだ始まっていません。<br>「試合」から開幕しましょう。</div>';
+  if (g) { const opp = League.team(lg, g.home === 'player' ? g.away : g.home), me = League.team(lg, 'player');
+    next = `<div class="match"><div class="ovr">${League.DIVISIONS[lg.divisionIndex].name}　第${lg.seasonNo}シーズン　第${lg.round + 1}節／全${lg.rounds}節</div>
+      <div class="vs"><div>${emb(me)}<div>${esc(me.name)}</div><div class="ovr num">総合 ${me.strength}</div></div><div class="num" style="font-size:22px">VS</div>
+      <div>${emb(opp)}<div>${esc(opp.name)}</div><div class="ovr num">総合 ${opp.strength}</div></div></div>
+      <a class="btn" href="#/league">試合へ</a></div>`; }
+  else if (lg && lg.status === 'finished') next = `<div class="match"><div>シーズン終了：<b class="num">${lg.result.rank}位</b></div><a class="btn" style="margin-top:8px" href="#/league">結果と報酬を受け取る</a></div>`;
+  const mv = Missions.view(s); const ready = [...mv.daily, ...mv.achievements].filter((m) => !m.claimed && m.progress >= m.goal).length;
+  el.append(h(`<h2>次の試合</h2>${next}
+    <h2>モード</h2><div class="grid2">
+      <a class="btn sub" href="#/practice">練習モード</a><a class="btn sub" href="#/challenge">10球チャレンジ</a>
+      <a class="btn sub" href="#/missions">ミッション${ready ? `<span class="num" style="color:var(--accent)"> ${ready}</span>` : ''}</a><a class="btn sub" href="#/settings">設定</a></div>
+    <h2>通算成績</h2><div class="panel num" style="display:flex;justify-content:space-around;text-align:center">
+      <div><div class="ovr">試合</div>${s.stats.league.games}</div><div><div class="ovr">勝</div>${s.stats.league.wins}</div><div><div class="ovr">敗</div>${s.stats.league.losses}</div><div><div class="ovr">分</div>${s.stats.league.draws}</div><div><div class="ovr">本塁打</div>${s.stats.league.homeRuns}</div></div>`));
+}});
+
+R.register('league', { tab: 'league', mount(el){
+  let s = App.get();
+  if (!s.league) { App.update((d) => { d.league = League.create(); }, { flush: true }); s = App.get(); }
+  const lg = s.league, st = League.standings(lg);
+  const tbl = `<table class="num"><tr><th>順</th><th>球団</th><th>試</th><th>勝</th><th>敗</th><th>分</th><th>率</th><th>差</th></tr>${st.map((r) => {
+    const t = League.team(lg, r.id); return `<tr class="${r.id === 'player' ? 'me' : ''}"><td>${r.rank}</td><td>${esc(t.name)}</td><td>${r.g}</td><td>${r.w}</td><td>${r.l}</td><td>${r.d}</td><td>${r.pct.toFixed(3).replace(/^0/, '')}</td><td>${r.gb ? r.gb.toFixed(1) : '-'}</td></tr>`; }).join('')}</table>`;
+  const last = lg.games.filter((g) => g.status === 'final' && g.round === lg.round - 1).map((g) => `<div class="num" style="display:flex;justify-content:space-between;padding:4px 0">${esc(League.team(lg, g.away).name)}<b>${g.as} - ${g.hs}</b>${esc(League.team(lg, g.home).name)}</div>`).join('');
+  const action = lg.status === 'active' ? `<button class="btn" id="play">第${lg.round + 1}節を戦う（3回制）</button>`
+    : `<div class="panel" style="text-align:center"><div class="ovr">最終順位</div><div class="num" style="font-size:40px">${lg.result.rank}位</div><div>報酬 <b class="num">${lg.result.reward}</b> コイン　${lg.result.move > 0 ? '昇格' : lg.result.move < 0 ? '降格' : '残留'}</div></div><button class="btn" id="next" style="margin-top:8px">報酬を受け取り次シーズンへ</button>`;
+  el.append(h(`<h2>${League.DIVISIONS[lg.divisionIndex].name}　第${lg.seasonNo}シーズン</h2><div class="panel">${tbl}</div>${last ? `<h2>前節の結果</h2><div class="panel">${last}</div>` : ''}<div style="margin-top:12px">${action}</div>`));
+  const p = $('#play', el); if (p) p.onclick = () => R.go('match', { mode: 'league' });
+  const n = $('#next', el); if (n) n.onclick = () => { const r = App.update((d) => League.claimAndNext(d), { flush: true }); if (r) toast(`${r.reward}コインを獲得`); R.refresh(); };
+}});
+
+// 試合：既存の試合エンジンを移設して起動。結果はFlowがリーグへ反映。
+R.register('match', { fullscreen: true, tab: 'league', playing: false,
+  mount(el, params){
+    const g = GNY.LegacyBridge.legacyElement('legacy-game'); el.appendChild(g);
+    this.playing = true;
+    // mount は待たずに返す（ルーターの遷移ロック中に次の遷移を呼ばないため）
+    setTimeout(async () => {
+      const out = await Flow.playLeagueMatch();
+      this.playing = false;
+      if (out && out.game) { toast(`${{ W:'勝利', L:'敗戦', D:'引き分け' }[out.outcome]}　経験値+${out.exp}`); }
+      else if (out && out.error) toast('今シーズンの試合は終了しています');
+      R.go('league', {}, { replace: true });
+    }, 0);
+  },
+  canLeave(){ return !this.playing || confirm('試合を中断しますか？（この節は未消化のまま残ります）'); },
+  unmount(){ $('#legacy-park').appendChild(GNY.LegacyBridge.legacyElement('legacy-game')); },
+});
+
+R.register('roster', { mount(el){
+  const s = App.get(); const lu = s.roster.lineup; const ids = Object.keys(s.roster.cards);
+  if (!ids.length) { el.append(h('<div class="empty">選手がいません。スカウトで獲得しましょう。</div>')); return; }
+  const ord = (id) => -Roster.overall(s.roster.cards[id]);
+  el.append(h(`<h2>オーダー（総合 <span class="num">${Roster.teamStrength(s)}</span>）</h2>
+    <div class="ovr" style="margin-bottom:8px">カードをタップでスタメン入れ替え。野手最大9人・投手1人。</div>
+    <div class="cards">${ids.sort((a, b) => ord(a) - ord(b)).map((id) => cardHTML(id, lu.batters.includes(id) || lu.pitcher === id)).join('')}</div>`));
+  el.querySelectorAll('.card').forEach((c) => c.onclick = () => {
+    const id = c.dataset.id, isP = Roster.DEFS[id].pos === 'P';
+    App.update((d) => { const L = d.roster.lineup;
+      if (isP) L.pitcher = L.pitcher === id ? null : id;
+      else if (L.batters.includes(id)) L.batters = L.batters.filter((x) => x !== id);
+      else if (L.batters.length < 9) L.batters.push(id); else toast('野手は9人までです'); });
+    R.refresh();
+  });
+}});
+
+R.register('scout', { mount(el){
+  const s = App.get();
+  el.append(h(`<h2>スカウト</h2><div class="panel"><div class="ovr">排出率　SS ${Gacha.rates.SS}%／SR ${Gacha.rates.SR}%／R ${Gacha.rates.R}%／N ${Gacha.rates.N}%　${Gacha.PITY}回でSS確定（あと<span class="num">${Gacha.PITY - s.gacha.pity}</span>回）</div></div>
+    <div class="grid2" style="margin-top:10px"><button class="btn sub" id="g1">1回 <span class="num">${Gacha.COST[1]}</span></button><button class="btn" id="g10">10回 <span class="num">${Gacha.COST[10]}</span></button></div><div id="res" class="cards" style="margin-top:12px"></div>`));
+  const run = (n) => { const r = Gacha.pull(n); if (!r) { toast('コインが足りません'); return; }
+    $('#res', el).innerHTML = r.map((x) => `<div>${cardHTML(x.id)}<div class="ovr" style="text-align:center;margin-top:2px">${{ new:'NEW', limitbreak:'限界突破', coin:'+' + x.coin + 'コイン' }[x.kind]}</div></div>`).join('');
+    hud(); };
+  $('#g1', el).onclick = () => run(1); $('#g10', el).onclick = () => run(10);
+  $('#g1', el).disabled = s.wallet.coins < Gacha.COST[1]; $('#g10', el).disabled = s.wallet.coins < Gacha.COST[10];
+}});
+
+R.register('missions', { tab: 'home', mount(el){
+  const mv = Missions.view(App.get());
+  const row = (m) => `<div class="panel" style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><div style="flex:1"><div>${esc(m.label)}</div><div class="bar" style="margin-top:6px"><i style="width:${m.progress / m.goal * 100}%;background:var(--ok)"></i></div><div class="ovr num">${m.progress}/${m.goal}　報酬 ${m.reward}</div></div>
+    <button class="btn" style="width:84px;padding:10px" data-id="${m.id}" ${m.claimed || m.progress < m.goal ? 'disabled' : ''}>${m.claimed ? '受取済' : '受取'}</button></div>`;
+  el.append(h(`<h2>デイリー</h2>${mv.daily.map(row).join('')}<h2>実績</h2>${mv.achievements.map(row).join('')}`));
+  el.querySelectorAll('button[data-id]').forEach((b) => b.onclick = () => { const n = Missions.claim(b.dataset.id); if (n) toast(`${n}コインを獲得`); R.refresh(); });
+}});
+
+R.register('settings', { tab: 'home', mount(el){
+  const s = App.get();
+  el.append(h(`<h2>設定</h2><div class="panel"><label style="display:flex;justify-content:space-between;align-items:center;min-height:44px">効果音<input type="checkbox" id="snd" ${s.settings.app.sound ? 'checked' : ''}></label>
+    <div class="ovr">球種カスタム・フォーム・モーション調整は既存UIをここに移設（変更確定ごとに4秒デモ広告）</div></div>
+    <h2>データ</h2><button class="btn sub" id="reset">データを初期化</button>`));
+  $('#snd', el).onchange = (e) => AdGate.commitSetting((st) => { st.app.sound = e.target.checked; });
+  $('#reset', el).onclick = () => { if (confirm('コイン・選手・リーグを含む全データを初期化します。元に戻せません。')) { GNY.Save.resetAll(); location.reload(); } };
+}});
+// 既存画面（練習・10球・ショップ）は移設のみ
+for (const [name, label] of [['practice', '練習モード'], ['challenge', '10球チャレンジ'], ['shop', 'ショップ']])
+  R.register(name, { tab: name === 'shop' ? 'shop' : 'home', fullscreen: name !== 'shop',
+    mount(el){ el.append(h(`<h2>${label}</h2>`)); el.appendChild(GNY.LegacyBridge.legacyElement('legacy-game')); el.append(h('<a class="btn sub" style="margin-top:12px" href="#/home">ホームへ戻る</a>')); },
+    unmount(){ $('#legacy-park').appendChild(GNY.LegacyBridge.legacyElement('legacy-game')); } });
+
+/* ---------- 起動 ---------- */
+// 既存の広告が未接続の場合のフォールバック表示
+if (!window.showDemoAd) window.showDemoAd = (ms, done) => { const d = document.createElement('div'); d.className = 'ad'; d.innerHTML = `<div class="box"><div class="ovr">デモ広告</div><div class="num" style="font-size:40px" id="adc">${ms / 1000}</div></div>`; document.body.appendChild(d);
+  let t = ms / 1000; const iv = setInterval(() => { t--; const c = d.querySelector('#adc'); if (c) c.textContent = t; if (t <= 0) { clearInterval(iv); d.remove(); done(); } }, 1000); };
+function hud(){ const s = App.get(); $('#hud-team').textContent = s.team.name; $('#hud-coin').textContent = s.wallet.coins.toLocaleString(); }
+App.subscribe(hud);
+Bus.on('save:error', () => toast('保存できませんでした（端末の空き容量・プライベートモードを確認）'));
+Bus.on('save:report', (r) => { if (['restored-backup', 'recovered-legacy', 'reset'].includes(r.status)) toast('保存データを復旧しました'); if (r.status === 'storage-unavailable') toast('この環境では進行を保存できません'); });
+App.init(); hud();
+const lb = Login.claim(); if (lb) toast(`ログインボーナス ${lb.day}日目：${lb.coins}コイン`);
+Bus.on('app:resume', () => { const r = Login.claim(); if (r) toast(`ログインボーナス ${r.day}日目：${r.coins}コイン`); });
+R.start();
+})();
+</script>
+</body>
+</html>
