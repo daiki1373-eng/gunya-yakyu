@@ -1,0 +1,18 @@
+{
+  "status": "draft-awaiting-native-device-test-and-App-Review",
+  "locale": "ja-JP",
+  "name": "ぐにゃ野球",
+  "subtitle": "回して、伸ばして、野球で勝負",
+  "bundleId": "jp.daiki1373.gunyayakyu",
+  "version": "1.0.0",
+  "build": "2",
+  "primaryCategory": "GAMES",
+  "gameSubcategory": "SPORTS",
+  "description": "投球フォームをいじって、自分だけの投げ方で勝負。全身を回したり、腕を風車のように回したり、胴をぐにゃっと伸ばしたり。自由なモーションと野球の駆け引きを楽しむ、オフラインの野球ゲームです。\n\n打撃はタイミングを合わせて打法を選択。投球は球種とコースを使い分けます。打球が出たら、捕球は自動。守備では送球先、攻撃では走者の進塁・帰塁・停止を操作できます。\n\n光と影のある3D球場で、選手を育てて大会へ。試合中の一時停止と、端末内への自動保存に対応しています。ログイン、広告、アプリ内課金はありません。\n\n学校・選手・キャラクターは架空です。",
+  "keywords": "野球,高校野球,育成,スポーツ,オフライン,投球,走塁,ぐにゃぐにゃ",
+  "supportUrl": "https://github.com/daiki1373-eng/gunya-yakyu/blob/main/docs/support.md",
+  "privacyPolicyUrl": "https://github.com/daiki1373-eng/gunya-yakyu/blob/main/docs/privacy.md",
+  "privacy": "Data Not Collected; verify the final native build and App Store Connect questionnaire before submission",
+  "ageRating": "Complete Apple's current questionnaire; do not copy an age rating from this draft",
+  "reviewNotes": "No account or sign-in is required. The game works offline. Start with はじめから, create a player, select 夏の大会へ進む, then start the match. Choose 3 innings for a shorter test. During defense choose the throw destination; during offense use 進塁/帰塁/止まる. 投球フォーム opens the three-pose editor and 回転・伸び settings. Changes to pitching form are cosmetic and session-only. All teams and players are fictional. No advertising, analytics, or real-money purchases are included."
+}

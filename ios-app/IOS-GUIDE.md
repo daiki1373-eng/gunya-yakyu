@@ -1,67 +1,71 @@
-# ぐにゃ野球 iOSアプリ化ガイド
+# iPhone版のビルドとリリース
 
-このフォルダは、ぐにゃ野球（Web版の検証済み本番ビルド）を iOS アプリとして App Store に出すための Capacitor プロジェクトです。作業の分担：プロジェクトの作成・組み込み・素材までは たんたん が完了。本人（田端さん）の Apple アカウントが必要な手続きだけ、以下の手順で進めてください。
+このプロジェクトは「ぐにゃ野球」のiPhone向けリリース候補です。署名済みビルド、実機テスト、TestFlight配信、App Store審査は別の工程です。ソースの準備だけで公開済みにはなりません。
 
-## 準備済みの内容
-- アプリ名：ぐにゃ野球
-- バンドルID：jp.daiki1373.gunyayakyu
-- 本体：www/index.html（本番ビルドそのまま。保存は端末内の localStorage で、Web版とは別に新規スタートになります）
-- アイコン原画：assets/icon-1024.png（1024×1024、全面ベタ）
-- iOSプロジェクト：ios/（Xcodeプロジェクト生成済み）
-- 触覚フィードバック用に @capacitor/haptics を組み込み済み（ヒット・本塁打で端末が振動します）
-- 段階G（甲子園V式）適用済み：ミートカーソルなしの4ボタン打法、不可視の投球の狙い、打順補正、守備・走塁オート、カウント制（2026-11-02にWeb本番ビルドへ差し替え済み）
+## Macでビルドする
 
-## 手順（MacBook Proで実施）
+Node.js 22以上、CocoaPods、Xcode 26以上を用意し、Xcodeで自分のApple Developerアカウントへサインインします。
 
-### 1. Xcode を入れる
-Mac App Store から Xcode（無料）をインストールする。
-
-### 2. プロジェクトを取得して依存関係を入れる
-このリポジトリを取得し、このフォルダで：
-```
-npm install
-npx cap sync ios
+```bash
+git clone https://github.com/daiki1373-eng/gunya-yakyu.git
+cd gunya-yakyu/ios-app
+bash scripts/mac-release.sh --simulator
 ```
 
-### 3. Apple Developer Program に登録する（年99ドル）
-- Apple Developer アプリ、または developer.apple.com から登録。Apple Account の2ファクタ認証が必要。
-- 注意：個人登録の場合、App Store の販売者名には本名が表示されます。
-- 支払いは本人のクレジットカードで（ここだけ金銭が絡むので本人の手続き）。
+すでに取得している場合は、作業中の変更を保存してから `git pull` で更新してください。リリース用ZIPを使う場合は、展開したフォルダ内の `ios-app` で同じスクリプトを実行できます。
 
-### 4. Xcode で開いて署名とアイコンを設定
+署名付きアーカイブは、Apple DeveloperのTeam IDを指定して作成します。Team IDはXcodeのSigning & Capabilities、またはApple DeveloperのMembershipで確認できます。パスワードや秘密鍵をリポジトリへ追加する必要はありません。
+
+```bash
+APPLE_TEAM_ID=自分のTeamID bash scripts/mac-release.sh
 ```
-npx cap open ios
+
+アーカイブが開いたら、Xcode Organizerの **Distribute App → App Store Connect → Upload** へ進みます。署名の許可が必要な場合は、Xcodeの案内に従って本人が設定してください。
+
+## 実機で確認する
+
+`npm run ios:open` でXcodeを開き、iPhoneを選んで実行します。
+
+- タイトルから選手作成、試合開始、試合終了まで進む。
+- 球種・コース、打法、送球先、走者の進塁・帰塁・停止を操作する。
+- フライ捕球後の帰塁、タッチアップ、フォースアウト、ダブルプレーを確認する。
+- フォーム編集、種族、必殺技を確認する。
+- アプリを閉じて戻り、一時停止から再開できることを確認する。
+- 再起動後のセーブ、機内モード、端末の発熱、電池消費、フレームレートを確認する。
+
+Windowsでのブラウザーテストは、この実機確認の代わりにはなりません。
+
+## TestFlightと審査
+
+1. App Store ConnectでバンドルID `jp.daiki1373.gunyayakyu` のアプリを選択、または作成する。
+2. XcodeからアップロードしたビルドをTestFlightで配信し、実機の不具合を修正する。
+3. `store-metadata.json` の説明文を確認し、サポートURLとプライバシーポリシーURLが公開されていることを確認する。
+4. 実機またはiOSシミュレーターのスクリーンショットを撮る。ブラウザーで作った確認画像を、実機撮影と記載しない。
+5. 年齢制限とApp Privacyの質問票を、実際のビルドに合わせて回答する。
+6. ビルドを選び、App Reviewへ提出する。承認後の公開はApp Store Connectで確認する。
+
+価格、配信国、販売者情報はアカウント所有者が決めてください。現行ソースに広告や実課金はありません。
+
+## 開発と同期
+
+```bash
+npm ci
+npm test
+npm run build
+npm run ios:sync
 ```
-- 左のプロジェクト設定 → Signing & Capabilities → Team に自分の Apple Developer アカウントを選ぶ（Automatically manage signing にチェック）。
-- Assets.xcassets の AppIcon に assets/icon-1024.png をドラッグして入れる。
-- 自分の iPhone を Mac につなぎ、実行ボタンで実機テストする。まずここで一通り遊んで、操作感と保存を確認。
 
-### 5. App Store Connect でアプリを作成
-appstoreconnect.apple.com → 新規App：
-- プラットフォーム iOS／名前：ぐにゃ野球／言語：日本語／バンドルID：jp.daiki1373.gunyayakyu／SKU：gunyayakyu
+`src/game.html` がゲーム本体、`src/renderer3d.js` が3D描画、`src/live-play.js` が守備・走塁、`src/live-controls.js` が操作とアニメーションです。`npm run build` で、Three.jsとネイティブ連携を含むオフラインHTMLを `www/index.html` と `../landscape/claude-v.html` に同じ内容で出力します。生成済みHTMLを直接編集しても、次のビルドで上書きされます。
 
-### 6. メタデータ（下書き、そのまま使えます）
-- サブタイトル：ぐにゃっと物理演算の高校野球ゲーム
-- カテゴリ：ゲーム ＞ スポーツ
-- 価格：無料
-- 年齢制限：4+（暴力表現なし・ギャンブルなし）
-- プライバシー：このアプリはデータを収集しません（広告SDK・解析SDKなし、保存は端末内のみ）。App Privacy の質問票では「Data Not Collected」で申告。
-- 説明文（案）：
-  主人公を育てて甲子園を目指す、ぐにゃぐにゃ物理演算の高校野球ゲーム。4ボタンの打法選択とタイミングで打つ打撃、見えない狙いと球種で投げる投球、打順が効く采配と投手の疲労管理。スカウトで選手を集め、3年間の世代交代を繰り返しながら全国制覇と連覇を目指します。学校・選手はすべて架空です。
-- キーワード案：野球,高校野球,甲子園,育成,物理演算,ラグドール
-- サポートURL：必須入力です。公開できるページ（自分のサイト、noteの固定ページ等）のURLを用意してください。
-- スクリーンショット：実機テスト時の画面を iPhone で撮影（6.9インチ枠）。最低3枚（試合・編成・スカウト）。
+`npm run ios:sync` でネイティブ側のWebアセットとプラグインを同期します。GitHub ActionsにもWebテストと署名なしiOSシミュレータービルドの設定があります。認証情報を使う配信ジョブは作成していません。
 
-### 7. アップロードと審査提出
-- Xcode → Product → Archive → Distribute App → App Store Connect にアップロード。
-- App Store Connect でビルドを選び、審査へ提出。
-- 審査向けメモ（英語で記入欄があります）：「ログイン不要で全機能が遊べます。オフライン動作。実在の学校・選手・団体とは無関係の架空コンテンツです。」
+保存キー `koushien_psx97_v1` と従来のセーブ内容を引き継ぎ、iPhoneではPreferencesにもバックアップします。異なる端末間のクラウド同期は行いません。
 
-## 審査で想定される指摘と備え
-- ガイドライン4.2（最小限の機能）：「Webサイトを包んだだけ」と見なされると落ちる可能性があります。本作はオフラインで完結するゲーム本編があるため通る見込みはありますが、絶対ではありません。落ちた場合は、触覚フィードバックや Game Center などのネイティブ機能を足して再提出するのが定石です。
-- 課金・広告：現行ビルドに実課金・実広告SDKは入っていません（デモ表示のみ）。審査では「課金なし・広告なし」で申告できます。
+3Dの描画にはオリジナルの手続き型モデルを使っています。フォトリアルな市販ゲームの人物・球場アセットは含みません。
 
-## 更新の流れ（次回以降）
-1. Web版の本番ビルド（index-prod.html）を www/index.html に上書き
-2. `npx cap sync ios`
-3. Xcode でバージョンを上げて Archive → 再提出
+## 公式資料
+
+- [App StoreのSDK要件](https://developer.apple.com/news/?id=ueeok6yw)
+- [Capacitor 8への更新](https://capacitorjs.com/docs/updating/8-0)
+- [App Privacy](https://developer.apple.com/app-store/app-privacy-details/)
+- [スクリーンショット仕様](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications)

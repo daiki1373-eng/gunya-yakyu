@@ -1,0 +1,49 @@
+name: iPhone release checks
+on:
+  workflow_dispatch:
+  push:
+    paths: ['ios-app/**', 'landscape/**', '.github/workflows/ios-build.yml']
+  pull_request:
+    paths: ['ios-app/**', 'landscape/**', '.github/workflows/ios-build.yml']
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ios-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ios-app/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-checks
+          path: ios-app/build/browser-check
+  ios-simulator:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ios-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ios-app/package-lock.json
+      - run: bash scripts/mac-release.sh --simulator
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: ios-app/build/simulator/Build/Products/Release-iphonesimulator/App.app

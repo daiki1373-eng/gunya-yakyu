@@ -2,7 +2,19 @@
 	"appId": "jp.daiki1373.gunyayakyu",
 	"appName": "ぐにゃ野球",
 	"webDir": "www",
+	"ios": {
+		"contentInset": "never",
+		"backgroundColor": "#102b35",
+		"preferredContentMode": "mobile"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 0
+		}
+	},
 	"packageClassList": [
-		"HapticsPlugin"
+		"HapticsPlugin",
+		"AppPlugin",
+		"PreferencesPlugin"
 	]
 }
