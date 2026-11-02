@@ -1,0 +1,49 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# WebGL build output (generated locally, see README)
+build-webgl/
+
+# IDE / solution files
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity3D meta files are required for Assets/ProjectSettings/Packages.
+# (Do NOT ignore *.meta)
+
+# Builds
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crashlytics / misc
+sysinfo.txt
+crashlytics-build.properties
+
+# OS
+.DS_Store
+Thumbs.db

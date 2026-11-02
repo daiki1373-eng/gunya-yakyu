@@ -1,0 +1,506 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 26
+  productGUID: 3f8a1c2e9b4d4e7fa1c05d6b8e2a4901
+  AndroidProfiler: 0
+  AndroidFilterTouchesWhenObscured: 0
+  AndroidEnableSustainedPerformanceMode: 0
+  defaultScreenOrientation: 4
+  targetDevice: 2
+  useOnDemandResources: 0
+  accelerometerFrequency: 60
+  companyName: Personal
+  productName: KoshienRoad
+  defaultCursor: {fileID: 0}
+  cursorHotspot: {x: 0, y: 0}
+  m_SplashScreenBackgroundColor: {r: 0.137, g: 0.12, b: 0.153, a: 1}
+  m_ShowUnitySplashScreen: 1
+  m_ShowUnitySplashLogo: 1
+  m_SplashScreenOverlayOpacity: 1
+  m_SplashScreenAnimation: 1
+  m_SplashScreenLogoStyle: 1
+  m_SplashScreenDrawMode: 0
+  m_SplashScreenBackgroundAnimationZoom: 1
+  m_SplashScreenLogoAnimationZoom: 1
+  m_SplashScreenBackgroundLandscapeAspect: 1
+  m_SplashScreenBackgroundPortraitAspect: 1
+  m_SplashScreenBackgroundLandscapeUvs:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+  m_SplashScreenBackgroundPortraitUvs:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+  m_SplashScreenLogos: []
+  m_VirtualRealitySplashScreen: {fileID: 0}
+  m_HolographicTrackingLossScreen: {fileID: 0}
+  defaultScreenWidth: 1920
+  defaultScreenHeight: 1080
+  defaultScreenWidthWeb: 960
+  defaultScreenHeightWeb: 540
+  m_StereoRenderingPath: 0
+  m_ActiveColorSpace: 1
+  m_MTRendering: 1
+  mipStripping: 0
+  numberOfMipsStripped: 0
+  m_StackTraceTypes: 010000000100000001000000010000000100000001000000
+  iosShowActivityIndicatorOnLoading: -1
+  androidShowActivityIndicatorOnLoading: -1
+  iosUseCustomAppBackgroundBehavior: 0
+  allowedAutorotateToPortrait: 0
+  allowedAutorotateToPortraitUpsideDown: 0
+  allowedAutorotateToLandscapeRight: 1
+  allowedAutorotateToLandscapeLeft: 1
+  useOSAutorotation: 1
+  use32BitDisplayBuffer: 1
+  preserveFramebufferAlpha: 0
+  disableDepthAndStencilBuffers: 0
+  androidStartInFullscreen: 1
+  androidRenderOutsideSafeArea: 1
+  androidUseSwappy: 1
+  androidBlitType: 0
+  androidResizableWindow: 0
+  androidDefaultWindowWidth: 1920
+  androidDefaultWindowHeight: 1080
+  androidMinimumWindowWidth: 400
+  androidMinimumWindowHeight: 300
+  androidFullscreenMode: 1
+  defaultIsNativeResolution: 1
+  macRetinaSupport: 1
+  runInBackground: 1
+  captureSingleScreen: 0
+  muteOtherAudioSources: 0
+  Prepare IOS For Recording: 0
+  Force IOS Speakers When Recording: 0
+  deferSystemGesturesMode: 0
+  hideHomeButton: 0
+  submitAnalytics: 1
+  usePlayerLog: 1
+  bakeCollisionMeshes: 0
+  forceSingleInstance: 0
+  useFlipModelSwapchain: 1
+  resizableWindow: 0
+  useMacAppStoreValidation: 0
+  macAppStoreCategory: public.app-category.games
+  gpuSkinning: 1
+  xboxPIXTextureCapture: 0
+  xboxEnableAvatar: 0
+  xboxEnableKinect: 0
+  xboxEnableKinectAutoTracking: 0
+  xboxEnableFitness: 0
+  vrSettings:
+    enable360StereoCapture: 0
+  isWSAHolographicRemotingEnabled: 0
+  enableFrameTimingStats: 0
+  enableOpenGLProfilerGPURecording: 0
+  useHDRDisplay: 0
+  hdrBitDepth: 0
+  m_ColorGamuts: 00000000
+  targetPixelDensity: 30
+  resolutionScalingMode: 0
+  resetResolutionOnWindowResize: 0
+  androidSupportedAspectRatio: 1
+  androidMaxAspectRatio: 2.1
+  applicationIdentifier:
+    Standalone: jp.daiki1373.koshienroad
+    WebGL: jp.daiki1373.koshienroad
+    iPhone: jp.daiki1373.koshienroad
+  buildNumber:
+    Standalone: 0
+    iPhone: 0
+  overrideDefaultApplicationIdentifier: 0
+  AndroidBundleVersionCode: 1
+  AndroidMinSdkVersion: 22
+  AndroidTargetSdkVersion: 0
+  AndroidPreferredInstallLocation: 1
+  aotOptions:
+  stripEngineCode: 1
+  iPhoneStrippingLevel: 0
+  iPhoneScriptCallOptimization: 0
+  ForceInternetPermission: 0
+  ForceSDCardPermission: 0
+  CreateWallpaper: 0
+  APKExpansionFiles: 0
+  keepLoadedShadersAlive: 0
+  StripUnusedMeshComponents: 1
+  VertexChannelCompressionMask: 405
+  iPhoneSdkVersion: 988
+  iOSTargetOSVersionString: 12.0
+  tvOSSdkVersion: 0
+  tvOSTargetOSVersionString: 12.0
+  uIPrerenderedIcon: 0
+  uIRequiresPersistentWiFi: 0
+  uIRequiresFullScreen: 1
+  uIStatusBarHidden: 1
+  uIExitOnSuspend: 0
+  iOSLaunchScreenType: 0
+  iOSLaunchScreenPortrait: {fileID: 0}
+  iOSLaunchScreenLandscape: {fileID: 0}
+  iOSLaunchScreenBackgroundColor:
+    serializedVersion: 2
+    rgba: 0
+  iOSLaunchScreenFillPct: 100
+  iOSLaunchScreenSize: 100
+  iOSLaunchScreenCustomXibPath:
+  iOSLaunchScreeniPadType: 0
+  iOSLaunchScreeniPadBackgroundColor:
+    serializedVersion: 2
+    rgba: 0
+  iOSLaunchScreeniPadFillPct: 100
+  iOSLaunchScreeniPadSize: 100
+  iOSLaunchScreeniPadCustomXibPath:
+  iOSDeviceRequirements: []
+  iOSURLSchemes: []
+  macOSURLSchemes: []
+  iOSBackgroundModes: 0
+  iOSMetalForceHardUnlit: 0
+  iOSRenderExtraFrameOnPause: 0
+  iosCopyPluginsCodeInsteadOfEmbedAndSign: 1
+  appleDeveloperTeamID:
+  iOSManualSigningProvisioningProfileID:
+  tvOSManualSigningProvisioningProfileID:
+  iOSManualSigningProvisioningProfileType: 0
+  tvOSManualSigningProvisioningProfileType: 0
+  appleEnableAutomaticSigning: 0
+  iOSRequireARKit: 0
+  iOSAutomaticallyDetectAndAddCapabilities: 1
+  appleEnableProMotion: 0
+  shaderPrecisionModel: 0
+  clonedFromGUID: 00000000000000000000000000000000
+  templatePackageId:
+  templateDefaultScene:
+  useCustomMainManifest: 0
+  useCustomLauncherManifest: 0
+  useCustomMainGradleTemplate: 0
+  useCustomGradlePropertiesTemplate: 0
+  useCustomGradleSettingsTemplate: 0
+  useCustomProguardFile: 0
+  AndroidTargetArchitectures: 1
+  AndroidTargetDevices: 0
+  AndroidSplashScreenScale: 0
+  androidSplashScreen: {fileID: 0}
+  AndroidKeystoreName:
+  AndroidKeyaliasName:
+  AndroidEnableArmv9SecurityFeatures: 0
+  AndroidBuildApkPerCpuArchitecture: 0
+  AndroidTVCompatibility: 0
+  AndroidIsGame: 1
+  AndroidEnableTango: 0
+  androidEnableBanner: 1
+  androidUseLowAccuracyLocation: 0
+  androidUseCustomKeystore: 0
+  m_AndroidBanners:
+  - width: 320
+    height: 180
+    banner: {fileID: 0}
+  androidGamepadSupportLevel: 0
+  chromeosInputEmulation: 1
+  AndroidMinifyRelease: 0
+  AndroidMinifyDebug: 0
+  AndroidValidateAppPermissions: 1
+  AndroidAppCategory: 3
+  AndroidCardboardVr: 0
+  AndroidDaydreamVr: 0
+  AndroidDaydreamIconForeground: {fileID: 0}
+  AndroidDaydreamIconBackground: {fileID: 0}
+  cameraUsageDescription:
+  locationUsageDescription:
+  microphoneUsageDescription:
+  bluetoothUsageDescription:
+  macOSTargetOSVersion: 10.13.0
+  switchQueueCommandMemory: 1048576
+  switchQueueControlMemory: 32768
+  switchQueueBufferMemory: 65536
+  switchQueueCommandBufferMemory: 16384
+  switchLTOSetting: 0
+  switchCompilerFlags:
+  switchTitleNames_0:
+  switchTitleNames_1:
+  switchTitleNames_2:
+  switchTitleNames_3:
+  switchTitleNames_4:
+  switchTitleNames_5:
+  switchTitleNames_6:
+  switchTitleNames_7:
+  switchTitleNames_8:
+  switchTitleNames_9:
+  switchTitleNames_10:
+  switchTitleNames_11:
+  switchTitleNames_12:
+  switchTitleNames_13:
+  switchTitleNames_14:
+  switchTitleNames_15:
+  switchPublisherNames_0:
+  switchPublisherNames_1:
+  switchPublisherNames_2:
+  switchPublisherNames_3:
+  switchPublisherNames_4:
+  switchPublisherNames_5:
+  switchPublisherNames_6:
+  switchPublisherNames_7:
+  switchPublisherNames_8:
+  switchPublisherNames_9:
+  switchPublisherNames_10:
+  switchPublisherNames_11:
+  switchPublisherNames_12:
+  switchPublisherNames_13:
+  switchPublisherNames_14:
+  switchPublisherNames_15:
+  switchIcons_0: {fileID: 0}
+  switchIcons_1: {fileID: 0}
+  switchIcons_2: {fileID: 0}
+  switchIcons_3: {fileID: 0}
+  switchIcons_4: {fileID: 0}
+  switchIcons_5: {fileID: 0}
+  switchIcons_6: {fileID: 0}
+  switchIcons_7: {fileID: 0}
+  switchIcons_8: {fileID: 0}
+  switchIcons_9: {fileID: 0}
+  switchIcons_10: {fileID: 0}
+  switchIcons_11: {fileID: 0}
+  switchIcons_12: {fileID: 0}
+  switchIcons_13: {fileID: 0}
+  switchIcons_14: {fileID: 0}
+  switchIcons_15: {fileID: 0}
+  switchManualHTMLGuide: {fileID: 0}
+  switchAccessibleURLs:
+  switchLegalInformation: {fileID: 0}
+  switchDemoQualified: 0
+  switchGameBootMedia: {fileID: 0}
+  switchAllowScreenshot: 1
+  switchControllerStyleSet: 0
+  switchEnableTouchScreen: 0
+  switchDisableHTCSPlayerCapture: 0
+  switchEnableDualSense: 0
+  switchEnableDualSenseOnWindows: 0
+  switchPlayerConnectionEnabled: 0
+  switchUSErrorsEnabled: 0
+  switchUseSugorokuFont: 0
+  switchUseLegacyConversion: 1
+  switchUseMiisanFont: 0
+  switchScreenResolutionBehavior: 2
+  switchRetainOutputResolutionAtSuspend: 0
+  switchStartupLogo: 0
+  switchAboveLogoHandling: 0
+  switchStartupLogoCustom: {fileID: 0}
+  switchIconsBehavior: 0
+  switchAppID: 0x00000000
+  switchNSODependencies:
+  switchTitleID: 0x0100000000000000
+  switchProductAssessments: 0
+  switchEnableMemoryExceptionHandling: 1
+  switchMicroSleepForDebug: 0
+  switchDispPage: 0
+  switchScreenShotDelay: 0
+  switchLocalCommunicationsId: 0x00000000
+  switchParentalControl: 0
+  switchAllContentsSystemDataSize: 0
+  switchAllSystemDataSize: 0
+  switchPresentIndependentStartupScene: 0
+  switchEnableSingleMode: 0
+  switchCameraCtrlId: 0
+  switchCameraRollingCtrlId: 0
+  switchDisableVSyncCount: 0
+  switchBcatClosed: 0
+  switchFooterFixed: 0
+  switchLcdShading: 0
+  switchSavedDataBackup: 0
+  switchOfflineManual: 0
+  switchTouchScreenMode: 0
+  switchAudioLatency: 0
+  switchSupportedNpadCount: 1
+  switchEnableWebRTC: 0
+  ps4TitleContentID: ED0000
+  ps4Category: 0
+  ps4MasterVersion: 01.00
+  ps4AppVersion: 01.00
+  ps4AppType: 0
+  ps4VideoOutPixelFormat: 0
+  ps4VideoOutInitialWidth: 1920
+  ps4VideoOutBaseModeWidth: 1920
+  ps4VideoOutReversedDepth: 0
+  ps4GarlicHeapSize: 2048
+  ps4ProGarlicHeapSize: 3072
+  ps4Passcode: frAQBc8Wsa1xVPfvJOGg2feihGU2J3N1m2W2
+  ps4UseLowGarlicMode: 0
+  ps4UseHostRotation: 0
+  ps4UseResolutionProMode: 0
+  vulkanNumSwapchainBuffers: 3
+  vulkanEnableSetSRGBWrite: 0
+  vulkanEnablePreTransform: 0
+  vulkanEnableLateAcquireNextImage: 0
+  vulkanEnableCommandBufferRecycling: 1
+  m_SupportedAspectRatios:
+  - 4:3
+  - 5:4
+  - 16:10
+  - 16:9
+  - Others
+  bundleVersion: 1.0
+  preloadedAssets: []
+  metroInputSource: 0
+  wsaTransparentSwapchain: 0
+  m_HolographicPauseOnTrackingLoss: 1
+  xboxOneHardwareVersion: 0
+  xboxOneDisplayName:
+  xboxOneDescription:
+  xboxOneProductId: 00000000000000000000000000000000
+  xboxOneUpdateKey:
+  xboxOneSandboxId:
+  xboxOneContentId: 00000000000000000000000000000000
+  xboxOneTitleId: 00000000000000000000000000000000
+  xboxOneSCId: 00000000000000000000000000000000
+  xboxOneGameOsVersion: 00000000000000000000000000000000
+  xboxOnePackagingEncryption: 0
+  xboxOneIsContentPackage: 0
+  xboxOneEnhancedXboxCompatibilityMode: 0
+  xboxOneEnableTypeOptimization: 0
+  xboxOneSocketTypes: []
+  xboxOneAdditionalCommandLineArgs:
+  xboxOneDir: Jupiter
+  xboxOneMonoLoggingLevel: 0
+  xboxOneLoggingLevel: 1
+  xboxOneDeveloperPayload: -1
+  xboxOneAppManifestOnlyForDisk: 0
+  xboxOneCapability: []
+  xboxOneDisableKinectGpuReservation: 1
+  isXboxOneNativeResolution: 0
+  xboxOneResolution: 0
+  xboxOneMonospaceFont: 0
+  xboxOneVADF: 0
+  xboxOneVRChroma: 0
+  xboxOneVersion: 1
+  xboxOneProductSignData: 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+  xboxOnePreviouslySavedProductSign: 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+  xboxOneLanguage: []
+  XboxOneEditions: []
+  XboxOneVCPortNumber: 1
+  XboxLegacySupportUsed: 0
+  vrEditorSettings:
+    daydreamIconForeground: {fileID: 0}
+    daydreamIconBackground: {fileID: 0}
+  cloudProjectId:
+  cloudEnabled: 0
+  luminIrisColorEncoding: 0
+  luminCert: 0
+  luminIsEnterprise: 0
+  luminVersion:
+    Major: 0
+    Minor: 0
+    Patch: 0
+  luminIcon:
+    m_Layers:
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+    - {fileID: 0}
+  luminBanner:
+    m_Layers:
+    - {fileID: 0}
+  luminCapabilities: []
+  luminPowerProfile: 0
+  framebufferDepthMemorylessMode: 0
+  qualitySettingsNames: []
+  projectName:
+  organizationId:
+  cloudServicesEnabled:
+    UnityPurchasing: 0
+    UnityAnalytics: 0
+    UnityAds: 0
+    UnityGameTutorials: 0
+    Collab: 0
+    Cloud Diagnostics: 0
+  m_BuildTargetIcons:
+  - m_BuildTarget:
+    m_Icons:
+    - m_Icon: {fileID: 0}
+      m_Width: 128
+      m_Height: 128
+  m_BuildTargetBatchingStaticFlags: {}
+  m_BuildTargetBatchingDynamicFlags: {}
+  m_BuildTargetGraphicsAPIs:
+  - m_BuildTarget: WindowsStandaloneSupport
+    m_APIs: 0b00000002000000
+    m_Automatic: 0
+  - m_BuildTarget: AndroidPlayer
+    m_APIs: 0400000003000000
+    m_Automatic: 0
+  - m_BuildTarget: iOSSupport
+    m_APIs: 0200000002000000
+    m_Automatic: 1
+  - m_BuildTarget: WebGLSupport
+    m_APIs: 0200000001000000
+    m_Automatic: 1
+  m_BuildTargetVRSettings: []
+  m_BuildTargetGroupLightmapEncodingQuality: []
+  m_BuildTargetGroupLightmapSettings: []
+  m_BuildTargetPlatformIcons:
+  - m_BuildTarget: Standalone
+    m_Kind: 0
+    m_Icons: []
+    m_SubKinds: []
+  openGLRequireES31: 0
+  openGLRequireES31AEP: 0
+  openGLRequireES31BAS: 0
+  openGLRequireES3: 0
+  m_TemplateCustomTags: {}
+  mobileMTRendering:
+    Android: 1
+    iPhone: 1
+    WebGL: 0
+  m_DefaultShaderChunkSizeInMB: 16
+  m_DefaultShaderChunkPath:
+  loadStoreDebugModeEnabled: 0
+  visionOSBundleVersion: 1.0
+  tvOSBundleVersion: 1.0
+  macOSBundleVersion: 1.0
+  webGLMemorySize: 32
+  webGLExceptionSupport: 1
+  webGLNameFilesAsHashes: 0
+  webGLShowDiagnostics: 0
+  webGLDataCaching: 1
+  webGLDebugSymbols: 0
+  webGLTemplate: APPLICATION:Default
+  webGLEmscriptenArgs:
+  webGLModulesDirectory:
+  webGLAnalyzeBuildSize: 0
+  webGLUseEmbeddedResources: 0
+  webGLCompressionFormat: 1
+  webGLInitialMemorySize: 32
+  webGLMaximumMemorySize: 2048
+  webGLMemoryGrowthMode: 2
+  webGLMemoryLinearGrowthStep: 16
+  webGLMemoryGeometricGrowthStep: 0.2
+  webGLMemoryGeometricGrowthCap: 96
+  webGLPowerPreference: 2
+  scriptingDefineSymbols: {}
+  additionalIl2CppArgs:
+  platformArchitecture: {}
+  scriptingBackend: {}
+  il2CppCompilerConfiguration: {}
+  il2CppCodeGeneration: {}
+  incrementalIl2CppBuild: {}
+  suppressCommonWarnings: 1
+  allowUnsafeCode: 0
+  useDeterministicCompilation: 1
+  additionalCompilerArguments:
+  selectedPlatform: 0
+  scriptingRuntimeVersion: 1
+  gcIncremental: 1
+  assemblyVersionValidation: 1
+  apiCompatibilityLevelPerPlatform: {}
+  apiCompatibilityLevel: 6
+  activeInputHandler: 0
+  windowsGamepadBackend: 0
+  forceSRGBBlit: 0
+  virtualTexturingSupportEnabled: 0
+  insecureHttpOption: 0
