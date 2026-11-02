@@ -202,3 +202,55 @@ NODE_PATH=/tmp/jsdom-test/node_modules node phase1-check.js index.html
 - v1移行、データ書き出し・読み込み・初期化UIは段階4のまま。
 - 重複上限後のレア度別変換量100/200/500/1,000コインは、仕様の正に数値がないため引き続き調整用の仮置き。
 - `phase1-check.js` は変更禁止のため、段階2・3で反転済みの7件の期待文言・固定値は更新していない。
+
+# 段階4
+
+## 変更点
+
+- 保存キー一式とv1移行の有効／無効を `CONFIG.STORAGE` に集約した。開発版 `index.html` は `gunya.save.v2.dev` / `.bak` / `.broken`、`gunya-yakyu-save-v3.dev`、`gunya.backup.v1.dev` だけを使う。本番版は `gunya.save.v2` / `.bak` / `.broken`、実v1キー `gunya-yakyu-save-v3`、`gunya.backup.v1` を使い、両ビルドとも移行を有効にしている。
+- v2が未作成の場合だけv1を読み、検証より先に原文を `backupV1` へ退避してから変換する。v1キーは削除も書き換えもしない。v1不在／破損時も新規v2へ移行完了フラグを保存するため、次回起動で再試行しない。有効な既存v2にはv1を重ねず、移行完了フラグだけを追加する。
+- 設定に「最初に選ぶ球種」を追加し、v1の選択球種を保持できるようにした。試合開始時は解禁済みならこの球種を初期選択する。
+- 設定画面にJSON書き出し、貼り付け／ファイル読み込み、初期化を追加した。読み込みはスキーマと主要スライスを検証し、不正理由を表示して拒否する。有効なデータだけ現行v2を `.bak` に退避して置き換える。初期化は二重確認後、現在のビルドのv2本体／`.bak`／`.broken`／v1退避だけを消し、v1移行元を残したまま新規状態と移行済みフラグを作る。
+- `build-prod.js` は `index.html` の `BUILD_CONFIG_START`〜`BUILD_CONFIG_END`、すなわちCONFIG内のビルド固有値だけを置換して `index-prod.html` を生成する。生成物を手修正する必要はない。
+- `phase4-check.js` はjsdomの隔離localStorageで開発版／本番版の内蔵自己テストを実行し、本番v1フィクスチャの変換、原文バックアップ、移行元不変、二重移行防止を追加確認する。内蔵の保存テストもすべてメモリストレージを使うため、自己テストから実データには触れない。
+
+## v1移行の対応づけ
+
+| v1 | v2 | 変換 |
+|---|---|---|
+| `coins` | `wallet.coins` | 0〜9,999,999の整数 |
+| `app.tickets` | `wallet.scoutTickets` | 0〜999の整数 |
+| `ownedPitch.straight/custom` | `unlocks.pitches.fastball/mypitch` | `curve` / `slider` / `fork` / `shoot` / `sinker` は同名対応 |
+| `ownedPose.square/open/closed/ichi` | `unlocks.battingForms.standard/open/closed/oneLeg` | 完全対応するフォームだけ移行 |
+| `premium` | `premium.pass` | `true` の場合に有効 |
+| `selPitch` | `settings.selectedPitch` | 球種IDを上記と同じ規則で変換 |
+| `pose` | `settings.battingForm` | フォームIDを上記と同じ規則で変換 |
+| `brkDir` | `settings.myPitch.direction` | `type/drop→down`、`slide/diag→left`、`rise→up`、`rev→right` |
+| `brkAmt` | `settings.myPitch.amount` | 0〜100 |
+| `mot.arm/rel/swing` | `settings.motion.armSwing/release/swingSpeed` | 0〜100 |
+| `records.totalHits + totalHR` | `stats.career.hits` | v1は本塁打を通常安打と別計上、v2は安打に含むため加算 |
+| `records.totalHR` | `stats.career.homeruns` | 0以上の整数 |
+| `app.league.results[].res === 'win'` | `stats.career.leagueWins` | v1に残っているリーグ結果から勝数を算出 |
+| `app.settings.teamName` | `team.name` | 前後空白を除き20文字まで |
+| `app.scoutCount` | `scout.totalPulls` | 0以上の整数 |
+
+対応先がなく移行しないものは、`meta.migrationReport` に記録する。対象は神主打法、`mot.fol/take/batFol`、ベストスコア、最長飛距離、プレイ回数、累計獲得コイン、旧選手／旧編成、8球団制の旧リーグ進行、旧ミッション／デイリー／ログイン状態、サウンド設定。v1には投球フォーム解禁データがないため、v2の投球フォームは初期状態から始める。
+
+## 自己テスト結果
+
+- JavaScript構文と起動：合格。
+- `NODE_PATH=/tmp/jsdom-test/node_modules node phase4-check.js`：`index.html` 48/48、`index-prod.html` 48/48。データ管理UI、初期化の二重確認、不正JSONのUI拒否、合成v1フィクスチャの移行、原文バックアップ、移行元不変、二重移行防止も合格。
+- 段階4で追加した内蔵7件：移行の対応づけ、移行前バックアップ／v1読み取り専用、二重移行防止、v1破損時の新規開始、書き出し→初期化→読み込み、不正JSON／不正スキーマ拒否、ビルド別CONFIG値。すべて合格。
+- `NODE_PATH=/tmp/jsdom-test/node_modules node phase1-check.js index.html`：60/67合格。段階3修正便と同じ内訳で、新規不合格なし。既知7件は段階1時点の固定期待（打順、報酬未付与、Lv、ホーム固定表示、仮データ、バッジ、localStorage未使用）と段階2以降の意図的な実装差。
+
+## 残課題
+
+- 実課金・実広告SDK・ストア公開・オンライン対戦は仕様どおり対象外。デモ課金／デモ広告だけを維持している。
+- v1の `app.league.results` は旧ゲームが保持している範囲だけを変換するため、それ以前のシーズン勝数までは復元できない。
+- 生成元は常に `index.html`。以後コードを変更した場合は `index-prod.html` を直接編集せず、生成と段階4チェックを再実行する。
+
+## 本番差し替え手順
+
+1. この成果物の `index-prod.html` は本番CONFIGで生成済み。内容を変更せず、現在の本番エントリHTMLとそのまま差し替える（配信側がファイル名 `index.html` 固定なら、`index-prod.html` を `index.html` として配置する）。追加のキー編集は不要。
+2. 再生成が必要な場合だけ `node build-prod.js` を実行する。
+3. 配置前の最終確認として `NODE_PATH=/tmp/jsdom-test/node_modules node phase4-check.js` を実行し、両方48/48とfixture migrationのOK表示を確認する。テストは隔離ストレージなので本番データには触れない。

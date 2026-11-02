@@ -244,6 +244,8 @@ button:disabled{cursor:not-allowed}
 .field output{font:600 15px/1 var(--f-num);color:var(--amber)}
 .field input[type=range]{width:100%;height:44px;accent-color:var(--amber)}
 .field select{min-height:44px;padding:0 10px;border-radius:8px;background:var(--navy);border:1px solid var(--line)}
+.data-import{width:100%;min-height:132px;padding:10px;border-radius:8px;background:var(--navy);border:1px solid var(--line);color:var(--text);font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
+.data-file{width:100%;min-height:44px;padding:8px;border-radius:8px;background:var(--navy);border:1px solid var(--line);color:var(--text-2)}
 
 /* スカウト演出 */
 .reveal{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:calc(20px + var(--safe-t)) 20px calc(20px + var(--safe-b));background:var(--stand)}
@@ -371,16 +373,27 @@ button:disabled{cursor:not-allowed}
      → 1 画面遷移（View・Shell・Modals・GameHud・Screens・Router・Actions・App）
      → デバッグ（Debug）→ 自己テストの登録 → 起動
    依存の向き：1 → 2a・2b・3・4 ／ 2a → 3・4 ／ 3 → 4 ／ 2b → なし（試合の通知を出すだけ）
-   localStorage に触れてよいのは Save だけ。段階3は開発用キーだけを使い、本番キーには触れない。
+   localStorage に触れてよいのは Save だけ。index.html は開発用キーだけを使い、本番キーには触れない。
    ===================================================================== */
 
 /* =====================================================================
    共通基盤：定数 CONFIG（バランス値・仮置き値・段階ごとの機能スイッチ・表示名）
    ===================================================================== */
 const CONFIG = Object.freeze({
-  VERSION: '段階3 本実装 0.4',
+  VERSION: '段階4 最終実装 1.0',
+  /* BUILD_CONFIG_START: build-prod.js はこの範囲だけを置換する */
+  BUILD: 'development',
+  STORAGE: Object.freeze({
+    main: 'gunya.save.v2.dev',
+    bak: 'gunya.save.v2.dev.bak',
+    broken: 'gunya.save.v2.dev.broken',
+    legacyV1: 'gunya-yakyu-save-v3.dev',
+    backupV1: 'gunya.backup.v1.dev',
+    migrationEnabled: true,
+  }),
+  /* BUILD_CONFIG_END */
   FEATURES: Object.freeze({
-    persistence: true,     // 段階2：開発用キー gunya.save.v2.dev だけを読み書き
+    persistence: true,     // CONFIG.STORAGE で開発用／本番用キーを切り替える
     leagueProgress: true,  // 段階2：試合結果をリーグに記録して節を進める
     leagueRewards: true,   // 段階2：リーグ戦の報酬を試合終了時にまとめて付与
     correction: true,      // 段階2：能力補正を MatchEngine.HOOKS 経由で有効にする
@@ -464,11 +477,12 @@ const Events = (() => {
 
 /* ---- 共通基盤：保存基盤 Save（localStorage に触れてよいのはここだけ） ---- */
 const Save = (() => {
-  // 段階1〜3の確認は本番キーを一切使わない。v1移行もまだ行わない。
-  const KEYS = Object.freeze({ main: 'gunya.save.v2.dev', bak: 'gunya.save.v2.dev.bak', backupV1: 'gunya.backup.v1.dev', broken: 'gunya.save.v2.dev.broken' });
+  // キーと移行スイッチはCONFIGだけで切り替える。v1キーはgetItem以外に使用しない。
+  const KEYS = Object.freeze({ ...CONFIG.STORAGE });
   const slices = new Map();
-  const meta = { createdAt: new Date().toISOString(), migratedFrom: null, migrationReport: [] };
+  const meta = { createdAt: new Date().toISOString(), migratedFrom: null, migrationReport: [], migration: { completed: false, status: 'pending', sourceKey: KEYS.legacyV1, at: null } };
   let last = null;
+  let defaults = null;
   let commits = 0;
   let testDepth = 0;
   const register = (name, api) => { slices.set(name, api); };
@@ -477,34 +491,155 @@ const Save = (() => {
     slices.forEach((api) => Object.assign(data, api.exportSlice()));
     return data;
   }
-  const valid = (data) => !!(data && typeof data === 'object' && data.schemaVersion === 2);
+  const plain = (o) => !!(o && typeof o === 'object' && !Array.isArray(o));
+  const valid = (data) => !!(plain(data) && data.schemaVersion === 2);
   const parse = (raw) => {
     if (!raw) return null;
     try { const data = JSON.parse(raw); return valid(data) ? data : null; } catch (e) { return null; }
   };
-  function readForLoad() {
+  function memoryStorage(initial = {}) {
+    const map = new Map(Object.entries(initial).map(([k, v]) => [k, String(v)]));
+    return { getItem: (k) => map.has(k) ? map.get(k) : null, setItem: (k, v) => map.set(k, String(v)), removeItem: (k) => map.delete(k), seed: (k, v) => map.set(k, String(v)), dump: () => Object.fromEntries(map) };
+  }
+  function validateData(data) {
+    const errors = [];
+    const reqObj = (key) => { if (!plain(data && data[key])) errors.push(`${key} がオブジェクトではありません`); };
+    if (!plain(data)) return { ok: false, reason: 'JSONのルートがオブジェクトではありません' };
+    if (data.schemaVersion !== 2) errors.push('schemaVersion は 2 である必要があります');
+    ['meta', 'wallet', 'unlocks', 'premium', 'team', 'cards', 'scout', 'league', 'stats', 'settings'].forEach(reqObj);
+    if (plain(data.wallet)) {
+      [['coins', 9999999], ['scoutTickets', 999], ['guaranteeTickets', 999]].forEach(([key, max]) => {
+        if (!Number.isInteger(data.wallet[key]) || data.wallet[key] < 0 || data.wallet[key] > max) errors.push(`wallet.${key} が範囲外です`);
+      });
+    }
+    if (plain(data.unlocks)) ['pitches', 'pitchingForms', 'battingForms'].forEach((key) => { if (!Array.isArray(data.unlocks[key]) || data.unlocks[key].some((x) => typeof x !== 'string')) errors.push(`unlocks.${key} が文字列配列ではありません`); });
+    if (plain(data.premium) && typeof data.premium.pass !== 'boolean') errors.push('premium.pass が真偽値ではありません');
+    if (plain(data.team)) {
+      if (typeof data.team.name !== 'string' || !data.team.name.trim()) errors.push('team.name が空です');
+      if (!Array.isArray(data.team.lineup) || data.team.lineup.length !== 9) errors.push('team.lineup は9人必要です');
+      if (!Array.isArray(data.team.rotation) || data.team.rotation.length !== 3) errors.push('team.rotation は3人必要です');
+    }
+    if (plain(data.league) && (!Number.isInteger(data.league.season) || data.league.season < 1 || !Array.isArray(data.league.results))) errors.push('league のシーズンまたは結果が不正です');
+    if (plain(data.stats) && !plain(data.stats.career)) errors.push('stats.career がありません');
+    if (plain(data.settings)) {
+      if (typeof data.settings.pitchingForm !== 'string' || typeof data.settings.battingForm !== 'string') errors.push('settings のフォームが不正です');
+      if (!plain(data.settings.myPitch) || !plain(data.settings.motion)) errors.push('settings の変化球またはモーションが不正です');
+    }
+    return errors.length ? { ok: false, reason: errors.slice(0, 4).join('／'), errors } : { ok: true, data };
+  }
+  const safeInt = (v, fallback = 0, max = Number.MAX_SAFE_INTEGER) => Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : fallback;
+  function convertV1(v1) {
+    const data = Util.copy(defaults || snapshot());
+    const report = [];
+    const pitchMap = { straight: 'fastball', curve: 'curve', slider: 'slider', fork: 'fork', shoot: 'shoot', sinker: 'sinker', custom: 'mypitch' };
+    const poseMap = { square: 'standard', open: 'open', closed: 'closed', ichi: 'oneLeg' };
+    const dirMap = { type: 'down', drop: 'down', slide: 'left', rise: 'up', diag: 'left', rev: 'right' };
+    data.wallet.coins = safeInt(v1.coins, data.wallet.coins, 9999999);
+    if (plain(v1.app)) data.wallet.scoutTickets = safeInt(v1.app.tickets, data.wallet.scoutTickets, 999);
+    const unlockedPitches = new Set(data.unlocks.pitches);
+    if (plain(v1.ownedPitch)) Object.keys(v1.ownedPitch).forEach((id) => { if (v1.ownedPitch[id] === true && pitchMap[id]) unlockedPitches.add(pitchMap[id]); });
+    data.unlocks.pitches = [...unlockedPitches];
+    const unlockedForms = new Set(data.unlocks.battingForms);
+    if (plain(v1.ownedPose)) Object.keys(v1.ownedPose).forEach((id) => { if (v1.ownedPose[id] === true && poseMap[id]) unlockedForms.add(poseMap[id]); });
+    data.unlocks.battingForms = [...unlockedForms];
+    if (plain(v1.ownedPose) && v1.ownedPose.kannushi === true) report.push('神主打法：v2に同一フォームがないため未移行');
+    data.premium.pass = v1.premium === true;
+    if (pitchMap[v1.selPitch]) data.settings.selectedPitch = pitchMap[v1.selPitch];
+    if (poseMap[v1.pose]) data.settings.battingForm = poseMap[v1.pose];
+    else if (v1.pose === 'kannushi') report.push('選択中の神主打法：v2標準フォームのまま');
+    if (dirMap[v1.brkDir]) data.settings.myPitch.direction = dirMap[v1.brkDir];
+    data.settings.myPitch.amount = safeInt(v1.brkAmt, data.settings.myPitch.amount, 100);
+    if (plain(v1.mot)) {
+      data.settings.motion.armSwing = safeInt(v1.mot.arm, data.settings.motion.armSwing, 100);
+      data.settings.motion.release = safeInt(v1.mot.rel, data.settings.motion.release, 100);
+      data.settings.motion.swingSpeed = safeInt(v1.mot.swing, data.settings.motion.swingSpeed, 100);
+      if (['fol', 'take', 'batFol'].some((k) => Number.isFinite(v1.mot[k]))) report.push('フォロースルー・テイクバック：v2に保存先がないため未移行');
+    }
+    if (plain(v1.records)) {
+      const hr = safeInt(v1.records.totalHR);
+      data.stats.career.homeruns = hr;
+      data.stats.career.hits = safeInt(v1.records.totalHits) + hr;
+      report.push('ベストスコア・最長飛距離・プレイ回数・累計獲得コイン：v2に保存先がないため未移行');
+    }
+    if (plain(v1.app)) {
+      if (plain(v1.app.settings) && typeof v1.app.settings.teamName === 'string' && v1.app.settings.teamName.trim()) data.team.name = v1.app.settings.teamName.trim().slice(0, 20);
+      if (Number.isFinite(v1.app.scoutCount)) data.scout.totalPulls = safeInt(v1.app.scoutCount);
+      const results = plain(v1.app.league) && Array.isArray(v1.app.league.results) ? v1.app.league.results : [];
+      data.stats.career.leagueWins = results.filter((x) => x && x.res === 'win').length;
+      if (plain(v1.app.players) || plain(v1.app.league) || plain(v1.app.missions)) report.push('旧選手・旧リーグ進行・旧ミッション：v2とデータモデルが異なるため未移行');
+    }
+    data.meta.migratedFrom = KEYS.legacyV1;
+    data.meta.migrationReport = report;
+    data.meta.migration = { completed: true, status: 'migrated', sourceKey: KEYS.legacyV1, at: new Date().toISOString() };
+    return data;
+  }
+  function migrateFromV1(store = window.localStorage) {
+    const raw = store.getItem(KEYS.legacyV1);
+    const data = Util.copy(defaults || snapshot());
+    let status = 'absent';
+    let out = data;
+    if (raw !== null) {
+      store.setItem(KEYS.backupV1, raw); // 検証前の原文を必ず退避する
+      let old = null;
+      try { old = JSON.parse(raw); } catch (e) { old = null; }
+      if (plain(old)) { out = convertV1(old); status = 'migrated'; }
+      else {
+        status = 'corrupt';
+        out.meta.migrationReport = ['v1原文をJSONオブジェクトとして読めなかったため新規開始'];
+      }
+    }
+    if (status !== 'migrated') {
+      out.meta.migratedFrom = null;
+      out.meta.migration = { completed: true, status, sourceKey: KEYS.legacyV1, at: new Date().toISOString() };
+    }
+    store.setItem(KEYS.main, JSON.stringify(out));
+    return { data: out, source: status === 'migrated' ? 'v1-migrated' : status === 'corrupt' ? 'new-v1-corrupt' : 'new-v1-absent', migrated: status === 'migrated' };
+  }
+  function readForLoad(store = window.localStorage) {
     try {
-      const raw = window.localStorage.getItem(KEYS.main);
+      const raw = store.getItem(KEYS.main);
       if (!raw) return { data: null, source: 'new' };
       const main = parse(raw);
       if (main) return { data: main, source: 'v2' };
-      window.localStorage.setItem(KEYS.broken, raw);
-      const backupRaw = window.localStorage.getItem(KEYS.bak);
+      store.setItem(KEYS.broken, raw);
+      const backupRaw = store.getItem(KEYS.bak);
       const backup = parse(backupRaw);
       if (!backup) return { data: null, source: 'new-corrupt' };
       // 復旧時は壊れた本体を .bak に回さず、検証済みバックアップを本体へ戻す。
-      window.localStorage.setItem(KEYS.main, backupRaw);
+      store.setItem(KEYS.main, backupRaw);
       return { data: backup, source: 'backup', recovered: true };
     } catch (e) { return { data: null, source: 'storage-unavailable', error: e.name }; }
   }
+  function takeMeta(data) {
+    if (!plain(data && data.meta)) return;
+    if (typeof data.meta.createdAt === 'string') meta.createdAt = data.meta.createdAt;
+    meta.migratedFrom = typeof data.meta.migratedFrom === 'string' ? data.meta.migratedFrom : null;
+    meta.migrationReport = Array.isArray(data.meta.migrationReport) ? data.meta.migrationReport.map(String) : [];
+    if (plain(data.meta.migration)) meta.migration = { ...meta.migration, ...data.meta.migration };
+  }
   // 読み込んで各モジュールに渡す。破損本体は .broken に退避して .bak から復旧する。
   function load() {
-    const found = CONFIG.FEATURES.persistence ? readForLoad() : { data: null, source: 'new' };
-    const data = found.data;
-    if (data && data.meta && typeof data.meta.createdAt === 'string') meta.createdAt = data.meta.createdAt;
+    if (!defaults) defaults = Util.copy(snapshot());
+    let found = CONFIG.FEATURES.persistence ? readForLoad() : { data: null, source: 'new' };
+    if (!found.data && found.source !== 'storage-unavailable' && CONFIG.FEATURES.persistence && KEYS.migrationEnabled) {
+      try { found = migrateFromV1(); } catch (e) { found = { data: null, source: 'storage-unavailable', error: e.name }; }
+    }
+    let data = found.data;
+    // 段階3以前の有効なv2がある場合は上書き移行せず、二重移行防止フラグだけを追加する。
+    if (data && KEYS.migrationEnabled && !(data.meta && data.meta.migration && data.meta.migration.completed)) {
+      const upgraded = Util.copy(data);
+      upgraded.meta = plain(upgraded.meta) ? upgraded.meta : {};
+      upgraded.meta.migration = { completed: true, status: 'existing-v2', sourceKey: KEYS.legacyV1, at: new Date().toISOString() };
+      try {
+        if (!parse(window.localStorage.getItem(KEYS.bak))) window.localStorage.setItem(KEYS.bak, JSON.stringify(data));
+        window.localStorage.setItem(KEYS.main, JSON.stringify(upgraded));
+      } catch (e) {}
+      data = upgraded;
+    }
+    takeMeta(data);
     slices.forEach((api) => api.importSlice(data || {}));
     last = snapshot();
-    return { source: found.source, recovered: !!found.recovered };
+    return { source: found.source, recovered: !!found.recovered, migrated: !!found.migrated };
   }
   // 状態が変わる操作の直後に呼ぶ。保存前の世代は毎回 .bak へ退避する。
   function commit(reason) {
@@ -514,7 +649,7 @@ const Save = (() => {
     if (!CONFIG.FEATURES.persistence) return { ok: true, persisted: false };
     try {
       const prev = window.localStorage.getItem(KEYS.main);
-      if (prev) window.localStorage.setItem(KEYS.bak, prev);
+      if (parse(prev)) window.localStorage.setItem(KEYS.bak, prev);
       window.localStorage.setItem(KEYS.main, JSON.stringify(last));
       commits += 1;
       return { ok: true, persisted: true };
@@ -522,32 +657,75 @@ const Save = (() => {
   }
   const peek = () => last || snapshot();
   const exportText = () => JSON.stringify(peek(), null, 2);
-  const importText = () => ({ ok: false, reason: '読み込みは段階4で作ります' });
-  const reset = () => ({ ok: false, reason: '初期化は段階4で作ります' });
-  // 内蔵テスト専用。実データを退避・復元し、開発用4キー以外には触れない。
+  function importText(text, store = window.localStorage) {
+    let data;
+    try { data = JSON.parse(String(text || '')); } catch (e) { return { ok: false, reason: `JSONの構文エラー：${e.message}` }; }
+    const checked = validateData(data);
+    if (!checked.ok) return checked;
+    try {
+      const current = store.getItem(KEYS.main);
+      store.setItem(KEYS.bak, parse(current) ? current : JSON.stringify(peek()));
+      store.setItem(KEYS.main, JSON.stringify(data));
+      if (store === window.localStorage) { takeMeta(data); last = Util.copy(data); }
+      return { ok: true, data };
+    } catch (e) { return { ok: false, reason: `保存できません：${e.name}` }; }
+  }
+  function reset(store = window.localStorage) {
+    try {
+      [KEYS.main, KEYS.bak, KEYS.broken, KEYS.backupV1].forEach((key) => store.removeItem(key));
+      const clean = Util.copy(defaults || snapshot());
+      clean.meta.createdAt = new Date().toISOString();
+      clean.meta.updatedAt = clean.meta.createdAt;
+      clean.meta.migratedFrom = null;
+      clean.meta.migrationReport = [];
+      clean.meta.migration = { completed: true, status: 'reset', sourceKey: KEYS.legacyV1, at: clean.meta.createdAt };
+      store.setItem(KEYS.main, JSON.stringify(clean)); // v1を残したまま再移行を防ぎ、新規状態で起動する
+      if (store === window.localStorage) { takeMeta(clean); last = clean; }
+      return { ok: true };
+    } catch (e) { return { ok: false, reason: `初期化できません：${e.name}` }; }
+  }
+  // 内蔵テストはメモリ上の隔離ストレージだけを使い、ブラウザの実データに触れない。
   function testPersistence() {
     if (!CONFIG.FEATURES.persistence) return { roundTrip: false, recovery: false };
-    const old = {};
-    try {
-      Object.values(KEYS).forEach((key) => { old[key] = window.localStorage.getItem(key); });
-      const sample = snapshot();
-      sample.meta.reason = 'selftest-roundtrip';
-      const text = JSON.stringify(sample);
-      window.localStorage.setItem(KEYS.main, text);
-      const roundTrip = JSON.stringify(parse(window.localStorage.getItem(KEYS.main))) === text;
-      window.localStorage.setItem(KEYS.bak, text);
-      window.localStorage.setItem(KEYS.main, '{broken-json');
-      const recovered = readForLoad();
-      const recovery = recovered.source === 'backup'
-        && window.localStorage.getItem(KEYS.broken) === '{broken-json'
-        && window.localStorage.getItem(KEYS.main) === text;
-      return { roundTrip, recovery };
-    } finally {
-      Object.values(KEYS).forEach((key) => {
-        if (old[key] === null) window.localStorage.removeItem(key);
-        else window.localStorage.setItem(key, old[key]);
-      });
-    }
+    const store = memoryStorage();
+    const sample = snapshot(); sample.meta.reason = 'selftest-roundtrip';
+    const text = JSON.stringify(sample);
+    store.setItem(KEYS.main, text);
+    const roundTrip = JSON.stringify(parse(store.getItem(KEYS.main))) === text;
+    store.setItem(KEYS.bak, text); store.setItem(KEYS.main, '{broken-json');
+    const recovered = readForLoad(store);
+    const recovery = recovered.source === 'backup' && store.getItem(KEYS.broken) === '{broken-json' && store.getItem(KEYS.main) === text;
+    return { roundTrip, recovery };
+  }
+  function testMigration() {
+    const fixture = { coins: 4321, ownedPitch: { straight: true, curve: true, custom: true }, ownedPose: { square: true, open: true, ichi: true, kannushi: true }, premium: true, pose: 'ichi', selPitch: 'custom', brkDir: 'rev', brkAmt: 77, mot: { arm: 11, rel: 22, fol: 33, swing: 44, take: 55, batFol: 66 }, records: { bestScore: 99, bestDist: 123, totalHR: 7, totalHits: 13, games: 8, totalCoins: 9000 }, app: { tickets: 4, scoutCount: 9, players: { ponta: 2 }, league: { results: [{ res: 'win' }, { res: 'loss' }, { res: 'win' }] }, missions: { hr1: true }, settings: { teamName: '移行テスト球団' } } };
+    const raw = JSON.stringify(fixture);
+    const store = memoryStorage({ [KEYS.legacyV1]: raw });
+    const first = migrateFromV1(store);
+    const mapped = first.data;
+    const legacyAfterFirst = store.getItem(KEYS.legacyV1);
+    store.seed(KEYS.legacyV1, JSON.stringify({ ...fixture, coins: 1 }));
+    const second = readForLoad(store);
+    const corruptRaw = '{v1-broken';
+    const brokenStore = memoryStorage({ [KEYS.legacyV1]: corruptRaw });
+    const broken = migrateFromV1(brokenStore);
+    return {
+      mapped, raw, backup: store.getItem(KEYS.backupV1), legacyAfterFirst, legacyAfter: JSON.parse(store.getItem(KEYS.legacyV1)), second: second.data,
+      broken: broken.data, brokenBackup: brokenStore.getItem(KEYS.backupV1), brokenRaw: corruptRaw,
+    };
+  }
+  function testDataManagement() {
+    const store = memoryStorage();
+    const text = exportText();
+    store.setItem(KEYS.main, text);
+    const resetResult = reset(store);
+    const clean = store.getItem(KEYS.main);
+    const imported = importText(text, store);
+    const roundTrip = imported.ok && JSON.stringify(JSON.parse(store.getItem(KEYS.main))) === JSON.stringify(JSON.parse(text)) && store.getItem(KEYS.bak) === clean;
+    const before = store.getItem(KEYS.main);
+    const badSyntax = importText('{bad', store);
+    const badShape = importText(JSON.stringify({ schemaVersion: 2 }), store);
+    return { resetResult, imported, roundTrip, badSyntax, badShape, unchanged: before === store.getItem(KEYS.main) };
   }
   function testScope(fn) {
     const beforeLast = last;
@@ -556,7 +734,7 @@ const Save = (() => {
     try { return fn(); }
     finally { testDepth -= 1; last = beforeLast; commits = beforeCommits; }
   }
-  return { KEYS, register, load, commit, peek, exportText, importText, reset, testPersistence, testScope, commitCount: () => commits };
+  return { KEYS, register, load, commit, peek, exportText, importText, reset, validateData, testPersistence, testMigration, testDataManagement, testScope, commitCount: () => commits };
 })();
 
 /* ---- 共通基盤：自己テスト SelfTest（関数は true か、ずれの説明を返す） ---- */
@@ -1432,7 +1610,7 @@ const { League, Correction } = (() => {
     };
     return { lineup, pitcher };
   }
-  const PLAY_DEFAULT = Object.freeze({ pitchingForm: 'overhand', battingForm: 'standard', myPitch: { direction: 'down', amount: 50 }, motion: { armSwing: 50, release: 50, swingSpeed: 50 } });
+  const PLAY_DEFAULT = Object.freeze({ selectedPitch: 'fastball', pitchingForm: 'overhand', battingForm: 'standard', myPitch: { direction: 'down', amount: 50 }, motion: { armSwing: 50, release: 50, swingSpeed: 50 } });
 
   // 6球団の2回総当たり（円順列）。自チームは弱い順に当たり、ホーム5・ビジター5
   function makeSchedule() {
@@ -1721,9 +1899,11 @@ const { League, Correction } = (() => {
         const p = data.settings;
         const pforms = ['overhand', 'threeQuarter', 'side', 'under', 'tornado'];
         const bforms = ['standard', 'open', 'closed', 'oneLeg', 'sway'];
+        const pitches = ['fastball', 'curve', 'slider', 'fork', 'shoot', 'sinker', 'mypitch'];
         const directions = ['up', 'down', 'left', 'right'];
         const n = (value, fallback) => Number.isFinite(Number(value)) ? Math.round(Util.clamp(Number(value), 0, 100)) : fallback;
         s.play = {
+          selectedPitch: pitches.includes(p.selectedPitch) ? p.selectedPitch : PLAY_DEFAULT.selectedPitch,
           pitchingForm: pforms.includes(p.pitchingForm) ? p.pitchingForm : PLAY_DEFAULT.pitchingForm,
           battingForm: bforms.includes(p.battingForm) ? p.battingForm : PLAY_DEFAULT.battingForm,
           myPitch: { direction: directions.includes(p.myPitch && p.myPitch.direction) ? p.myPitch.direction : PLAY_DEFAULT.myPitch.direction, amount: n(p.myPitch && p.myPitch.amount, PLAY_DEFAULT.myPitch.amount) },
@@ -2043,7 +2223,7 @@ const MatchEngine = (() => {
   function mount(drawingPort) { port = drawingPort; }
   function start(matchConfig) {
     cfg = matchConfig; state = 'running'; rng = (() => { let s = (cfg.seed || 1) >>> 0; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
-    selectedPitch = (cfg.unlockedPitches && cfg.unlockedPitches[0]) || 'fastball';
+    selectedPitch = (cfg.unlockedPitches || []).includes(cfg.play && cfg.play.selectedPitch) ? cfg.play.selectedPitch : (cfg.unlockedPitches && cfg.unlockedPitches[0]) || 'fastball';
     game = { inning: 1, half: 'top', outs: 0, score: { home: 0, away: 0 }, order: { user: 0, opponent: 0 }, pitches: { user: 0, opponent: 0 }, bases: { user: [0, 0, 0], opponent: [0, 0, 0] }, batting: {}, k: 0, attempts: 0, phase: 'ready', nextAt: 0 };
     const participants = cfg.teams ? [...cfg.teams.user.lineup.map((b) => b.cardId), cfg.teams.user.pitcher.cardId] : [];
     fielders = FIELD_HOME.map((f) => ({ ...f })); clock = 0; last = 0; emit('match:start', { userSide: cfg.userSide, participants }); atBat();
@@ -2580,11 +2760,13 @@ const Screens = (() => {
     const un = Economy.getUnlocks();
     const cat = Economy.getCatalog();
     const opts = (kind, list, cur) => cat.filter((i) => i.kind === kind && list.includes(i.key)).map((i) => `<option value="${i.key}"${i.key === cur ? ' selected' : ''}>${i.name}</option>`).join('');
+    const pitchOpts = opts('pitch', un.pitches, ps.selectedPitch);
     const dirs = [['down', '落ちる'], ['left', '左へ曲がる'], ['right', '右へ曲がる'], ['up', '浮き上がる']].map(([k, t]) => `<option value="${k}"${k === ps.myPitch.direction ? ' selected' : ''}>${t}</option>`).join('');
     const range = (id, label, v) => `<div class="field"><label for="f-${id}">${label}<output id="o-${id}">${v}</output></label><input id="f-${id}" type="range" min="0" max="100" step="1" value="${v}" data-out="o-${id}"></div>`;
     return `<section class="screen">${View.pageHead('設定')}
       <p class="note">球種・フォーム・変化量・モーションは次の試合から反映されます。確定するたびに4秒のデモ広告が流れます（プレミアムパスでは流れません）。</p>
       <div class="panel" id="play-form">
+        <div class="field"><label for="f-pitch">最初に選ぶ球種</label><select id="f-pitch">${pitchOpts}</select></div>
         <div class="field"><label for="f-pform">投球フォーム</label><select id="f-pform">${opts('pitchingForm', un.pitchingForms, ps.pitchingForm)}</select></div>
         <div class="field"><label for="f-bform">打撃フォーム</label><select id="f-bform">${opts('battingForm', un.battingForms, ps.battingForm)}</select></div>
         <div class="field"><label for="f-mydir">マイ変化球の曲がり方</label><select id="f-mydir">${dirs}</select></div>
@@ -2592,8 +2774,14 @@ const Screens = (() => {
       </div>
       <button class="btn btn-amber" type="button" data-act="confirmSettings">設定を確定</button>
       <div class="sec-h"><h2>画面</h2></div><div class="panel"><div class="kv"><span>画面の向き</span><b>縦で統一（Q3=A 仮置き）</b></div></div>
-      <div class="sec-h"><h2>データ管理</h2><p>段階4で作ります</p></div>
-      <div class="panel data-btns"><button class="btn-s btn-line" type="button" disabled>書き出し</button><button class="btn-s btn-line" type="button" disabled>読み込み</button><button class="btn-s btn-line" type="button" disabled>初期化</button></div>
+      <div class="sec-h"><h2>データ管理</h2><p>JSON形式</p></div>
+      <div class="panel">
+        <div class="data-btns"><button class="btn-s btn-line" type="button" data-act="exportData">セーブを書き出す</button></div>
+        <div class="field"><label for="import-json">JSONを貼り付け</label><textarea class="data-import" id="import-json" spellcheck="false" placeholder="ここに書き出したJSONを貼り付けます"></textarea></div>
+        <div class="field"><label for="import-file">またはJSONファイルを選択</label><input class="data-file" id="import-file" type="file" accept="application/json,.json"></div>
+        <div class="data-btns"><button class="btn-s btn-amber" type="button" data-act="importData">貼り付けJSONを読み込む</button><button class="btn-s btn-line" type="button" data-act="importFile">選択ファイルを読み込む</button><button class="btn-s btn-danger" type="button" data-act="resetData">初期化</button></div>
+      </div>
+      <p class="note">読み込みは形式を検証し、現在のセーブをバックアップしてから置き換えます。初期化はこの${CONFIG.BUILD === 'production' ? '本番' : '開発'}ビルドのデータだけが対象です。</p>
       <p class="note">版：${CONFIG.VERSION}</p>
     </section>`;
   };
@@ -2716,7 +2904,7 @@ const Actions = {
   confirmSettings() {
     const v = (id) => document.getElementById(id).value;
     const changed = League.updatePlaySettings({
-      pitchingForm: v('f-pform'), battingForm: v('f-bform'),
+      selectedPitch: v('f-pitch'), pitchingForm: v('f-pform'), battingForm: v('f-bform'),
       myPitch: { direction: v('f-mydir'), amount: Number(v('f-myAmt')) },
       motion: { armSwing: Number(v('f-arm')), release: Number(v('f-rel')), swingSpeed: Number(v('f-swing')) },
     });
@@ -2724,6 +2912,45 @@ const Actions = {
     const ad = Ads.onSettingsChanged();
     const done = () => Shell.toast('設定を確定しました');
     if (ad.show) Shell.showDemoAd(ad.seconds, '設定変更のデモ広告').then(done); else done();
+  },
+  exportData() {
+    try {
+      const blob = new Blob([Save.exportText()], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `gunya-save-v2-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      Shell.toast('セーブを書き出しました');
+    } catch (e) { Shell.toast(`書き出せません：${e.message}`); }
+  },
+  importData() {
+    const input = document.getElementById('import-json');
+    const text = input ? input.value.trim() : '';
+    if (!text) { Shell.toast('読み込むJSONを貼り付けてください'); return; }
+    Shell.confirm({ title: 'セーブを読み込みますか', body: '形式を検証し、現在のセーブをバックアップしてから置き換えます。', okLabel: '検証して読み込む' }, () => {
+      const r = Save.importText(text);
+      if (!r.ok) { Shell.toast(`読み込みを拒否しました：${r.reason}`); return; }
+      window.location.reload();
+    });
+  },
+  async importFile() {
+    const input = document.getElementById('import-file');
+    const file = input && input.files && input.files[0];
+    if (!file) { Shell.toast('JSONファイルを選択してください'); return; }
+    try {
+      const text = await file.text();
+      const area = document.getElementById('import-json'); if (area) area.value = text;
+      Actions.importData();
+    } catch (e) { Shell.toast(`ファイルを読めません：${e.message}`); }
+  },
+  resetData() {
+    Shell.confirm({ title: 'セーブを初期化しますか', body: 'コイン・選手・進行・設定を新規開始の状態に戻します。', okLabel: '次へ', danger: true }, () => {
+      Shell.confirm({ title: '本当に初期化しますか', body: 'この操作は取り消せません。v1の移行元データ自体は変更しません。', okLabel: '初期化する', danger: true }, () => {
+        const r = Save.reset();
+        if (!r.ok) { Shell.toast(r.reason); return; }
+        window.location.reload();
+      });
+    });
   },
   claimMission(el) { const r = Missions.claim(el.dataset.id); Shell.toast(r.ok ? (r.capped ? '受取済み。1日上限のためコインは付与されません' : '受け取りました') : r.reason); Router.refresh(); },
   openLoginBonus() { LoginBonus.markShown(); Shell.openModal('loginBonus'); },
@@ -2913,6 +3140,44 @@ const MatchFlow = (() => {
   });
   t('段階2 保存の往復', () => Save.testPersistence().roundTrip || '開発用キーでJSONを往復できない');
   t('段階2 バックアップ復旧', () => Save.testPersistence().recovery || '破損退避または.bak復旧に失敗');
+  t('段階4 v1移行の対応づけ', () => {
+    const x = Save.testMigration().mapped;
+    const ok = x.wallet.coins === 4321 && x.wallet.scoutTickets === 4 && x.premium.pass
+      && ['fastball', 'curve', 'mypitch'].every((id) => x.unlocks.pitches.includes(id))
+      && ['standard', 'open', 'oneLeg'].every((id) => x.unlocks.battingForms.includes(id))
+      && x.settings.selectedPitch === 'mypitch' && x.settings.battingForm === 'oneLeg'
+      && x.settings.myPitch.direction === 'right' && x.settings.myPitch.amount === 77
+      && x.settings.motion.armSwing === 11 && x.settings.motion.release === 22 && x.settings.motion.swingSpeed === 44
+      && x.stats.career.hits === 20 && x.stats.career.homeruns === 7 && x.stats.career.leagueWins === 2
+      && x.team.name === '移行テスト球団' && x.scout.totalPulls === 9 && x.meta.migration.completed;
+    return ok || JSON.stringify(x);
+  });
+  t('段階4 v1原文の退避と読み取り専用', () => {
+    const x = Save.testMigration();
+    return (x.backup === x.raw && x.legacyAfterFirst === x.raw) || 'backupV1または移行元原文が一致しない';
+  });
+  t('段階4 v1二重移行防止', () => {
+    const x = Save.testMigration();
+    return (x.legacyAfter.coins === 1 && x.second.wallet.coins === 4321 && x.second.meta.migration.completed) || JSON.stringify(x.second);
+  });
+  t('段階4 v1破損時は退避して新規開始', () => {
+    const x = Save.testMigration();
+    return (x.brokenBackup === x.brokenRaw && x.broken.wallet.coins === CONFIG.ECONOMY.startCoins && x.broken.meta.migration.status === 'corrupt') || JSON.stringify(x.broken);
+  });
+  t('段階4 書き出し→初期化→読み込みの往復', () => {
+    const x = Save.testDataManagement();
+    return (x.resetResult.ok && x.imported.ok && x.roundTrip) || JSON.stringify(x);
+  });
+  t('段階4 不正JSON・不正スキーマの拒否', () => {
+    const x = Save.testDataManagement();
+    return (!x.badSyntax.ok && !x.badShape.ok && x.unchanged && /JSON/.test(x.badSyntax.reason) && /wallet|meta/.test(x.badShape.reason)) || JSON.stringify(x);
+  });
+  t('段階4 ビルド別CONFIG値', () => {
+    const s = CONFIG.STORAGE;
+    const dev = CONFIG.BUILD === 'development' && s.main === 'gunya.save.v2.dev' && s.bak === 'gunya.save.v2.dev.bak' && s.broken === 'gunya.save.v2.dev.broken' && s.legacyV1 === 'gunya-yakyu-save-v3.dev' && s.backupV1 === 'gunya.backup.v1.dev';
+    const prod = CONFIG.BUILD === 'production' && s.main === 'gunya.save.v2' && s.bak === 'gunya.save.v2.bak' && s.broken === 'gunya.save.v2.broken' && s.legacyV1 === 'gunya-yakyu-save-v3' && s.backupV1 === 'gunya.backup.v1';
+    return ((dev || prod) && s.migrationEnabled === true) || `${CONFIG.BUILD}:${JSON.stringify(s)}`;
+  });
   t('段階2 リーグ1シーズン自動進行', () => {
     const x = League.testSeasonSimulation(1);
     return (x.rounds === 10 && x.games === 30 && x.results.length === 10) || `節${x.rounds} 試合${x.games}`;
