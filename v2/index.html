@@ -368,19 +368,19 @@ button:disabled{cursor:not-allowed}
      → 1 画面遷移（View・Shell・Modals・GameHud・Screens・Router・Actions・App）
      → デバッグ（Debug）→ 自己テストの登録 → 起動
    依存の向き：1 → 2a・2b・3・4 ／ 2a → 3・4 ／ 3 → 4 ／ 2b → なし（試合の通知を出すだけ）
-   localStorage に触れてよいのは Save だけ。段階1〜3は CONFIG.FEATURES.persistence=false で書かない。
+   localStorage に触れてよいのは Save だけ。段階2は開発用キーだけを使い、本番キーには触れない。
    ===================================================================== */
 
 /* =====================================================================
    共通基盤：定数 CONFIG（バランス値・仮置き値・段階ごとの機能スイッチ・表示名）
    ===================================================================== */
 const CONFIG = Object.freeze({
-  VERSION: '段階2 試合統合 0.2',
+  VERSION: '段階2 本実装 0.3',
   FEATURES: Object.freeze({
-    persistence: false,    // 段階4：gunya.save.v2 の保存・読み込み・移行
-    leagueProgress: false, // 段階2：試合結果をリーグに記録して節を進める
-    leagueRewards: false,  // 段階2：リーグ戦の報酬を試合終了時にまとめて付与
-    correction: false,     // 段階2：能力補正を試合設定で有効にする
+    persistence: true,     // 段階2：開発用キー gunya.save.v2.dev だけを読み書き
+    leagueProgress: true,  // 段階2：試合結果をリーグに記録して節を進める
+    leagueRewards: true,   // 段階2：リーグ戦の報酬を試合終了時にまとめて付与
+    correction: true,      // 段階2：能力補正を MatchEngine.HOOKS 経由で有効にする
     growth: false,         // 段階3：経験値・特訓・限界突破・スカウトの排出と消費
     daily: false,          // 段階4：ログボ・ミッションの付与とリーグ戦以外の1日上限
   }),
@@ -457,31 +457,48 @@ const Events = (() => {
 
 /* ---- 共通基盤：保存基盤 Save（localStorage に触れてよいのはここだけ） ---- */
 const Save = (() => {
-  // 段階1〜3の確認は本番キーを一切使わない。
+  // 段階1〜3の確認は本番キーを一切使わない。v1移行もまだ行わない。
   const KEYS = Object.freeze({ main: 'gunya.save.v2.dev', bak: 'gunya.save.v2.dev.bak', backupV1: 'gunya.backup.v1.dev', broken: 'gunya.save.v2.dev.broken' });
   const slices = new Map();
   const meta = { createdAt: new Date().toISOString(), migratedFrom: null, migrationReport: [] };
   let last = null;
+  let commits = 0;
   const register = (name, api) => { slices.set(name, api); };
   function snapshot() {
     const data = { schemaVersion: 2, meta: { ...meta, updatedAt: new Date().toISOString() } };
     slices.forEach((api) => Object.assign(data, api.exportSlice()));
     return data;
   }
-  function readMain() {
-    // 段階4：本体 → .bak → v1移行 → 新規 の順に読む（仕様書 A-10）。ここは枠だけ
-    try { const raw = window.localStorage.getItem(KEYS.main); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  const valid = (data) => !!(data && typeof data === 'object' && data.schemaVersion === 2);
+  const parse = (raw) => {
+    if (!raw) return null;
+    try { const data = JSON.parse(raw); return valid(data) ? data : null; } catch (e) { return null; }
+  };
+  function readForLoad() {
+    try {
+      const raw = window.localStorage.getItem(KEYS.main);
+      if (!raw) return { data: null, source: 'new' };
+      const main = parse(raw);
+      if (main) return { data: main, source: 'v2' };
+      window.localStorage.setItem(KEYS.broken, raw);
+      const backupRaw = window.localStorage.getItem(KEYS.bak);
+      const backup = parse(backupRaw);
+      if (!backup) return { data: null, source: 'new-corrupt' };
+      // 復旧時は壊れた本体を .bak に回さず、検証済みバックアップを本体へ戻す。
+      window.localStorage.setItem(KEYS.main, backupRaw);
+      return { data: backup, source: 'backup', recovered: true };
+    } catch (e) { return { data: null, source: 'storage-unavailable', error: e.name }; }
   }
-  // 読み込んで各モジュールに渡す。段階1〜3は既定値で始める
+  // 読み込んで各モジュールに渡す。破損本体は .broken に退避して .bak から復旧する。
   function load() {
-    let data = null;
-    let source = 'new';
-    if (CONFIG.FEATURES.persistence) { data = readMain(); if (data) source = 'v2'; }
+    const found = CONFIG.FEATURES.persistence ? readForLoad() : { data: null, source: 'new' };
+    const data = found.data;
+    if (data && data.meta && typeof data.meta.createdAt === 'string') meta.createdAt = data.meta.createdAt;
     slices.forEach((api) => api.importSlice(data || {}));
     last = snapshot();
-    return { source };
+    return { source: found.source, recovered: !!found.recovered };
   }
-  // 状態が変わる操作の直後に呼ぶ。段階1〜3は書き込まず、写しだけ作る
+  // 状態が変わる操作の直後に呼ぶ。保存前の世代は毎回 .bak へ退避する。
   function commit(reason) {
     last = snapshot();
     last.meta.reason = reason;
@@ -490,6 +507,7 @@ const Save = (() => {
       const prev = window.localStorage.getItem(KEYS.main);
       if (prev) window.localStorage.setItem(KEYS.bak, prev);
       window.localStorage.setItem(KEYS.main, JSON.stringify(last));
+      commits += 1;
       return { ok: true, persisted: true };
     } catch (e) { return { ok: false, persisted: false, error: e.name }; }
   }
@@ -497,7 +515,32 @@ const Save = (() => {
   const exportText = () => JSON.stringify(peek(), null, 2);
   const importText = () => ({ ok: false, reason: '読み込みは段階4で作ります' });
   const reset = () => ({ ok: false, reason: '初期化は段階4で作ります' });
-  return { KEYS, register, load, commit, peek, exportText, importText, reset };
+  // 内蔵テスト専用。実データを退避・復元し、開発用4キー以外には触れない。
+  function testPersistence() {
+    if (!CONFIG.FEATURES.persistence) return { roundTrip: false, recovery: false };
+    const old = {};
+    try {
+      Object.values(KEYS).forEach((key) => { old[key] = window.localStorage.getItem(key); });
+      const sample = snapshot();
+      sample.meta.reason = 'selftest-roundtrip';
+      const text = JSON.stringify(sample);
+      window.localStorage.setItem(KEYS.main, text);
+      const roundTrip = JSON.stringify(parse(window.localStorage.getItem(KEYS.main))) === text;
+      window.localStorage.setItem(KEYS.bak, text);
+      window.localStorage.setItem(KEYS.main, '{broken-json');
+      const recovered = readForLoad();
+      const recovery = recovered.source === 'backup'
+        && window.localStorage.getItem(KEYS.broken) === '{broken-json'
+        && window.localStorage.getItem(KEYS.main) === text;
+      return { roundTrip, recovery };
+    } finally {
+      Object.values(KEYS).forEach((key) => {
+        if (old[key] === null) window.localStorage.removeItem(key);
+        else window.localStorage.setItem(key, old[key]);
+      });
+    }
+  }
+  return { KEYS, register, load, commit, peek, exportText, importText, reset, testPersistence, commitCount: () => commits };
 })();
 
 /* ---- 共通基盤：自己テスト SelfTest（関数は true か、ずれの説明を返す） ---- */
@@ -595,12 +638,12 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     s.ledger.unshift({ at: new Date().toISOString(), cur, delta, reason });
     if (s.ledger.length > E.ledgerSize) s.ledger.length = E.ledgerSize;
   }
-  function changed(reason) { Events.emit('wallet:changed', wallet()); Save.commit(reason); }
+  function changed(reason, persist = true) { Events.emit('wallet:changed', wallet()); if (persist) Save.commit(reason); }
   function canSpend(cost = {}) { return CURRENCIES.every((c) => (cost[c] || 0) <= s[c]); }
-  function spend(cost, reason) {
+  function spend(cost, reason, options = {}) {
     if (!canSpend(cost)) return false;
     CURRENCIES.forEach((c) => { const v = Math.floor(cost[c] || 0); if (v > 0) { s[c] -= v; log(c, -v, reason); } });
-    changed(reason);
+    changed(reason, options.commit !== false);
     return true;
   }
   function capNonLeague(v) {
@@ -611,7 +654,7 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     return g;
   }
   // source：league ／ nonLeague（Q1の1日上限の対象）／ purchase ／ ad ／ debug など
-  function earn(gain, reason, source = 'other') {
+  function earn(gain, reason, source = 'other', options = {}) {
     const out = {};
     CURRENCIES.forEach((c) => {
       let v = Math.max(0, Math.floor(gain[c] || 0));
@@ -620,7 +663,7 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
       v = Math.min(v, (c === 'coins' ? E.maxCoins : E.maxTickets) - s[c]);
       if (v > 0) { s[c] += v; log(c, v, reason); out[c] = v; }
     });
-    if (Object.keys(out).length) changed(reason);
+    if (Object.keys(out).length) changed(reason, options.commit !== false);
     return out;
   }
   const isUnlocked = (item) => s.unlocks[LIST[item.kind]].includes(item.key);
@@ -630,7 +673,7 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     const item = CATALOG.find((i) => i.id === itemId);
     if (!item) return { ok: false, reason: '見つからない品目です' };
     if (isUnlocked(item)) return { ok: false, reason: 'もう解禁しています' };
-    if (!spend({ coins: item.price }, `unlock:${item.id}`)) return { ok: false, reason: 'コインが足りません' };
+    if (!spend({ coins: item.price }, `unlock:${item.id}`, { commit: false })) return { ok: false, reason: 'コインが足りません' };
     s.unlocks[LIST[item.kind]].push(item.key);
     Events.emit('unlocks:changed', getUnlocks());
     Save.commit('unlock');
@@ -655,15 +698,16 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     if (e.mode === 'league') { if (pendingLeague) pendingLeague[hr ? 'homeruns' : 'hits'] += 1; return; }
     earn({ coins: hr ? E.homerunCoins : E.hitCoins }, hr ? 'homerun' : 'hit', 'nonLeague');
   });
-  Events.on('match:end', (e) => {
+  function settleMatch(e) {
     if (e.mode !== 'league' || !pendingLeague) { lastMatchRewards = null; pendingLeague = null; return; }
     const p = pendingLeague;
     const r = { result: e.result, hits: p.hits, hitCoins: p.hits * E.hitCoins, homeruns: p.homeruns, homerunCoins: p.homeruns * E.homerunCoins, resultCoins: E.leagueResultCoins[e.result] || 0, granted: CONFIG.FEATURES.leagueRewards };
     r.total = r.hitCoins + r.homerunCoins + r.resultCoins;
-    if (r.granted) earn({ coins: r.total }, 'leagueMatch', 'league');
+    if (r.granted) earn({ coins: r.total }, `leagueMatch:${e.result}`, 'league', { commit: false });
     lastMatchRewards = r;
     pendingLeague = null;
-  });
+    return { ...r };
+  }
   Events.on('match:aborted', () => { pendingLeague = null; });
   Events.on('record:updated', (c) => { career = { ...career, ...c }; });
 
@@ -673,7 +717,7 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     getUnlocks, getCatalog, buyUnlock, getPacks, demoPurchase,
     isPremium: () => s.premium.pass,
     getLastMatchRewards: () => (lastMatchRewards ? { ...lastMatchRewards } : null),
-    syncCareer: (c) => { career = { ...career, ...c }; },
+    syncCareer: (c) => { career = { ...career, ...c }; }, settleMatch,
   };
 
   function rollAds() { const k = Util.dayKey(); if (s.ads.dayKey !== k) { s.ads.dayKey = k; s.ads.rewardCount = 0; } }
@@ -738,7 +782,24 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
 
   Save.register('economy', {
     exportSlice: () => ({ wallet: wallet(), ledger: s.ledger.slice(), dailyCap: { ...s.dailyCap }, unlocks: getUnlocks(), premium: Util.copy(s.premium), ads: { ...s.ads }, missions: Util.copy(s.missions), login: { ...s.login } }),
-    importSlice: () => { /* 段階4：data.wallet などを検証して取り込む。足りない項目は既定値のまま */ },
+    importSlice: (data) => {
+      const w = data.wallet;
+      if (w && typeof w === 'object') CURRENCIES.forEach((c) => {
+        if (Number.isFinite(w[c])) s[c] = Math.floor(Util.clamp(w[c], 0, c === 'coins' ? E.maxCoins : E.maxTickets));
+      });
+      if (Array.isArray(data.ledger)) s.ledger = data.ledger.filter((x) => x && CURRENCIES.includes(x.cur) && Number.isFinite(x.delta) && typeof x.reason === 'string').slice(0, E.ledgerSize).map((x) => ({ at: String(x.at || ''), cur: x.cur, delta: Math.floor(x.delta), reason: x.reason }));
+      if (data.unlocks && typeof data.unlocks === 'object') Object.keys(LIST).forEach((kind) => {
+        const key = LIST[kind];
+        if (Array.isArray(data.unlocks[key])) s.unlocks[key] = [...new Set(data.unlocks[key].filter((id) => CATALOG.some((x) => x.kind === kind && x.key === id)))];
+        const initial = CATALOG.filter((x) => x.kind === kind && x.initial).map((x) => x.key);
+        initial.forEach((id) => { if (!s.unlocks[key].includes(id)) s.unlocks[key].push(id); });
+      });
+      if (data.premium && typeof data.premium === 'object') s.premium = { pass: !!data.premium.pass, purchases: Array.isArray(data.premium.purchases) ? data.premium.purchases.slice() : [] };
+      if (data.dailyCap && typeof data.dailyCap === 'object') s.dailyCap = { dayKey: typeof data.dailyCap.dayKey === 'string' ? data.dailyCap.dayKey : null, nonLeagueEarned: Math.max(0, Math.floor(data.dailyCap.nonLeagueEarned || 0)) };
+      if (data.ads && typeof data.ads === 'object') s.ads = { dayKey: typeof data.ads.dayKey === 'string' ? data.ads.dayKey : null, rewardCount: Math.max(0, Math.floor(data.ads.rewardCount || 0)) };
+      if (data.missions && typeof data.missions === 'object') s.missions = { ...s.missions, ...Util.copy(data.missions) };
+      if (data.login && typeof data.login === 'object') s.login = { ...s.login, ...Util.copy(data.login) };
+    },
   });
 
   return { Economy, Ads, Missions, LoginBonus };
@@ -854,13 +915,27 @@ const Growth = (() => {
   const getScoutInfo = () => ({ costs: CONFIG.SCOUT.costs, rates: CONFIG.SCOUT.rates, guaranteeRates: CONFIG.SCOUT.guaranteeRates, pityRemaining: CONFIG.SCOUT.pity - s.scout.pity, enabled: CONFIG.FEATURES.growth });
   function scout() {
     // 段階3：Economy.spend で支払い、排出・天井・重複処理を行い、growth:acquired を出す
-    return { ok: false, preview: true, results: [{ cardId: 'B101', status: 'NEW' }], reason: '段階1は演出の見本です（排出と消費は段階3で作ります）' };
+    return { ok: false, preview: true, results: [{ cardId: 'B101', status: 'NEW' }], reason: '演出の見本です（排出と消費は段階3で作ります）' };
   }
   const train = () => ({ ok: false, reason: '特訓は段階3で作ります' });
 
   Save.register('growth', {
     exportSlice: () => ({ team: { name: s.teamName, lineup: Util.copy(s.lineup), rotation: s.rotation.slice(), nextStarter: s.nextStarter }, cards: Util.copy(s.owned), scout: { ...s.scout } }),
-    importSlice: () => { /* 段階4：data.team・data.cards・data.scout を検証して取り込む */ },
+    importSlice: (data) => {
+      const team = data.team;
+      if (team && typeof team === 'object') {
+        if (typeof team.name === 'string' && team.name.trim()) s.teamName = team.name.trim().slice(0, 20);
+        if (Array.isArray(team.lineup) && team.lineup.length === 9 && team.lineup.every((x) => x && master(x.cardId) && x.pos in LB.pos)) s.lineup = team.lineup.map((x) => ({ cardId: x.cardId, pos: x.pos }));
+        if (Array.isArray(team.rotation) && team.rotation.length && team.rotation.every((id) => { const c = master(id); return c && c.type === 'P'; })) s.rotation = team.rotation.slice(0, 3);
+        if (Number.isInteger(team.nextStarter)) s.nextStarter = Util.clamp(team.nextStarter, 0, s.rotation.length - 1);
+      }
+      if (data.cards && typeof data.cards === 'object') Object.keys(data.cards).forEach((id) => {
+        const c = master(id); const own = data.cards[id];
+        if (!c || !own || typeof own !== 'object') return;
+        s.owned[id] = { lv: Math.floor(Util.clamp(own.lv || 1, 1, maxLvOf(c, own.lb || 0))), exp: Math.max(0, Math.floor(own.exp || 0)), lb: Math.floor(Util.clamp(own.lb || 0, 0, G.limitBreakMax)), fatigue: Math.max(0, Math.floor(own.fatigue || 0)) };
+      });
+      if (data.scout && typeof data.scout === 'object') s.scout = { ...s.scout, pity: Math.max(0, Math.floor(data.scout.pity || 0)), totalPulls: Math.max(0, Math.floor(data.scout.totalPulls || 0)), adTicketDayKey: typeof data.scout.adTicketDayKey === 'string' ? data.scout.adTicketDayKey : null };
+    },
   });
 
   return {
@@ -903,8 +978,9 @@ const { League, Correction } = (() => {
   // CPU選手は保存せず、球団番号×シーズンのシードから毎回同じ10人を再生成する。
   function generateCpuTeam(teamId, season) {
     const team = TEAMS[teamId];
-    const rng = Util.seeded((teamId * 1000003) ^ (season * 9176));
-    const seasonBonus = Math.min(15, Math.max(0, season - 1) * 3);
+    // 個体差のシードは球団で固定し、シーズン差は全能力への一律ボーナスだけにする。
+    const rng = Util.seeded(teamId * 1000003);
+    const seasonBonus = cpuBonus(season);
     const base = team.overall + seasonBonus;
     const jitter = (spread = 9) => (rng() * 2 - 1) * spread;
     const lineup = CPU_POS.map((pos, i) => {
@@ -922,7 +998,7 @@ const { League, Correction } = (() => {
         mult: { contact: m3(abilities.meet), power: m3(abilities.power), speed: m3(abilities.speed), defense: m3(abilities.defense) },
       };
     });
-    const kmh = bounded(128 + base * 0.36 + jitter(4), 120, 165);
+    const kmh = bounded(128 + team.overall * 0.36 + seasonBonus + jitter(4), 120, 165);
     const abilities = { control: bounded(base + jitter()), stamina: bounded(base + 5 + jitter()), movement: bounded(base + jitter()) };
     const pitcher = {
       cardId: `CPU-${teamId}-${season}-P`, name: `${CPU_NAMES[teamId - 1][(teamId + season) % 9]} ${CPU_GIVEN[(teamId * 2 + season) % 9]}`,
@@ -933,7 +1009,6 @@ const { League, Correction } = (() => {
     };
     return { lineup, pitcher };
   }
-  const PLACEHOLDER_SCORES = [[[4, 2], [1, 5], [3, 2]], [[1, 3], [0, 4], [2, 2]], [[2, 5], [6, 3], [0, 1]]]; // 第1〜3節の仮の結果（ホーム, ビジター）
   const PLAY_DEFAULT = Object.freeze({ pitchingForm: 'overhand', battingForm: 'standard', myPitch: { direction: 'down', amount: 50 }, motion: { armSwing: 50, release: 50, swingSpeed: 50 } });
 
   // 6球団の2回総当たり（円順列）。自チームは弱い順に当たり、ホーム5・ビジター5
@@ -954,20 +1029,63 @@ const { League, Correction } = (() => {
     return [...first, ...first.map((games) => games.map((g) => ({ home: g.away, away: g.home })))];
   }
   const s = {
-    season: 1, round: 3, schedule: makeSchedule(),
+    season: 1, round: 0, schedule: makeSchedule(),
     play: Util.copy(PLAY_DEFAULT),
-    career: { hits: 18, homeruns: 7, strikeouts: 12, leagueWins: 2 }, // 仮：v1の通算記録を引き継いだ想定
+    career: { hits: 0, homeruns: 0, strikeouts: 0, leagueWins: 0 },
     seasonHistory: [], lastResult: null,
   };
-  PLACEHOLDER_SCORES.forEach((games, r) => games.forEach((score, i) => { s.schedule[r][i].score = score; }));
   let current = null;
   let pending = null;
+
+  const scoreOk = (score) => Array.isArray(score) && score.length === 2 && score.every((n) => Number.isInteger(n) && n >= 0 && n <= 99);
+  const resultsOf = (schedule = s.schedule) => schedule.map((games) => games.map((g) => (g.score ? g.score.slice() : null)));
+  function scheduleFromResults(results, season) {
+    const schedule = makeSchedule();
+    if (!Array.isArray(results)) return schedule;
+    for (let r = 0; r < schedule.length; r += 1) {
+      const row = results[r];
+      const userIndex = schedule[r].findIndex((g) => g.home === 0 || g.away === 0);
+      if (!Array.isArray(row) || !scoreOk(row[userIndex])) break;
+      schedule[r].forEach((g, i) => { if (scoreOk(row[i])) g.score = row[i].slice(); });
+      resolveCpuRound(schedule, season, r);
+    }
+    return schedule;
+  }
+  function playedRounds(schedule = s.schedule) {
+    let n = 0;
+    for (const games of schedule) {
+      const user = games.find((g) => g.home === 0 || g.away === 0);
+      if (!user || !user.score) break;
+      n += 1;
+    }
+    return n;
+  }
 
   const winPct = (w, l) => (w + l === 0 ? 0 : w / (w + l));
   const formatPct = (w, l) => { const p = winPct(w, l); return p >= 1 ? '1.000' : p.toFixed(3).slice(1); };
   const nameOf = (id) => (id === 0 ? Growth.getTeamName() : TEAMS[id].name);
   const shortOf = (id) => (id === 0 ? Growth.getTeamName() : TEAMS[id].short);
-  const getTeams = () => TEAMS.map((t) => ({ ...t, name: nameOf(t.id), short: shortOf(t.id), overall: t.id === 0 ? Growth.teamOverall() : t.overall }));
+  const getTeams = () => TEAMS.map((t) => ({ ...t, name: nameOf(t.id), short: shortOf(t.id), overall: t.id === 0 ? Growth.teamOverall() : cpuOverall(t.id, s.season) }));
+  const cpuBonus = (season) => Math.min(15, Math.max(0, season - 1) * 3);
+  const cpuOverall = (teamId, season) => TEAMS[teamId].overall + cpuBonus(season);
+  // CPU戦勝率：戦力の二乗比。先に8%の引き分け判定を行い、残りを勝率で分ける。
+  function simulateCpuGame(season, round, game) {
+    const seed = ((season * 1000003) ^ ((round + 1) * 9176) ^ (game.home * 389) ^ (game.away * 1543)) >>> 0;
+    const rng = Util.seeded(seed);
+    if (rng() < 0.08) { const n = Math.floor(rng() * 4); return [n, n]; }
+    const h = cpuOverall(game.home, season);
+    const a = cpuOverall(game.away, season);
+    const homeWin = (h * h) / (h * h + a * a);
+    const homeWon = rng() < homeWin;
+    const loser = Math.floor(rng() * 4);
+    const winner = loser + 1 + Math.floor(rng() * 3);
+    return homeWon ? [winner, loser] : [loser, winner];
+  }
+  function resolveCpuRound(schedule, season, round) {
+    schedule[round].forEach((game) => {
+      if (game.home !== 0 && game.away !== 0 && !game.score) game.score = simulateCpuGame(season, round, game);
+    });
+  }
 
   // 順位：勝率→同率球団どうしの対戦勝率→得失点差→総得点→球団番号（仕様書 A-4）
   function getStandings() {
@@ -1095,7 +1213,7 @@ const { League, Correction } = (() => {
     pending.strikeouts += 1;
     if (e.mode !== 'league') flush();
   });
-  Events.on('match:end', (e) => {
+  function settleMatch(e) {
     if (!current) return;
     flush();
     const userIsHome = current.userSide === 'home';
@@ -1108,25 +1226,88 @@ const { League, Correction } = (() => {
       mvp: e.mvp, recorded: false,
     };
     if (e.mode === 'league' && CONFIG.FEATURES.leagueProgress) {
-      // 段階2：日程に結果を書き、CPU同士の2試合を決着させ、節を進める
+      const roundIndex = current.round - 1;
+      const game = s.schedule[roundIndex] && s.schedule[roundIndex].find((g) => g.home === 0 || g.away === 0);
+      if (game && !game.score && scoreOk([e.score.home, e.score.away])) {
+        game.score = [e.score.home, e.score.away];
+        resolveCpuRound(s.schedule, s.season, roundIndex);
+        s.round = playedRounds();
+        if (e.result === 'W') s.career.leagueWins += 1;
+        s.lastResult.recorded = true;
+        Events.emit('record:updated', { ...s.career });
+      }
     }
     current = null;
     pending = null;
-    Save.commit('matchEnd');
-  });
+    return s.lastResult;
+  }
   Events.on('match:aborted', () => { current = null; pending = null; });
 
+  function seasonReward() {
+    if (s.round < CONFIG.LEAGUE.rounds) return null;
+    const rank = getStandings().find((r) => r.isUser).rank;
+    return { rank, ...CONFIG.ECONOMY.seasonRankRewards[Math.min(rank, 4) - 1] };
+  }
+  function advanceSeason() {
+    const reward = seasonReward();
+    if (!reward || !CONFIG.FEATURES.leagueRewards) return { ok: false, reason: 'シーズンがまだ終わっていません' };
+    const gain = { coins: reward.coins || 0, guaranteeTickets: reward.guaranteeTickets || 0 };
+    const granted = Economy.earn(gain, `seasonRank:${s.season}:${reward.rank}`, 'league', { commit: false });
+    s.seasonHistory.push({ season: s.season, results: resultsOf() });
+    s.season += 1;
+    s.schedule = makeSchedule();
+    s.round = 0;
+    s.lastResult = null;
+    current = null;
+    pending = null;
+    Save.commit('seasonAdvance');
+    Events.emit('season:advanced', { season: s.season, reward: granted });
+    return { ok: true, rank: reward.rank, reward: granted, season: s.season };
+  }
+
+  function testSeasonSimulation(season = 1) {
+    const schedule = makeSchedule();
+    for (let r = 0; r < CONFIG.LEAGUE.rounds; r += 1) {
+      const user = schedule[r].find((g) => g.home === 0 || g.away === 0);
+      user.score = r % 3 === 0 ? [2, 2] : user.home ? [3, 1] : [1, 3];
+      resolveCpuRound(schedule, season, r);
+    }
+    return { rounds: playedRounds(schedule), games: schedule.flat().filter((g) => scoreOk(g.score)).length, results: resultsOf(schedule) };
+  }
+
   Save.register('league', {
-    exportSlice: () => {
-      const me = getStandings().find((r) => r.isUser);
-      return {
-        league: { season: s.season, round: s.round, schedule: Util.copy(s.schedule) },
-        seasonHistory: s.seasonHistory.slice(),
-        stats: { career: { ...s.career }, league: { w: me.w, l: me.l, d: me.d } },
-        settings: Util.copy(s.play),
-      };
+    exportSlice: () => ({
+      league: { season: s.season, results: resultsOf() },
+      seasonHistory: Util.copy(s.seasonHistory),
+      stats: { career: { ...s.career } },
+      settings: Util.copy(s.play),
+    }),
+    importSlice: (data) => {
+      if (data.league && typeof data.league === 'object') {
+        if (Number.isInteger(data.league.season) && data.league.season >= 1) s.season = data.league.season;
+        const results = Array.isArray(data.league.results)
+          ? data.league.results
+          : Array.isArray(data.league.schedule) ? data.league.schedule.map((games) => games.map((g) => g && g.score || null)) : null;
+        s.schedule = scheduleFromResults(results, s.season);
+        s.round = playedRounds();
+      }
+      if (Array.isArray(data.seasonHistory)) s.seasonHistory = data.seasonHistory.filter((x) => x && Number.isInteger(x.season) && Array.isArray(x.results)).map((x) => ({ season: x.season, results: Util.copy(x.results) }));
+      const career = data.stats && data.stats.career;
+      if (career && typeof career === 'object') Object.keys(s.career).forEach((key) => { if (Number.isFinite(career[key])) s.career[key] = Math.max(0, Math.floor(career[key])); });
+      if (data.settings && typeof data.settings === 'object') {
+        const p = data.settings;
+        const pforms = ['overhand', 'threeQuarter', 'side', 'under', 'tornado'];
+        const bforms = ['standard', 'open', 'closed', 'oneLeg', 'sway'];
+        const directions = ['up', 'down', 'left', 'right'];
+        const n = (value, fallback) => Number.isFinite(Number(value)) ? Math.round(Util.clamp(Number(value), 0, 100)) : fallback;
+        s.play = {
+          pitchingForm: pforms.includes(p.pitchingForm) ? p.pitchingForm : PLAY_DEFAULT.pitchingForm,
+          battingForm: bforms.includes(p.battingForm) ? p.battingForm : PLAY_DEFAULT.battingForm,
+          myPitch: { direction: directions.includes(p.myPitch && p.myPitch.direction) ? p.myPitch.direction : PLAY_DEFAULT.myPitch.direction, amount: n(p.myPitch && p.myPitch.amount, PLAY_DEFAULT.myPitch.amount) },
+          motion: { armSwing: n(p.motion && p.motion.armSwing, 50), release: n(p.motion && p.motion.release, 50), swingSpeed: n(p.motion && p.motion.swingSpeed, 50) },
+        };
+      }
     },
-    importSlice: () => { /* 段階4：data.league などを検証して取り込む */ },
   });
 
   const League = {
@@ -1134,7 +1315,10 @@ const { League, Correction } = (() => {
     getLastResult: () => (s.lastResult ? { ...s.lastResult } : null),
     getCareer: () => ({ ...s.career }),
     getPlaySettings: () => Util.copy(s.play),
-    updatePlaySettings, formatPct,
+    updatePlaySettings, formatPct, settleMatch, advanceSeason, seasonReward,
+    isSeasonComplete: () => s.round >= CONFIG.LEAGUE.rounds,
+    testSeasonSimulation, simulateCpuGame: (season, round, game) => simulateCpuGame(season, round, game),
+    cpuSeasonBonus: cpuBonus, generateCpuTeam,
     resultDestination: (result = s.lastResult) => (result && result.mode === 'league' && result.round >= CONFIG.LEAGUE.rounds ? 'season' : 'pregame'),
   };
   return { League, Correction };
@@ -1280,6 +1464,7 @@ const MatchEngine = (() => {
     const range = clamp(HOOKS.fielderRange(54, f, cfg), 35, 76);
     let kind = dist >= 108 ? 'HR' : dist >= 64 ? '2B' : '1B';
     if (kind !== 'HR' && quality < 0.82 && rng() < clamp(0.60 - quality * 0.34 + (range - 54) / 100, 0.12, 0.72)) kind = 'OUT';
+    else if (kind === '1B' && rng() < clamp(0.08 + (HOOKS.runSpeed(1, b, cfg) - 1) * 0.35, 0, 0.18)) kind = '2B';
     ball = { ...ball, hit: true, t: 0, sx: 720, sy: 330, tx: targetX, ty: targetY, peak: 70 + quality * 115, dist, kind };
     fielders = FIELD_HOME.map((f0) => ({ ...f0, sx: f0.x, sy: f0.y }));
     game.phase = 'flight';
@@ -1346,10 +1531,11 @@ const MatchEngine = (() => {
     const side = activeSide();
     if (!userBatting()) {
       const b = batter(side);
-      const meet = b.abilities && b.abilities.meet || 50;
       const p = pitcher('user');
-      const control = p.abilities && p.abilities.control || 50;
-      const q = clamp(0.34 + (meet - control) / 180 + (rng() - 0.5) * 0.45, 0.05, 0.96);
+      const x = { pitch: ball && ball.id || 'fastball', count: game.pitches.user };
+      const contact = HOOKS.sweetSpot(1, b, cfg);
+      const scatter = HOOKS.pitchScatter(1, p, cfg, x);
+      const q = clamp(0.46 + (contact - 1) * 0.8 + (scatter - 1) * 0.8 + (rng() - 0.5) * 0.45, 0.05, 0.96);
       if (q < 0.30) { recordOut(side, true, '三振！'); return; }
       if (q < 0.58) { recordOut(side, false, '守備でアウト'); return; }
       hitBall(side, q);
@@ -1439,7 +1625,7 @@ const MatchEngine = (() => {
   function debugAct(kind, forced) {
     if (state !== 'running') return;
     const side = activeSide();
-    if (kind === 'hit' || kind === 'hr' || kind === 'oppHit') { ball = { dist: kind === 'hr' ? 120 : 55 }; recordHit(side, kind === 'hr' ? 'HR' : '1B'); }
+    if (kind === 'hit' || kind === 'hr' || kind === 'oppHit') { const target = kind === 'oppHit' ? 'opponent' : 'user'; ball = { dist: kind === 'hr' ? 120 : 55 }; recordHit(target, kind === 'hr' ? 'HR' : '1B'); }
     else if (kind === 'oppRun') addRuns('opponent', 1);
     else if (kind === 'k') recordOut(side, true, '三振！');
     else if (kind === 'out') recordOut(side, false, 'アウト');
@@ -1759,12 +1945,11 @@ const Screens = (() => {
     const daily = Missions.list('daily');
     const badge = Missions.unclaimedCount();
     return `<section class="screen">
-      <p class="note">${View.draft()}　リーグの値は段階2で実データになります</p>
       <div class="status"><div class="ovr"><small>チーム総合力</small><b>${ovr}</b></div>
         <dl class="facts"><div class="fact"><dt>順位</dt><dd><b>${me.rank}</b>位</dd></div><div class="fact"><dt>勝率</dt><dd><b>${me.pctText}</b></dd></div>
         <div class="fact wide"><dt>成績（${season.played}試合）</dt><dd><b>${me.w}</b>勝 <b>${me.l}</b>敗 <b>${me.d}</b>分</dd></div></dl></div>
       <div class="board" role="group" aria-label="次の試合"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, League.getTeams(), ovr)}<div class="board-foot"><span>数字はチーム総合力</span><span>${next.home ? 'ホーム' : 'ビジター'}</span></div></div>
-      <button class="btn btn-turf" type="button" data-act="startLeague">試合開始</button>
+      <button class="btn btn-turf" type="button" data-act="startLeague">${League.isSeasonComplete() ? 'シーズン結果へ' : '試合開始'}</button>
       <div class="sec-h"><h2>先発予定と4番打者</h2><p>押すと詳細</p></div>
       <div class="cards2">${View.card(starter, { go: true, caption: '先発予定' })}${View.card(cleanup, { go: true, caption: '4番' })}</div>
       <button class="row-link" type="button" data-go="missions">${View.icon('checklist')}<span><b>ミッション</b><small>デイリー ${daily.filter((m) => m.done).length}/${daily.length} 達成</small></span>${badge ? `<span class="badge" aria-label="未受取 ${badge}件">${badge}</span>` : '<span></span>'}${View.icon('chevron')}</button>
@@ -1783,9 +1968,9 @@ const Screens = (() => {
     }).join('');
     const mode = (m, title, sub) => `<button class="mode" type="button" data-act="playMode" data-mode="${m}">${View.icon('ball')}<span><b>${title}</b><small>${sub}</small></span><span></span>${View.icon('chevron')}</button>`;
     return `<section class="screen">
-      <div class="sec-h first"><h2>シーズン${season.season}</h2><p>${View.draft()}　第${season.played}節まで消化</p></div>
+      <div class="sec-h first"><h2>シーズン${season.season}</h2><p>第${season.played}節まで消化</p></div>
       <div class="board"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, teams, Growth.teamOverall())}</div>
-      <button class="btn btn-turf" type="button" data-act="startLeague">試合開始</button>
+      <button class="btn btn-turf" type="button" data-act="startLeague">${League.isSeasonComplete() ? 'シーズン結果へ' : '試合開始'}</button>
       <div class="sec-h"><h2>順位表</h2><p>勝率は引き分けを除く</p></div>${View.standingsTable(League.getStandings())}
       <div class="sec-h"><h2>日程</h2><p>自チームの10試合</p></div><div class="panel">${sched}</div>
       <div class="sec-h"><h2>その他のモード</h2><p>リーグの成績には入りません</p></div>
@@ -1823,7 +2008,7 @@ const Screens = (() => {
     const rewards = league && rw ? `<div class="sec-h"><h2>コイン</h2><p>${rw.granted ? '付与済み' : '表示のみ（リーグ報酬は未実装）'}</p></div><div class="panel">${row(`ヒット ${rw.hits}本 ×${CONFIG.ECONOMY.hitCoins}`, fmt(rw.hitCoins))}${row(`本塁打 ${rw.homeruns}本 ×${CONFIG.ECONOMY.homerunCoins}`, fmt(rw.homerunCoins))}${row(`試合報酬（${RESULT[rw.result]}）`, fmt(rw.resultCoins))}${row('合計', fmt(rw.total))}</div>` : '';
     const mvp = league && r.mvp ? Growth.getCard(r.mvp) : null;
     return `<section class="screen">
-      <div class="sec-h first"><h2>${league ? `第${r.round}節の結果` : `${r.modeLabel}の結果`}</h2><p>${View.draft()}</p></div>
+      <div class="sec-h first"><h2>${league ? `第${r.round}節の結果` : `${r.modeLabel}の結果`}</h2></div>
       <div class="board"><div class="board-head"><span>試合終了</span><span class="res-badge ${r.result}">${RESULT[r.result]}</span></div>
         <div class="board-row"><span class="board-side">先攻</span><span class="board-team${r.userSide === 'away' ? ' me' : ''}">${esc(r.awayName)}</span><span class="board-num led">${r.score.away}</span></div>
         <div class="board-row"><span class="board-side">後攻</span><span class="board-team${r.userSide === 'home' ? ' me' : ''}">${esc(r.homeName)}</span><span class="board-num led">${r.score.home}</span></div></div>
@@ -1841,12 +2026,10 @@ const Screens = (() => {
       return `<div class="kv"><span>${x.label}${mine ? '（あなた）' : ''}</span><b>${fmt(x.coins)}コイン${x.guaranteeTickets ? `＋★3以上確定チケット${x.guaranteeTickets}枚` : ''}</b></div>`;
     }).join('');
     return `<section class="screen">${View.pageHead('シーズン終了')}
-      <p class="note">${View.draft()}　段階1は今の順位で表示しています</p>
       <div class="season-hero"><span>最終順位</span><b class="led">${me.rank}</b><span>位</span></div>
       <div class="sec-h"><h2>順位報酬</h2></div><div class="panel">${rewards}</div>
       <div class="sec-h"><h2>最終順位表</h2></div>${View.standingsTable(rows)}
-      <button class="btn btn-amber" type="button" disabled>報酬を受け取って次のシーズンへ</button>
-      ${View.lockNote('次のシーズンへの切り替えは段階2で作ります')}
+      <button class="btn btn-amber" type="button" data-act="claimSeason"${League.isSeasonComplete() ? '' : ' disabled'}>報酬を受け取って次のシーズンへ</button>
     </section>`;
   };
 
@@ -2043,7 +2226,7 @@ const Actions = {
   noop() {},
   back: () => Router.back(),
   setParam: (el) => Router.refresh({ [el.dataset.key]: el.dataset.val }),
-  startLeague: () => Router.go('pregame'),
+  startLeague: () => Router.go(League.isSeasonComplete() ? 'season' : 'pregame'),
   playball: () => Router.go('game', { mode: 'league' }),
   playMode: (el) => Router.go('game', { mode: el.dataset.mode }),
   pause() {
@@ -2096,6 +2279,12 @@ const Actions = {
   claimMission(el) { const r = Missions.claim(el.dataset.id); Shell.toast(r.ok ? '受け取りました' : r.reason); Router.refresh(); },
   openLoginBonus() { LoginBonus.markShown(); Shell.openModal('loginBonus'); },
   claimLoginBonus() { const r = LoginBonus.claim(); Shell.closeModal('ui'); Shell.toast(r.ok ? '受け取りました' : r.reason); },
+  claimSeason() {
+    const r = League.advanceSeason();
+    if (!r.ok) { Shell.toast(r.reason); return; }
+    Shell.toast(`順位報酬を受け取り、シーズン${r.season}を始めました`);
+    Router.replace('home');
+  },
   scout(el) {
     const r = Growth.scout(el.dataset.kind);
     if (!r.results || !r.results.length) { Shell.toast(r.reason); return; }
@@ -2151,6 +2340,20 @@ const Debug = (() => {
   return { enabled: () => enabled, mount, toggleFps };
 })();
 
+/* ---- 段階2：試合終了トランザクション（報酬→リーグ→保存を固定順で1回） ---- */
+const MatchFlow = (() => {
+  let last = null;
+  Events.on('match:end', (event) => {
+    const before = Save.commitCount();
+    const rewards = Economy.settleMatch(event);
+    const result = League.settleMatch(event);
+    const saved = Save.commit('matchEnd');
+    last = { rewards, result, saved, commits: Save.commitCount() - before };
+    Events.emit('match:settled', { event, ...last });
+  });
+  return { last: () => (last ? { ...last } : null) };
+})();
+
 /* ---- 自己テストの登録（段階ごとに足す。デバッグの「自己テスト」で実行） ---- */
 (() => {
   const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -2187,11 +2390,11 @@ const Debug = (() => {
     const userHome = sch.filter((rd) => rd.user.home).length;
     return (ok && userHome === 5) || `総当たりが崩れている（自チームのホーム ${userHome}試合）`;
   });
-  t('LG-05 順位とゲーム差（仮データ）', () => {
+  t('LG-05 順位は保存済み結果から再計算', () => {
     const st = League.getStandings();
-    const ids = st.map((r) => r.id).join(',');
-    const gb = st.map((r) => r.gbText).join(',');
-    return (ids === '5,4,3,0,1,2' && gb === '-,0,0.5,0.5,2.5,2.5') || `順位 ${ids}／差 ${gb}`;
+    const games = League.getSchedule().flatMap((r) => r.games).filter((g) => g.score).length;
+    const wins = st.reduce((n, r) => n + r.w, 0); const losses = st.reduce((n, r) => n + r.l, 0); const draws = st.reduce((n, r) => n + r.d, 0);
+    return (st.length === 6 && wins === losses && wins + draws / 2 === games && st.every((r, i) => r.rank === i + 1)) || `試合${games} 勝${wins} 敗${losses} 分${draws}`;
   });
   t('LG-05 勝率の表示', () => (League.formatPct(2, 1) === '.667' && League.formatPct(0, 0) === '.000' && League.formatPct(3, 0) === '1.000') || '勝率の表示が違う');
   t('A-8 日付キー（午前4時で切り替え）', () => (Util.dayKey(new Date(2026, 10, 2, 3, 59)) === '2026-11-01' && Util.dayKey(new Date(2026, 10, 2, 4, 0)) === '2026-11-02') || '日付キーが違う');
@@ -2204,7 +2407,7 @@ const Debug = (() => {
   t('A-12 試合設定の形', () => {
     const c = League.buildMatchConfig('league');
     const b = c.teams.user.lineup[0];
-    return (c.teams.user.lineup.length === 9 && c.userSide === 'away' && c.correction.enabled === false && near(b.mult.contact, 0.982, 1e-6) && c.teams.user.pitcher.staminaThreshold === 25 && near(c.teams.user.pitcher.mult.velocity, 0.94, 1e-6)) || '試合設定の形が違う';
+    return (c.teams.user.lineup.length === 9 && ['home', 'away'].includes(c.userSide) && c.correction.enabled === true && near(b.mult.contact, 0.982, 1e-6) && c.teams.user.pitcher.staminaThreshold === 25 && near(c.teams.user.pitcher.mult.velocity, 0.94, 1e-6)) || '試合設定の形が違う';
   });
   t('P0-1 CPU選手のシード生成', () => {
     const a = League.buildMatchConfig('league');
@@ -2220,11 +2423,39 @@ const Debug = (() => {
     const H = MatchEngine.HOOKS;
     return (near(H.pitchBreak(10, p, cfg, { pitch: 'fork', count: 0 }), 11.5) && near(H.pitchSpeed(100, p, cfg, { count: 35 }), 90) && near(H.pitchSpeed(100, { ...p, fatigued: true }, cfg, { count: 0 }), 85) && H.pitchSpeed(100, p, { correction: { enabled: false } }, { count: 99 }) === 100) || '接続点の計算が違う';
   });
-  t('A-12 保存の枠（段階1は書き込まない）', () => {
-    const r = Save.commit('selftest');
-    const p = Save.peek();
-    return (r.persisted === false && p.schemaVersion === 2 && ['wallet', 'team', 'cards', 'league', 'settings', 'missions'].every((k) => k in p)) || '保存の枠が違う';
+  t('段階2 補正式をHOOKSだけで両軍へ適用', () => {
+    const mult = Correction.multiplier(75); const H = MatchEngine.HOOKS; const cfg = { correction: { enabled: true } };
+    const user = H.exitVelocity(100, { mult: { power: mult } }, cfg);
+    const cpu = H.sweetSpot(100, { mult: { contact: mult } }, cfg);
+    return (near(mult, 1.15) && near(user, 115) && near(cpu, 115)) || `${mult}/${user}/${cpu}`;
   });
+  t('段階2 保存は事実だけ', () => {
+    const p = Save.peek();
+    const text = JSON.stringify(p.league);
+    return (p.schemaVersion === 2 && Array.isArray(p.league.results) && !('round' in p.league) && !('schedule' in p.league) && !(p.stats && p.stats.league) && !text.includes('CPU-')) || '順位・日程構造・CPU選手を保存している';
+  });
+  t('段階2 保存の往復', () => Save.testPersistence().roundTrip || '開発用キーでJSONを往復できない');
+  t('段階2 バックアップ復旧', () => Save.testPersistence().recovery || '破損退避または.bak復旧に失敗');
+  t('段階2 リーグ1シーズン自動進行', () => {
+    const x = League.testSeasonSimulation(1);
+    return (x.rounds === 10 && x.games === 30 && x.results.length === 10) || `節${x.rounds} 試合${x.games}`;
+  });
+  t('段階2 CPU自動決着の再現性', () => {
+    const game = { home: 1, away: 5 };
+    const a = League.simulateCpuGame(3, 6, game); const b = League.simulateCpuGame(3, 6, game);
+    return (JSON.stringify(a) === JSON.stringify(b) && a.length === 2 && a.every(Number.isInteger)) || `${a}/${b}`;
+  });
+  t('段階2 シーズン跨ぎのCPU強化と上限', () => {
+    const a = League.generateCpuTeam(2, 1); const b = League.generateCpuTeam(2, 2); const f = League.generateCpuTeam(2, 6); const g = League.generateCpuTeam(2, 7);
+    const batterUp = Object.keys(a.lineup[0].abilities).every((key) => b.lineup[0].abilities[key] - a.lineup[0].abilities[key] === 3);
+    const pitcherUp = b.pitcher.kmh - a.pitcher.kmh === 3 && ['control', 'stamina', 'movement'].every((key) => b.pitcher.abilities[key] - a.pitcher.abilities[key] === 3);
+    return (batterUp && pitcherUp && League.cpuSeasonBonus(6) === 15 && League.cpuSeasonBonus(7) === 15 && JSON.stringify(f.lineup[0].abilities) === JSON.stringify(g.lineup[0].abilities) && f.pitcher.kmh === g.pitcher.kmh) || '＋3またはシーズン6の＋15上限が違う';
+  });
+  t('段階2 match:endの保存は1回', () => {
+    const x = MatchFlow.last();
+    return (!x || x.commits === 1) || `保存${x.commits}回`;
+  });
+  t('ECO-02 財布の記録は直近50件', () => Economy.getLedger().length <= CONFIG.ECONOMY.ledgerSize || `記録${Economy.getLedger().length}件`);
 })();
 
 /* ---- 1 画面遷移：起動と組み立て ---- */
@@ -2241,13 +2472,13 @@ const App = (() => {
     if (out) { const o = document.getElementById(out); if (o) o.textContent = ev.target.value; }
   }
   function boot() {
-    Save.load();                              // 段階1〜3は既定値で始める
+    Save.load();                              // 開発用v2本体、破損時はバックアップから復旧
     Economy.syncCareer(League.getCareer());   // 経済（ミッション）へ通算記録を渡す
     Shell.mount();
     Events.on('wallet:changed', () => Shell.refreshHeader());
     Events.on('premium:changed', () => Shell.refreshHeader());
     // 試合が終わったら結果へ（試合の画面は履歴から外す）
-    Events.on('match:end', () => { setTimeout(() => { if (Router.current().name === 'game') Router.replace('result'); }, 0); });
+    Events.on('match:settled', () => { setTimeout(() => { if (Router.current().name === 'game') Router.replace('result'); }, 0); });
     document.addEventListener('click', onClick);
     document.addEventListener('input', onInput);
     window.addEventListener('popstate', Router.onPopState);
