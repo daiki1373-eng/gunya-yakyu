@@ -328,6 +328,14 @@ button{ touch-action:manipulation }
 #tabs{padding-bottom:env(safe-area-inset-bottom)}
 .eng-controls{padding-bottom:calc(9px + env(safe-area-inset-bottom))}
 .eng-status{min-height:20px;font-size:12px;font-weight:700;color:var(--text-2);text-align:center}
+.eng-diamond{display:grid;grid-template-columns:repeat(3,minmax(0,100px));grid-template-rows:repeat(3,minmax(56px,auto));gap:4px;justify-content:center;width:100%;max-width:308px;margin:0 auto;transition:transform .1s}
+.eng-diamond[hidden],.eng-row[hidden]{display:none}
+.eng-diamond .eng-action{padding:4px;font-size:12px;overflow-wrap:anywhere}
+.eng-diamond [data-ps="tri"]{grid-area:1/2}.eng-diamond [data-ps="sq"]{grid-area:2/1}.eng-diamond [data-ps="cir"]{grid-area:2/3}.eng-diamond [data-ps="cross"]{grid-area:3/2}
+[data-ps="tri"] .eng-symbol{color:#3FA34D}[data-ps="sq"] .eng-symbol{color:#D96CA0}[data-ps="cir"] .eng-symbol{color:#D74437}[data-ps="cross"] .eng-symbol{color:#4A7FB5}
+.eng-symbol{font-size:18px;font-weight:900}.eng-diamond.pulse{transform:scale(.97)}
+.eng-diamond .on{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
+[data-eng-dpad]{max-width:308px;width:100%;margin:0 auto;touch-action:none}[data-eng-dpad] .eng-action{min-width:0;touch-action:none}
 .eng-pitch-row{display:grid;grid-template-columns:minmax(0,1fr) 1fr;gap:8px}
 .eng-select,.eng-action{min-height:46px;border-radius:9px;border:1px solid var(--line);background:var(--panel);padding:0 10px;font-size:14px;font-weight:900;text-align:center}
 .eng-action.main{background:var(--amber);border-color:var(--amber);color:var(--amber-ink)}
@@ -428,6 +436,7 @@ const CONFIG = Object.freeze({
   }),
   /* BUILD_CONFIG_END */
   FEATURES: Object.freeze({
+    throwSelect: false, // 段階G：送球先の手動選択（既定OFF）
     persistence: true,     // CONFIG.STORAGE で開発用／本番用キーを切り替える
     league: false,         // 段階A：6球団リーグは主モードから外し無効化
     tournament: true,      // 段階A：地方予選（3試合）→甲子園本大会（3試合）の大会トーナメント
@@ -2626,6 +2635,7 @@ const MatchEngine = (() => {
     fastball: { name: 'まっすぐ', speed: 1.00, bx: 0, by: 0 }, curve: { name: 'カーブ', speed: 0.82, bx: -34, by: 26 },
     slider: { name: 'スライダー', speed: 0.88, bx: -47, by: 7 }, fork: { name: 'フォーク', speed: 0.86, bx: 0, by: 45 },
     shoot: { name: 'シュート', speed: 0.91, bx: 32, by: 5 }, sinker: { name: 'シンカー', speed: 0.86, bx: 21, by: 34 },
+    slowball: { name: 'スロー', speed: 0.80, bx: 0, by: 8 },
     mypitch: { name: 'マイ変化球', speed: 0.87, bx: 0, by: 0 },
   });
   const DEFAULT_BATTER = Object.freeze({ cardId: null, name: '打者', mult: { contact: 1, power: 1, speed: 1, defense: 1 }, abilities: { meet: 50, power: 50, speed: 50, defense: 50 } });
@@ -2643,17 +2653,42 @@ const MatchEngine = (() => {
   let swingAt = null;
   let selectedPitch = 'fastball';
   let fielders = [];
-  let batterShift = 0; // 打者の左右位置（芯合わせ）-44..44
-  let shiftShown = 0; // 表示用（イージング）
-  let trail = []; // 球の軌跡
-  let bufC = null; // 低解像度レンダリング用バッファ
-  let sparks = []; // 打撃時の火花
-  let shakeT = 0; // 画面シェイク残り時間
-  const clampShift = (v) => clamp(Math.round(v), -44, 44);
-  let aim = { ax: 0, ay: 0 }; // 投球の狙い（自軍投球時）-1..1
-  let tactic = null; // 作戦：'bunt' のみ
+  let trail = [];
+  let bufC = null;
+  let sparks = [];
+  let shakeT = 0;
+  let aim = { ax: 0, ay: 0 };
+  let currentSwingStyle = null;
+  let buntStance = false;
+  let buntAdjust = 0;
+  let dirHeld = { up: false, down: false, left: false, right: false };
+  let swingDir = null;
+  let pendingThrow = null;
+  const IDEAL_T = 0.82;
+  const ORDER_MULT = Object.freeze([1.1, 0.8, 1.3, 1.3, 1.3, 1, 1, 0.7, 0.7]);
+  const orderMultAt = (n) => ORDER_MULT[n - 1] || 1;
+  const orderMult = (side) => orderMultAt((game.order[side] % 9) + 1);
+  const flightSeconds = (kmh) => clamp(18.44 * 3.6 / kmh, 0.36, 0.90);
+  function judgeTiming(errMs, style, heightMatch) {
+    const winMul = (style === 'power' ? 0.7 : style === 'hnr' ? 1.15 : 1) * (heightMatch > 0 ? 1.2 : heightMatch < 0 ? 0.85 : 1);
+    const coreW = 50 * winMul, contactW = 110 * winMul;
+    return { zone: errMs <= coreW ? 'core' : errMs <= contactW ? 'contact' : 'miss', coreW, contactW };
+  }
+  const isStrikeZone = (ball) => !!ball && Math.abs(ball.bx) <= 34 && ball.by >= -26 && ball.by <= 40;
+  const throwSelectEnabled = () => !!((cfg && cfg.features && cfg.features.throwSelect) || CONFIG.FEATURES.throwSelect);
+  function pitchButtonsFor(p, unlocked) {
+    const sp = (p && p.special) || [];
+    const first = sp[0] === 'curve' && sp[1] ? sp[1] : sp[0];
+    const second = sp[0] === 'curve' && sp[1] ? sp[0] : sp[1];
+    const ids = ['fastball', unlocked && unlocked.includes('mypitch') ? 'mypitch' : first || 'shoot', second || (first === 'curve' ? 'slider' : 'curve'), sp.includes('fork') ? 'fork' : 'slowball'];
+    if (ids[1] === ids[3]) ids[1] = 'shoot';
+    return ['tri', 'sq', 'cir', 'cross'].map((btn, i) => {
+      let pitch = ids[i];
+      if (Array.isArray(unlocked) && unlocked.length && !['fastball', 'slowball'].includes(pitch) && !unlocked.includes(pitch)) pitch = btn === 'cross' ? 'slowball' : 'fastball';
+      return { btn, pitch, name: PITCHES[pitch].name };
+    });
+  }
   const coreFactor = (coreDiff) => clamp(1.08 - Math.abs(coreDiff) / 46, 0.08, 1);
-  let cursorY = 0; // ミートカーソルの縦位置 -44..44
   const PROJ = {
     bat: { sx: 622, sy: 230, kx: 1.1, ky: 1.05, cx: 360, cy: 330, r0: 2.5, r1: 12 },
     pit: { sx: 252, sy: 322, kx: 0.45, ky: 0.4, cx: 622, cy: 262, r0: 10, r1: 3 }
@@ -2665,7 +2700,6 @@ const MatchEngine = (() => {
     const e = t * 0.65 + t * t * 0.35;
     return { x: P.sx + (tx - P.sx) * e, y: P.sy + (ty - P.sy) * t, r: P.r0 + (P.r1 - P.r0) * Math.pow(t, 1.4) };
   }
-  const coreFactor2 = (ax, ay, cx, cy) => clamp(1.08 - Math.hypot(ax - cx, ay - cy) / 52, 0.06, 1);
   const stealChance = (mash, speedMult) => clamp(0.42 + (speedMult - 1) * 0.5 + mash * 0.018, 0.05, 0.92);
 
   const matchMode = () => cfg.mode === 'league' || cfg.mode === 'tournament' || cfg.mode === 'exhibition';
@@ -2690,12 +2724,14 @@ const MatchEngine = (() => {
     const uTeam = cfg.teams && cfg.teams.user;
     port.update({
       status: `${status}　球数${cnt}・疲労${fatPct}%`, phase: game.phase, batting: userBatting(), selectedPitch,
-      pitches: (cfg.unlockedPitches || ['fastball']).map((id) => ({ id, name: (PITCHES[id] || PITCHES.fastball).name })),
-      canPitch: state === 'running' && game.phase === 'ready', canSwing: state === 'running' && game.phase === 'pitch' && userBatting(),
+      pitchButtons: !userBatting() ? pitchButtonsFor(pitcher('user'), cfg.unlockedPitches) : [],
+      canPitchButtons: state === 'running' && game.phase === 'ready' && !userBatting(),
+      canStartPitch: state === 'running' && game.phase === 'ready' && userBatting(),
+      canStyle: state === 'running' && userBatting() && ['windup', 'pitch'].includes(game.phase),
+      buntStance, count: { ...game.count }, throwSelect: pendingThrow ? { bases: [1, 2, 3, 4] } : null,
+      canPitch: state === 'running' && game.phase === 'ready', canSwing: state === 'running' && game.phase === 'pitch' && userBatting() && swingAt === null,
       canFinish: cfg.mode !== 'league' && cfg.mode !== 'tournament' && game.phase === 'ready', attempts: game.attempts,
       total: cfg.mode === 'challenge10' ? 10 : null,
-      shift: batterShift, cursorY, aim: { ...aim }, tactic,
-      canSteal: canSteal(), stealOpen: game.phase === 'steal',
       benchBatters: uTeam && uTeam.bench ? uTeam.bench.map((b) => ({ cardId: b.cardId, name: b.name })) : [],
       benchPitchers: uTeam && uTeam.benchPitchers ? uTeam.benchPitchers.map((b) => ({ cardId: b.cardId, name: b.name })) : [],
     });
@@ -2752,38 +2788,58 @@ const MatchEngine = (() => {
       setUi(`投手交代：${u.pitcher.name}`);
     }
   }
-  function setTactic(next) {
-    if (!game || state !== 'running' || !userBatting()) return;
-    tactic = tactic === next ? null : next;
-    setUi(tactic === 'bunt' ? '作戦：バント' : '作戦なし');
+  function setDir(name, on) {
+    if (!Object.prototype.hasOwnProperty.call(dirHeld, name)) return;
+    const rising = !dirHeld[name] && on;
+    dirHeld[name] = !!on;
+    if (!rising || state !== 'running') return;
+    if (!userBatting() && game.phase === 'ready') {
+      aim.ax = clamp(aim.ax + (name === 'left' ? -0.5 : name === 'right' ? 0.5 : 0), -2, 2);
+      aim.ay = clamp(aim.ay + (name === 'up' ? -0.5 : name === 'down' ? 0.5 : 0), -2, 2);
+    }
+    if (buntStance && ['up', 'down'].includes(name)) buntAdjust = clamp(buntAdjust + (name === 'down' ? 1 : -1), -1, 1);
   }
-  function setShift(dir) {
-    batterShift = clampShift(batterShift + dir * 11);
-    setUi(`打者位置 ${batterShift > 0 ? '+' : ''}${batterShift}`);
-  }
-  function setShiftTo(v) {
-    batterShift = clampShift(v);
-    setUi(`打者位置 ${batterShift > 0 ? '+' : ''}${batterShift}`);
-  }
-  function setCursor(cx, cy) {
-    batterShift = clampShift(cx);
-    cursorY = clampShift(cy);
-    setUi('ミートカーソルを合わせた');
-  }
-  function setAim(ax, ay) {
-    aim = { ax, ay };
-    setUi('狙いを決めました');
+  function readyPitch() {
+    game.phase = 'ready'; ball = null; trail = []; swingAt = null; currentSwingStyle = null; swingDir = null;
+    buntStance = false; buntAdjust = 0; aim = { ax: 0, ay: 0 }; pendingThrow = null;
   }
   function atBat() {
     if (state === 'idle') return;
-    game.phase = 'ready';
-    ball = null;
-    trail = [];
-    swingAt = null;
-    const side = activeSide();
-    const b = batter(side);
+    game.count = { s: 0, b: 0 };
+    readyPitch();
+    const side = activeSide(), b = batter(side);
     emit('match:atBat', { side, order: (game.order[side] % 9) + 1, cardId: b.cardId });
     setUi(userBatting() ? '投球開始を押し、球を引きつけてスイング' : '球種を選んで投球開始');
+  }
+  function addStrike(side, kind) {
+    game.count.s += 1;
+    if (game.count.s >= 3) { recordOut(side, true, kind === 'swing' ? '空振り三振' : '見逃し三振'); return; }
+    readyPitch(); setUi(`${kind === 'swing' ? '空振り' : '見逃し'} ${game.count.s}ストライク`);
+  }
+  function addBall(side) {
+    game.count.b += 1;
+    if (game.count.b >= 4) { walk(side); return; }
+    readyPitch(); setUi(`ボール ${game.count.b}ボール`);
+  }
+  function foulBall(side) {
+    if (game.count.s < 2) game.count.s += 1;
+    readyPitch(); setUi('ファウル');
+  }
+  function walk(side) {
+    const bs = game.bases[side];
+    if (bs[0]) {
+      if (bs[1]) {
+        if (bs[2]) { game.score[sideKey(side)] += 1; emit('match:run', { side, runs: 1 }); }
+        bs[2] = 1;
+      }
+      bs[1] = 1;
+    }
+    bs[0] = 1;
+    emit('match:walk', { side }); if (port) port.banner('四球', '');
+    game.order[side] += 1; game.attempts += 1;
+    if (cfg.mode === 'challenge10' && game.attempts >= 10) { finish(); return; }
+    if (game.inning >= cfg.innings && game.half === 'bottom' && game.score.home > game.score.away) { finish(); return; }
+    game.phase = 'between'; game.nextAt = clock + 0.85; setUi('四球');
   }
   function pitchDefinition(id, useUserSettings = false) {
     const d = { ...(PITCHES[id] || PITCHES.fastball) };
@@ -2799,9 +2855,9 @@ const MatchEngine = (() => {
     if (state !== 'running' || game.phase !== 'ready') return;
     const ps = pitchingSide();
     const p = pitcher(ps);
-    const userIds = cfg.unlockedPitches && cfg.unlockedPitches.length ? cfg.unlockedPitches : ['fastball'];
-    const cpuIds = [...new Set(['fastball', ...(p.special || [])])].filter((id) => PITCHES[id]);
-    const id = ps === 'user' ? selectedPitch : cpuIds[Math.floor(rng() * cpuIds.length)];
+    const slots = ps === 'user' ? null : pitchButtonsFor(p, null);
+    const pick = ps === 'user' ? null : rng();
+    const id = ps === 'user' ? selectedPitch : slots[pick < 0.45 ? 0 : pick < 0.65 ? 1 : pick < 0.85 ? 2 : 3].pitch;
     const d = pitchDefinition(id, ps === 'user');
     game.pitches[ps] += 1;
     game.pitchCounts = game.pitchCounts || {};
@@ -2809,7 +2865,7 @@ const MatchEngine = (() => {
     game.pitchCounts[pKey] = (game.pitchCounts[pKey] || 0) + 1;
     const x = { pitch: id, count: game.pitchCounts[pKey] };
     const aimPt = ps === 'user' ? { ...aim } : { ax: Math.round(rng() * 2 - 1), ay: Math.round(rng() * 2 - 1) };
-    const kmh = clamp(HOOKS.pitchSpeed((p.kmh || 142) * d.speed, p, cfg, x), 105, 170);
+    const kmh = clamp(HOOKS.pitchSpeed((p.kmh || 142) * d.speed, p, cfg, x), 70, 170);
     const breakM = clamp(HOOKS.pitchBreak(1, p, cfg, x), 0.55, 1.55);
     const scatter = clamp(HOOKS.pitchScatter(14, p, cfg, x), 4, 32);
     const play = ps === 'user' ? cfg.play : null;
@@ -2817,48 +2873,64 @@ const MatchEngine = (() => {
     const form = (play && play.pitchingForm) || 'overhand';
     const formY = form === 'under' ? 30 : form === 'side' ? 18 : form === 'threeQuarter' ? 8 : form === 'tornado' ? -8 : form === 'dogeza' ? 34 : form === 'spread' ? 6 : form === 'spin' ? -4 : 0;
     const formX = form === 'side' ? 13 : form === 'under' ? 8 : form === 'tornado' ? -7 : form === 'spread' ? 4 : 0;
-    ball = { x: 222, y: 300 + formY + (motion.release - 50) * 0.16, t: 0, id, name: d.name, kmh, bx: d.bx * breakM + formX + aimPt.ax * 20 + (rng() - 0.5) * scatter, by: d.by * breakM + aimPt.ay * 15 + (rng() - 0.5) * scatter, aimX: aimPt.ax, aimY: aimPt.ay, releaseY: formY + (motion.release - 50) * 0.16, wind: 0.22 + (100 - motion.armSwing) * 0.002, flight: clamp(0.93 - (kmh - 105) / 180, 0.54, 0.93), hit: false };
+    ball = { x: 222, y: 300 + formY + (motion.release - 50) * 0.16, t: 0, id, name: d.name, kmh, bx: d.bx * breakM + formX + aimPt.ax * 20 + (rng() - 0.5) * scatter, by: d.by * breakM + aimPt.ay * 15 + (rng() - 0.5) * scatter, aimX: aimPt.ax, aimY: aimPt.ay, releaseY: formY + (motion.release - 50) * 0.16, wind: 0.22 + (100 - motion.armSwing) * 0.002, flight: flightSeconds(kmh), hit: false };
     game.phase = 'windup';
     emit('match:pitch', { side: ps, pitch: id, kmh: Math.round(kmh), count: game.pitches[ps] });
     setUi(`${d.name}　${Math.round(kmh)} km/h`);
   }
-  function swing() {
-    if (state !== 'running' || game.phase !== 'pitch' || !userBatting() || swingAt !== null) return;
-    swingAt = ball.t;
+  function swing() { swingStyle('west'); }
+  function swingStyle(style) {
+    if (state !== 'running' || !userBatting() || !['west', 'hnr', 'power', 'bunt'].includes(style)) return;
+    if (style === 'bunt') {
+      if (!['ready', 'windup', 'pitch'].includes(game.phase)) return;
+      if (!buntStance) { buntStance = true; setUi('バントの構え'); return; }
+    }
+    if (game.phase !== 'pitch' || swingAt !== null) return;
+    swingAt = ball.t; currentSwingStyle = style;
+    if (style !== 'bunt') buntStance = false;
+    swingDir = style === 'bunt' ? null : dirHeld.down ? 'down' : dirHeld.up ? 'up' : null;
     if (port) port.swing();
+    setUi(style === 'bunt' ? 'バント！' : 'スイング！');
+  }
+  function choosePitchButton(btn) {
+    if (state !== 'running' || userBatting() || game.phase !== 'ready') return;
+    const row = pitchButtonsFor(pitcher('user'), cfg.unlockedPitches).find((r) => r.btn === btn);
+    if (row) { selectedPitch = row.pitch; startPitch(); }
   }
   function stat(cardId) {
     if (!cardId) return null;
     game.batting[cardId] = game.batting[cardId] || { cardId, ab: 0, h: 0, hr: 0, rbi: 0 };
     return game.batting[cardId];
   }
-  function addRuns(side, basesHit) {
-    const bases = game.bases[side];
-    let runs = 0;
-    if (basesHit >= 4) { runs = 1 + bases[0] + bases[1] + bases[2]; bases.splice(0, 3, 0, 0, 0); }
-    else {
-      for (let i = 2; i >= 0; i -= 1) if (bases[i]) { bases[i] = 0; if (i + basesHit >= 3) runs += 1; else bases[i + basesHit] = 1; }
-      bases[basesHit - 1] = 1;
-    }
+  function advanceRunners(side, n) {
+    const bs = game.bases[side]; let runs = 0;
+    for (let i = 2; i >= 0; i -= 1) if (bs[i]) { bs[i] = 0; if (i + n >= 3) runs += 1; else bs[i + n] = 1; }
     if (runs) { game.score[sideKey(side)] += runs; emit('match:run', { side, runs }); }
     return runs;
   }
-  function hitBall(side, quality) {
+  function addRuns(side, basesHit) {
+    let runs = advanceRunners(side, basesHit);
+    if (basesHit >= 4) { runs += 1; game.score[sideKey(side)] += 1; emit('match:run', { side, runs: 1 }); }
+    else game.bases[side][basesHit - 1] = 1;
+    return runs;
+  }
+  function hitBall(side, quality, mods = {}) {
     const b = batter(side);
     if (ball) { for (let i = 0; i < 12; i += 1) { const a = rng() * Math.PI * 2; const sp = 40 + rng() * 130; sparks.push({ x: ball.x, y: ball.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, life: 0.45 }); } }
     if (quality > 0.8) shakeT = 0.28;
     const exit = clamp(HOOKS.exitVelocity(72 + quality * 88, b, cfg), 55, 182);
     const angle = -0.92 + (rng() - 0.5) * 0.42;
-    const dist = clamp(exit * (0.62 + quality * 0.42) + (rng() - 0.5) * 18, 8, 145);
+    const dm = (mods.style === 'power' && mods.core ? 1.25 : 1) * (mods.style === 'hnr' ? 0.85 : 1) * orderMult(side) * (mods.dir === 'down' ? 0.94 : mods.dir === 'up' ? 1.08 : 1);
+    const dist = clamp((exit * (0.62 + quality * 0.42) + (rng() - 0.5) * 18) * dm, 8, 145);
     const targetX = clamp(500 + Math.cos(angle) * dist * 3.0, 425, 900);
     const targetY = clamp(360 + Math.sin(angle) * dist * 1.45, 115, 390);
     const defense = team(side === 'user' ? 'opponent' : 'user');
     const f = defense && defense.lineup ? defense.lineup[Math.floor(rng() * defense.lineup.length)] : DEFAULT_BATTER;
     const range = clamp(HOOKS.fielderRange(54, f, cfg), 35, 76);
     let kind = dist >= 108 ? 'HR' : dist >= 64 ? '2B' : '1B';
-    if (kind !== 'HR' && quality < 0.82 && rng() < clamp(0.60 - quality * 0.34 + (range - 54) / 100, 0.12, 0.72)) kind = 'OUT';
+    if (kind !== 'HR' && quality < 0.82 && rng() < clamp(0.60 - quality * 0.34 + (range - 54) / 100 + (mods.dir === 'down' ? 0.12 : 0), 0.12, 0.8)) kind = 'OUT';
     else if (kind === '1B' && rng() < clamp(0.08 + (HOOKS.runSpeed(1, b, cfg) - 1) * 0.35, 0, 0.18)) kind = '2B';
-    ball = { ...ball, hit: true, t: 0, sx: 720, sy: 330, tx: targetX, ty: targetY, peak: 70 + quality * 115, dist, kind };
+    ball = { ...ball, hit: true, t: 0, sx: 720, sy: 330, tx: targetX, ty: targetY, peak: 70 + quality * 115, dist, kind, mods, rangeF: range };
     fielders = FIELD_HOME.map((f0) => ({ ...f0, sx: f0.x, sy: f0.y }));
     game.phase = 'flight';
     setUi(kind === 'HR' ? '大きな当たり！' : '打球を追っています');
@@ -2868,7 +2940,8 @@ const MatchEngine = (() => {
     const st = side === 'user' ? stat(b.cardId) : null;
     const bases = kind === 'HR' ? 4 : kind === '2B' ? 2 : 1;
     const before = game.score[sideKey(side)];
-    const runs = addRuns(side, bases);
+    const extra = ball && ball.mods && ball.mods.style === 'hnr' ? advanceRunners(side, 1) : 0;
+    const runs = extra + addRuns(side, bases);
     if (st) { st.ab += 1; st.h += 1; st.rbi += runs; if (kind === 'HR') st.hr += 1; }
     emit('match:hit', { side, kind, cardId: b.cardId, rbi: runs });
     if (port) port.banner(kind === 'HR' ? 'ホームラン！' : kind === '2B' ? 'ツーベース！' : 'ヒット！', `${Math.round(ball.dist)}m${runs ? `　${runs}点` : ''}`);
@@ -2877,7 +2950,7 @@ const MatchEngine = (() => {
     if (cfg.mode === 'challenge10' && game.attempts >= 10) { finish(); return; }
     if (game.inning >= cfg.innings && game.half === 'bottom' && game.score.home > game.score.away) { finish(); return; }
     game.phase = 'between'; game.nextAt = clock + 0.85;
-    if (before !== game.score[sideKey(side)]) setUi(`${runs}点入りました`);
+    setUi(before !== game.score[sideKey(side)] ? `${runs}点入りました` : kind === 'HR' ? 'ホームラン！' : kind === '2B' ? 'ツーベース！' : 'ヒット！');
   }
   function recordOut(side, strikeout = false, label = 'アウト') {
     const b = batter(side);
@@ -2896,6 +2969,7 @@ const MatchEngine = (() => {
   }
   function changeHalf() {
     game.outs = 0;
+    game.count = { s: 0, b: 0 };
     game.bases.user.fill(0);
     game.bases.opponent.fill(0);
     if (game.half === 'top') {
@@ -2922,43 +2996,88 @@ const MatchEngine = (() => {
     if (raf) cancelAnimationFrame(raf);
     emit('match:end', { result, score: { ...game.score }, batting, pitching: cfg.teams ? [{ cardId: cfg.teams.user.pitcher.cardId, pitches: game.pitches.user, k: game.k }] : [], mvp });
   }
+  function buntPlay(side) {
+    if (game.outs < 2) {
+      advanceRunners(side, 1);
+      if (matchMode() && game.inning >= cfg.innings && game.half === 'bottom' && game.score.home > game.score.away) { finish(); return; }
+    }
+    recordOut(side, false, 'バント');
+  }
   function resolveContact() {
     const side = activeSide();
     if (!userBatting()) {
-      const b = batter(side);
-      const p = pitcher('user');
-      const x = { pitch: ball && ball.id || 'fastball', count: game.pitches.user };
-      const contact = HOOKS.sweetSpot(1, b, cfg);
-      const scatter = HOOKS.pitchScatter(1, p, cfg, x);
-      const edge = ball && (Math.abs(ball.bx) > 26 || Math.abs(ball.by) > 24) ? -0.05 : 0;
+      if (!isStrikeZone(ball) && rng() < 0.55) { addBall(side); return; }
+      const b = batter(side), p = pitcher('user');
+      const x = { pitch: ball.id, count: game.pitches.user };
+      const contact = HOOKS.sweetSpot(1, b, cfg), scatter = HOOKS.pitchScatter(1, p, cfg, x);
+      const edge = Math.abs(ball.bx) > 26 || Math.abs(ball.by) > 24 ? -0.05 : 0;
       const q = clamp(0.46 + (contact - 1) * 0.8 + (scatter - 1) * 0.8 + edge + (rng() - 0.5) * 0.45, 0.05, 0.96);
-      if (q < 0.30) { recordOut(side, true, '三振！'); return; }
+      if (q < 0.30) { addStrike(side, 'swing'); return; }
+      if (q < 0.40) { foulBall(side); return; }
       if (q < 0.58) { recordOut(side, false, '守備でアウト'); return; }
-      hitBall(side, q);
+      hitBall(side, clamp(q * orderMult(side), 0.05, 0.97), {}); return;
+    }
+    if (swingAt === null) { if (isStrikeZone(ball)) addStrike(side, 'called'); else addBall(side); return; }
+    const errMs = Math.abs(swingAt - IDEAL_T) * ball.flight * 1000;
+    if (currentSwingStyle === 'bunt') {
+      const height = ball.by >= 14 ? 1 : ball.by <= -8 ? -1 : 0;
+      const heightMatch = buntAdjust > 0 ? height : buntAdjust < 0 ? -height : 0;
+      const j = judgeTiming(errMs, 'bunt', heightMatch);
+      if (j.zone === 'miss') addStrike(side, 'swing');
+      else if (j.zone === 'contact' && rng() < 0.5) foulBall(side);
+      else buntPlay(side);
       return;
     }
-    const b = batter(side);
-    if (tactic === 'bunt' && swingAt !== null) {
-      tactic = null;
-      const bs = game.bases.user;
-      if (bs[2]) { game.score[sideKey(side)] += 1; emit('match:run', { side, runs: 1 }); }
-      if (bs[1]) { bs[2] = 1; bs[1] = 0; }
-      if (bs[0]) { bs[1] = 1; bs[0] = 0; }
-      recordOut(side, false, 'バント');
+    const height = ball.by <= -8 ? 1 : ball.by >= 14 ? -1 : 0;
+    const heightMatch = swingDir === 'up' ? height : swingDir === 'down' ? -height : 0;
+    const style = currentSwingStyle || 'west', j = judgeTiming(errMs, style, heightMatch);
+    const mods = { style, core: j.zone === 'core', dir: swingDir };
+    if (j.zone === 'miss') { addStrike(side, 'swing'); return; }
+    if (j.zone === 'contact') { if (rng() < 0.5) foulBall(side); else hitBall(side, 0.15 + rng() * 0.2, mods); return; }
+    const quality = clamp((0.55 + 0.45 * (1 - errMs / j.coreW)) * HOOKS.sweetSpot(1, batter(side), cfg) * (heightMatch > 0 ? 1.06 : 1), 0.08, 1);
+    hitBall(side, quality, mods);
+  }
+  function flightResult(kind) {
+    const side = activeSide();
+    if (kind === 'OUT') {
+      if (game.outs < 2 && ball.mods && ball.mods.style === 'hnr') {
+        advanceRunners(side, 1);
+        if (matchMode() && game.inning >= cfg.innings && game.half === 'bottom' && game.score.home > game.score.away) { finish(); return; }
+      }
+      recordOut(side, false, 'ナイスキャッチ');
+    } else recordHit(side, kind);
+  }
+  function chooseThrow(base) {
+    if (!pendingThrow || ![1, 2, 3, 4].includes(base)) return;
+    ball.throwResolved = true;
+    const kind = pendingThrow.kind; pendingThrow = null;
+    if (kind === 'OUT') {
+      flightResult(kind);
+      if (state === 'running') setUi('送球完了');
       return;
     }
-    const form = cfg.play && cfg.play.battingForm || 'standard';
-    const formWidth = form === 'closed' ? 1.18 : form === 'open' ? 0.83 : form === 'oneLeg' ? 0.76 : 1;
-    const window = clamp(HOOKS.sweetSpot(0.14 * formWidth, b, cfg), 0.075, 0.20);
-    const diff = swingAt === null ? 9 : Math.abs(swingAt - 0.82);
-    if (diff > window) { recordOut(side, true, swingAt === null ? '見逃し三振' : '空振り三振'); return; }
-    const timingQ = clamp(1 - diff / window, 0.12, 1);
-    const coreF = ball ? coreFactor2(clamp(ball.bx, -60, 60), clamp(ball.by, -40, 60), batterShift, cursorY) : coreFactor(0);
-    hitBall(side, clamp(timingQ * (0.30 + 0.70 * coreF), 0.08, 1));
+    const side = activeSide(), bs = game.bases[side], basesHit = kind === '2B' ? 2 : 1;
+    const leadIdx = bs.lastIndexOf(1), dest = Math.min(leadIdx + basesHit + 1, 4);
+    if (leadIdx >= 0 && base === dest && rng() < clamp(0.25 + ((ball.rangeF || 54) - 54) / 100, 0.1, 0.6)) {
+      bs[leadIdx] = 0; game.outs += 1;
+      emit('match:out', { side, label: '送球アウト' }); if (port) port.banner('送球アウト', '');
+      if (game.outs >= 3 && matchMode()) {
+        changeHalf();
+        if (state === 'running') setUi('チェンジ');
+        return;
+      }
+      recordHit(side, kind);
+    } else {
+      recordHit(side, kind);
+      if (leadIdx >= 0 && base !== dest && state === 'running' && game.phase === 'between') {
+        advanceRunners(side, 1);
+        if (matchMode() && game.inning >= cfg.innings && game.half === 'bottom' && game.score.home > game.score.away) { finish(); return; }
+      }
+    }
+    if (state === 'running') setUi('送球完了');
   }
   function update(dt) {
     clock += dt;
-    shiftShown += (batterShift - shiftShown) * Math.min(1, dt * 16);
     if (shakeT > 0) shakeT = Math.max(0, shakeT - dt);
     sparks = sparks.filter((sp) => { sp.life -= dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 260 * dt; return sp.life > 0; });
     if (state !== 'running') return;
@@ -2983,7 +3102,10 @@ const MatchEngine = (() => {
       ball.x = ball.sx + (ball.tx - ball.sx) * t;
       ball.y = ball.sy + (ball.ty - ball.sy) * t - Math.sin(Math.PI * t) * ball.peak;
       fielders.forEach((f) => { f.x = f.sx + (ball.tx - f.sx) * t * 0.68; f.y = f.sy + (ball.ty - f.sy) * t * 0.68; });
-      if (t >= 1) { if (ball.kind === 'OUT') recordOut(activeSide(), false, 'ナイスキャッチ'); else recordHit(activeSide(), ball.kind); }
+      if (t >= 1) {
+        if (ball.kind !== 'HR' && throwSelectEnabled() && !userBatting() && !ball.throwResolved) { game.phase = 'throw'; pendingThrow = { kind: ball.kind }; setUi('送球先を選んでください'); return; }
+        flightResult(ball.kind);
+      }
     }
   }
   function player(g, x, y, color, pose = 0) {
@@ -3030,20 +3152,14 @@ const MatchEngine = (() => {
     const bForm = batPlay && batPlay.battingForm || 'standard';
     const batPose = bForm === 'open' ? -0.28 : bForm === 'closed' ? 0.25 : bForm === 'oneLeg' ? 0.48 : bForm === 'sway' ? Math.sin(clock * 5) * 0.22 : 0;
     const sw = swingAt !== null && game.phase === 'pitch' && ball ? clamp((ball.t - swingAt) * (5 + batMotion.swingSpeed / 18), 0, 1) : 0;
-    const drawBat = (pose) => { g.save(); g.translate(4, -79); g.rotate(-1.7 + pose * 2.4); g.strokeStyle = '#C8A24A'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(78, 0); g.stroke(); g.restore(); };
+    const drawBat = (pose) => { g.save(); g.translate(4, -79); g.rotate(userBatting() && buntStance ? -0.2 : -1.7 + pose * 2.4); g.strokeStyle = '#C8A24A'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(78, 0); g.stroke(); g.restore(); };
     if (userBatting()) {
       player(g, 320, 306, '#2E7D4F', Math.sin(clock * 4) * 0.08);
       player(g, 884, 306, '#2E7D4F', Math.sin(clock * 4 + 2) * 0.08);
       g.save(); g.translate(622, 240); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', pPose); g.restore();
-      g.strokeStyle = 'rgba(255,255,255,.65)'; g.lineWidth = 2; g.strokeRect(290, 255, 140, 150);
-      g.strokeStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.moveTo(337, 255); g.lineTo(337, 405); g.moveTo(383, 255); g.lineTo(383, 405); g.moveTo(290, 305); g.lineTo(430, 305); g.moveTo(290, 355); g.lineTo(430, 355); g.stroke();
-      const cxp = 360 + batterShift * 1.1; const cyp = 330 + cursorY * 1.05;
-      g.strokeStyle = '#FFB020'; g.lineWidth = 3; g.beginPath(); g.arc(cxp, cyp, 16, 0, 7); g.stroke(); g.fillStyle = '#FFB020'; g.beginPath(); g.arc(cxp, cyp, 3.5, 0, 7); g.fill();
       g.save(); g.translate(215, 400); g.scale(2.2, 2.2); player(g, 0, 0, '#C23B32', batPose + sw * 1.2); drawBat(sw); g.restore();
     } else {
       g.save(); g.translate(648, 242); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', batPose); drawBat(0); g.restore();
-      g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2; g.strokeRect(590, 232, 64, 60);
-      if (game.phase === 'ready') { const gx = 622 + aim.ax * 9; const gy = 262 + aim.ay * 5.6; g.strokeStyle = '#FFF'; g.beginPath(); g.arc(gx, gy, 6, 0, 7); g.stroke(); g.fillStyle = '#FFF'; g.beginPath(); g.arc(gx, gy, 2, 0, 7); g.fill(); }
       g.save(); g.translate(215, 400 + (pitchForm === 'dogeza' ? 55 : 0)); g.scale(2.2, 2.2); player(g, 0, 0, '#255FA8', pPose); g.restore();
     }
     trail.forEach((tp, i) => { g.globalAlpha = (i + 1) / trail.length * 0.28; g.fillStyle = '#FFF'; g.beginPath(); g.arc(tp.x, tp.y, 2 + (i + 1) / trail.length * 3.5, 0, 7); g.fill(); });
@@ -3058,12 +3174,15 @@ const MatchEngine = (() => {
     }
   }
   function drawHeader(g) {
-    g.fillStyle = 'rgba(4,10,18,.76)'; g.fillRect(14, 14, 330, 46); g.fillStyle = '#FFB020'; g.font = '700 22px sans-serif';
+    g.fillStyle = 'rgba(4,10,18,.76)'; g.fillRect(14, 14, 430, 58); g.fillStyle = '#FFB020'; g.font = '700 22px sans-serif';
     g.fillText(`${game.inning}回${game.half === 'top' ? '表' : '裏'}　${game.score.away} - ${game.score.home}`, 28, 44);
     const bsNow = game.bases[userBatting() ? 'user' : 'opponent'];
     const dia = [[268, 30], [284, 40], [252, 40]];
     dia.forEach(([dx, dy], i) => { g.save(); g.translate(dx, dy); g.rotate(Math.PI / 4); g.fillStyle = bsNow[i] ? '#FFB020' : 'rgba(255,255,255,.25)'; g.fillRect(-6, -6, 12, 12); g.restore(); });
-    for (let i = 0; i < 3; i += 1) { g.beginPath(); g.arc(312 + i * 14, 35, 5, 0, 7); g.fillStyle = i < game.outs ? '#FF5A4E' : 'rgba(255,255,255,.25)'; g.fill(); }
+    [['S', 2, game.count.s, '#FFD94A'], ['B', 3, game.count.b, '#57D977'], ['O', 3, game.outs, '#FF5A4E']].forEach(([label, total, lit, color], row) => {
+      const y = 26 + row * 17; g.fillStyle = '#FFF'; g.font = '700 12px sans-serif'; g.fillText(label, 334, y + 4);
+      for (let i = 0; i < total; i += 1) { g.beginPath(); g.arc(359 + i * 21, y, 5, 0, 7); g.fillStyle = i < lit ? color : 'rgba(255,255,255,.25)'; g.fill(); }
+    });
   }
   function draw() {
     if (!port || !game) return;
@@ -3074,7 +3193,7 @@ const MatchEngine = (() => {
     g.save();
     g.scale(0.5, 0.5);
     if (shakeT > 0) { g.save(); g.translate((rng() - 0.5) * 9 * shakeT * 4, (rng() - 0.5) * 7 * shakeT * 4); }
-    if (game.phase === 'flight') drawFieldScene(g); else drawMatchScene(g);
+    if (game.phase === 'flight' || game.phase === 'throw') drawFieldScene(g); else drawMatchScene(g);
     sparks.forEach((sp) => { const ox = game.phase === 'flight' ? 240 : 0; const oy = game.phase === 'flight' ? -3 : 0; g.globalAlpha = Math.max(0, sp.life / 0.45); g.fillStyle = '#FFB020'; g.beginPath(); g.arc(sp.x + ox, sp.y + oy, 3.2, 0, 7); g.fill(); });
     g.globalAlpha = 1;
     drawHeader(g);
@@ -3093,13 +3212,14 @@ const MatchEngine = (() => {
   function start(matchConfig) {
     cfg = matchConfig; state = 'running'; rng = (() => { let s = (cfg.seed || 1) >>> 0; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
     selectedPitch = (cfg.unlockedPitches || []).includes(cfg.play && cfg.play.selectedPitch) ? cfg.play.selectedPitch : (cfg.unlockedPitches && cfg.unlockedPitches[0]) || 'fastball';
-    batterShift = 0; cursorY = 0; shiftShown = 0; trail = []; sparks = []; shakeT = 0; aim = { ax: 0, ay: 0 }; tactic = null;
-    game = { inning: 1, half: 'top', outs: 0, score: { home: 0, away: 0 }, order: { user: 0, opponent: 0 }, pitches: { user: 0, opponent: 0 }, bases: { user: [0, 0, 0], opponent: [0, 0, 0] }, batting: {}, k: 0, attempts: 0, phase: 'ready', nextAt: 0, pitchCounts: {} };
+    currentSwingStyle = null; buntStance = false; buntAdjust = 0; dirHeld = { up: false, down: false, left: false, right: false }; swingDir = null; pendingThrow = null;
+    trail = []; sparks = []; shakeT = 0; aim = { ax: 0, ay: 0 };
+    game = { inning: 1, half: 'top', outs: 0, count: { s: 0, b: 0 }, score: { home: 0, away: 0 }, order: { user: 0, opponent: 0 }, pitches: { user: 0, opponent: 0 }, bases: { user: [0, 0, 0], opponent: [0, 0, 0] }, batting: {}, k: 0, attempts: 0, phase: 'ready', nextAt: 0, pitchCounts: {} };
     const participants = cfg.teams ? [...cfg.teams.user.lineup.map((b) => b.cardId), cfg.teams.user.pitcher.cardId] : [];
     fielders = FIELD_HOME.map((f) => ({ ...f })); clock = 0; last = 0; emit('match:start', { userSide: cfg.userSide, participants }); atBat();
     if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
   }
-  function choosePitch(id) { if (PITCHES[id] && (cfg.unlockedPitches || []).includes(id)) { selectedPitch = id; setUi('球種を選びました'); } }
+  function choosePitch(id) { if (PITCHES[id] && (id === 'slowball' || (cfg.unlockedPitches || []).includes(id))) { selectedPitch = id; setUi('球種を選びました'); } }
   function pause() { if (state === 'running') { state = 'paused'; setUi('一時停止中'); } }
   function resume() { if (state === 'paused') { state = 'running'; last = 0; setUi(game.phase === 'ready' ? '試合を再開しました' : 'プレイ中'); } }
   function abort() { if (state === 'idle') return; state = 'idle'; if (raf) cancelAnimationFrame(raf); emit('match:aborted'); if (port) port.clear(); }
@@ -3112,7 +3232,7 @@ const MatchEngine = (() => {
     else if (kind === 'out') recordOut(side, false, 'アウト');
     else if (kind === 'end') finish(forced);
   }
-  return { mount, start, startPitch, swing, choosePitch, finish, pause, resume, abort, isRunning: () => state !== 'idle', debugAct, HOOKS, beginSteal, resolveSteal, substitute, setTactic, setShift, setShiftTo, setCursor, setAim, testHooks: { coreFactor, coreFactor2, projPoint, stealChance, clampShift, getCursor: () => ({ x: batterShift, y: cursorY }), staminaFactor: (p, count) => stamina(p, count) } };
+  return { mount, start, startPitch, swing, choosePitch, finish, pause, resume, abort, isRunning: () => state !== 'idle', debugAct, HOOKS, beginSteal, resolveSteal, substitute, swingStyle, setDir, choosePitchButton, chooseThrow, testHooks: { ORDER_MULT, orderMultAt, flightSeconds, judgeTiming, pitchButtonsFor, isStrikeZone, throwSelectEnabled, coreFactor, projPoint, stealChance, staminaFactor: (p, count) => stamina(p, count) } };
 })();
 
 /* =====================================================================
@@ -3265,6 +3385,7 @@ const Commentary = (() => {
       case 'pitch': return `投げた！ ${d.name || 'ストレート'} ${d.kmh ? `${d.kmh}km/h` : ''}`;
       case 'atBat': return `${d.order || ''}番 ${d.name || '打者'}、打席に入ります`;
       case 'hit': return d.kind === 'HR' ? '打ったー！ 大きい、大きい！ 入った、ホームラン！' : d.kind === '2B' ? '鋭い当たり！ ツーベースヒット！' : '打った！ ヒット！ チャンスが広がります';
+      case 'walk': return 'フォアボール！ 選びました';
       case 'strikeout': return '三振！ 球場がどよめきます';
       case 'out': return `${d.label || 'アウト'}！ 守備がさばいた`;
       case 'run': return `${d.runs || 1}点が入った！ スタンドが沸いています`;
@@ -3292,7 +3413,10 @@ const GameSurface = (() => {
   let root = null;
   let bannerTimer = 0;
   let lastPitchList = '';
-  let mashCount = 0;
+  let lastView = null;
+  let keysBound = false;
+  let activeMount = null;
+  const symbols = { tri: '△', sq: '□', cir: '○', cross: '×' };
   const one = (sel) => (root ? root.querySelector(sel) : null);
   function markup() {
     return `<div class="eng">
@@ -3300,12 +3424,15 @@ const GameSurface = (() => {
       <div class="eng-controls">
         <p class="eng-status" aria-live="polite">試合を準備しています</p>
         <p class="eng-commentary" aria-live="polite"></p>
-        <div class="eng-pitch-row"><select class="eng-select" data-engine-pitch aria-label="球種"></select><button class="eng-action main" type="button" data-engine-act="pitch">投球開始</button></div>
-        <button class="eng-action swing" type="button" data-engine-act="swing">スイング</button>
-        <div class="eng-row" data-eng-shift hidden><button class="eng-action" type="button" data-engine-act="shiftL">左へ寄る</button><input class="eng-range" type="range" min="-44" max="44" step="1" value="0" data-eng-range aria-label="打者位置スライダー"><span class="eng-shift-val">打者位置 0</span><button class="eng-action" type="button" data-engine-act="shiftR">右へ寄る</button></div>
-        <div class="eng-aim" data-eng-aim hidden role="group" aria-label="投球の狙い">${[[-1, -1, '外・高'], [0, -1, '中・高'], [1, -1, '内・高'], [-1, 0, '外・中'], [0, 0, '真ん中'], [1, 0, '内・中'], [-1, 1, '外・低'], [0, 1, '中・低'], [1, 1, '内・低']].map(([x, y, t]) => `<button class="eng-action aim-cell" type="button" data-aim="${x},${y}">${t}</button>`).join('')}</div>
-        <div class="eng-pad-wrap" data-eng-padwrap hidden><div class="eng-pad" data-eng-pad><i class="eng-pad-dot"></i></div><span class="eng-pad-label">ミートカーソル（なぞって合わせる）</span></div>
-        <div class="eng-row" data-eng-tactics hidden><button class="eng-action" type="button" data-engine-act="steal">盗塁</button><button class="eng-action" type="button" data-engine-act="bunt" aria-pressed="false">バント</button><button class="eng-action mash" type="button" data-engine-act="mash" hidden>連打！</button></div>
+        <div class="eng-row" data-eng-startrow><button class="eng-action main" type="button" data-engine-act="pitch">投球開始</button></div>
+        <div class="eng-diamond" data-eng-batbtns hidden aria-label="打法">
+          ${[['hnr', 'tri', 'ヒットエンドラン'], ['west', 'sq', 'ウエストボール'], ['bunt', 'cir', 'バント'], ['power', 'cross', '長打']].map(([style, btn, name]) => `<button class="eng-action" type="button" data-style="${style}" data-ps="${btn}"><span class="eng-symbol">${symbols[btn]}</span> ${name}</button>`).join('')}
+        </div>
+        <div class="eng-diamond" data-eng-pitchbtns hidden aria-label="球種">
+          ${Object.keys(symbols).map((btn) => `<button class="eng-action" type="button" data-pitchbtn="${btn}" data-ps="${btn}"><span class="eng-symbol">${symbols[btn]}</span></button>`).join('')}
+        </div>
+        <div class="eng-row" data-eng-dpad hidden aria-label="方向">${[['up', '↑'], ['down', '↓'], ['left', '←'], ['right', '→']].map(([dir, label]) => `<button class="eng-action" type="button" data-dir="${dir}">${label}</button>`).join('')}</div>
+        <div class="eng-row" data-eng-throw hidden>${['一塁', '二塁', '三塁', '本塁'].map((name, i) => `<button class="eng-action" type="button" data-throw="${i + 1}">${name}</button>`).join('')}</div>
         <div class="eng-row" data-eng-subs hidden><select class="eng-select" data-engine-sub="bat" aria-label="代打"><option value="">代打を選ぶ</option></select><select class="eng-select" data-engine-sub="pitch" aria-label="投手交代"><option value="">投手交代</option></select></div>
         <div class="eng-meter" aria-hidden="true"><i></i></div>
         <button class="eng-action" type="button" data-engine-act="finish" hidden>このモードを終了</button>
@@ -3318,31 +3445,35 @@ const GameSurface = (() => {
   }
   function update(v) {
     if (!root) return;
+    lastView = v;
     const status = one('.eng-status');
     const pitch = one('[data-engine-act="pitch"]');
-    const swing = one('[data-engine-act="swing"]');
     const finish = one('[data-engine-act="finish"]');
-    const select = one('[data-engine-pitch]');
     if (status) status.textContent = `${v.status}${v.total ? `　${v.attempts}/${v.total}球` : ''}`;
-    if (pitch) { pitch.disabled = !v.canPitch; pitch.textContent = v.batting ? '投球開始' : '投げる'; }
-    if (swing) swing.disabled = !v.canSwing;
+    one('[data-eng-startrow]').hidden = !v.batting;
+    if (pitch) pitch.disabled = !v.canStartPitch;
     if (finish) { finish.hidden = !v.canFinish; finish.disabled = !v.canFinish; }
-    const key = JSON.stringify(v.pitches || []);
-    if (select && key !== lastPitchList) { select.innerHTML = (v.pitches || []).map((p) => `<option value="${Util.esc(p.id)}">${Util.esc(p.name)}</option>`).join(''); lastPitchList = key; }
-    if (select) { select.value = v.selectedPitch; select.disabled = v.batting || !v.canPitch; }
-    const shiftRow = one('[data-eng-shift]');
-    if (shiftRow) { shiftRow.hidden = !v.batting; const val = one('.eng-shift-val'); if (val) val.textContent = `打者位置 ${v.shift > 0 ? '+' : ''}${v.shift || 0}`; const rg = one('[data-eng-range]'); if (rg && Number(rg.value) !== (v.shift || 0)) rg.value = v.shift || 0; }
-    const aimBox = one('[data-eng-aim]');
-    if (aimBox) { aimBox.hidden = !!v.batting; aimBox.querySelectorAll('[data-aim]').forEach((b) => { const [x, y] = b.dataset.aim.split(',').map(Number); b.classList.toggle('on', v.aim && v.aim.ax === x && v.aim.ay === y); b.disabled = !v.canPitch; }); }
-    const padWrap = one('[data-eng-padwrap]');
-    if (padWrap) { padWrap.hidden = !v.batting; const dot = one('.eng-pad-dot'); if (dot) { dot.style.left = `${((v.shift || 0) / 44 * 0.5 + 0.5) * 100}%`; dot.style.top = `${((v.cursorY || 0) / 44 * 0.5 + 0.5) * 100}%`; } }
-    const tacRow = one('[data-eng-tactics]');
-    if (tacRow) {
-      tacRow.hidden = !v.batting;
-      const steal = one('[data-engine-act="steal"]'); if (steal) steal.disabled = !v.canSteal;
-      const bunt = one('[data-engine-act="bunt"]'); if (bunt) bunt.setAttribute('aria-pressed', v.tactic === 'bunt' ? 'true' : 'false');
-      const mash = one('[data-engine-act="mash"]'); if (mash) mash.hidden = !v.stealOpen;
-    }
+    one('[data-eng-batbtns]').hidden = !v.batting;
+    root.querySelectorAll('[data-style]').forEach((b) => {
+      const bunt = b.dataset.style === 'bunt';
+      b.disabled = bunt ? !(v.batting && (v.phase === 'ready' || v.phase === 'windup' || v.canSwing)) : !v.canSwing;
+      b.classList.toggle('on', bunt && !!v.buntStance);
+      if (bunt) b.setAttribute('aria-pressed', String(!!v.buntStance));
+    });
+    one('[data-eng-pitchbtns]').hidden = !!v.batting;
+    const key = JSON.stringify(v.pitchButtons || []);
+    root.querySelectorAll('[data-pitchbtn]').forEach((b) => {
+      b.disabled = !v.canPitchButtons;
+      if (key !== lastPitchList) {
+        const p = (v.pitchButtons || []).find((p) => p.btn === b.dataset.pitchbtn);
+        b.innerHTML = `<span class="eng-symbol">${symbols[b.dataset.pitchbtn]}</span> ${Util.esc(p ? p.name : '')}`;
+      }
+    });
+    lastPitchList = key;
+    one('[data-eng-dpad]').hidden = !['ready', 'windup', 'pitch'].includes(v.phase);
+    root.querySelectorAll('[data-dir]').forEach((b) => { b.hidden = !!v.batting && ['left', 'right'].includes(b.dataset.dir); });
+    one('[data-eng-throw]').hidden = !v.throwSelect;
+    root.querySelectorAll('[data-throw]').forEach((b) => { b.disabled = !v.throwSelect || !v.throwSelect.bases.includes(Number(b.dataset.throw)); });
     const subRow = one('[data-eng-subs]');
     if (subRow) {
       const batSel = one('[data-engine-sub="bat"]');
@@ -3366,17 +3497,10 @@ const GameSurface = (() => {
     bannerTimer = setTimeout(() => { if (box) box.classList.remove('show'); }, 700);
   }
   function swingFx() {
-    const b = one('[data-engine-act="swing"]');
+    const b = one('[data-eng-batbtns]');
     if (!b) return;
     b.classList.add('pulse');
     setTimeout(() => b.classList.remove('pulse'), 100);
-  }
-  function movePad(pad, ev) {
-    const r = pad.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    const cx = Math.min(1, Math.max(-1, ((ev.clientX - r.left) / r.width) * 2 - 1));
-    const cy = Math.min(1, Math.max(-1, ((ev.clientY - r.top) / r.height) * 2 - 1));
-    MatchEngine.setCursor(cx * 44, cy * 44);
   }
   function say(text) {
     const el = one('.eng-commentary');
@@ -3389,6 +3513,7 @@ const GameSurface = (() => {
   Events.on('match:pitch', (e) => say(Commentary.line('pitch', e)));
   Events.on('match:atBat', (e) => say(Commentary.line('atBat', e)));
   Events.on('match:hit', (e) => { say(Commentary.line('hit', e)); Sfx.crack(); Sfx.crowd(e.kind === 'HR'); });
+  Events.on('match:walk', (e) => say(Commentary.line('walk', e)));
   Events.on('match:strikeout', () => say(Commentary.line('strikeout')));
   Events.on('match:out', (e) => say(Commentary.line('out', e)));
   Events.on('match:run', (e) => say(Commentary.line('run', e)));
@@ -3398,33 +3523,72 @@ const GameSurface = (() => {
     if (!c || /jsdom/i.test(navigator.userAgent)) return null;
     return c.getContext('2d');
   }
+  function playStyle(style) {
+    if (style !== 'bunt') {
+      if (!lastView || !lastView.canSwing) return;
+      NativeFeel.tap(); Sfx.whoosh();
+    }
+    MatchEngine.swingStyle(style);
+  }
   function onClick(ev) {
-    const b = ev.target.closest('[data-engine-act],[data-eng]');
+    const b = ev.target.closest('[data-engine-act],[data-eng],[data-style],[data-pitchbtn],[data-throw]');
     if (!b || b.disabled) return;
-    if (b.dataset.aim) { const [ax, ay] = b.dataset.aim.split(',').map(Number); MatchEngine.setAim(ax, ay); return; }
-    if (b.dataset.engineAct === 'pitch') MatchEngine.startPitch();
-    else if (b.dataset.engineAct === 'swing') { NativeFeel.tap(); Sfx.whoosh(); MatchEngine.swing(); }
-    else if (b.dataset.engineAct === 'shiftL') MatchEngine.setShift(-1);
-    else if (b.dataset.engineAct === 'shiftR') MatchEngine.setShift(1);
-    else if (b.dataset.engineAct === 'bunt') MatchEngine.setTactic('bunt');
-    else if (b.dataset.engineAct === 'steal') { mashCount = 0; MatchEngine.beginSteal(); setTimeout(() => { MatchEngine.resolveSteal(mashCount); }, 1200); }
-    else if (b.dataset.engineAct === 'mash') { mashCount += 1; }
+    if (b.dataset.style) playStyle(b.dataset.style);
+    else if (b.dataset.pitchbtn) MatchEngine.choosePitchButton(b.dataset.pitchbtn);
+    else if (b.dataset.throw) MatchEngine.chooseThrow(Number(b.dataset.throw));
+    else if (b.dataset.engineAct === 'pitch') MatchEngine.startPitch();
     else if (b.dataset.engineAct === 'finish') MatchEngine.finish();
     else if (b.dataset.eng === 'end') MatchEngine.debugAct('end', b.dataset.r);
     else if (b.dataset.eng) MatchEngine.debugAct(b.dataset.eng);
   }
+  function onKey(ev) {
+    if (Shell.hasModal()) return;
+    if (!activeMount || activeMount.target !== root || !root.isConnected || !lastView) return;
+    const dir = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[ev.key];
+    if (dir) {
+      ev.preventDefault();
+      if (!ev.repeat) MatchEngine.setDir(dir, ev.type === 'keydown');
+      return;
+    }
+    const key = ev.key.toLowerCase();
+    if (ev.type !== 'keydown' || ev.repeat) return;
+    if (lastView.throwSelect && ['1', '2', '3', '4'].includes(key)) { MatchEngine.chooseThrow(Number(key)); return; }
+    if (!['w', 'a', 's', 'd'].includes(key)) return;
+    if (lastView.batting) playStyle({ w: 'hnr', a: 'west', s: 'power', d: 'bunt' }[key]);
+    else if (lastView.canPitchButtons) MatchEngine.choosePitchButton({ w: 'tri', a: 'sq', s: 'cross', d: 'cir' }[key]);
+  }
   function mount(target) {
     root = target;
+    const mounted = { target };
+    activeMount = mounted;
+    lastView = null;
     lastPitchList = '';
     root.innerHTML = markup();
-    root.addEventListener('click', onClick);
-    root.addEventListener('change', (ev) => { if (ev.target.matches('[data-engine-pitch]')) MatchEngine.choosePitch(ev.target.value); if (ev.target.matches('[data-engine-sub]')) { MatchEngine.substitute(ev.target.dataset.engineSub, ev.target.value); ev.target.value = ''; } });
-    root.addEventListener('input', (ev) => { if (ev.target.matches('[data-eng-range]')) MatchEngine.setShiftTo(Number(ev.target.value)); });
-    root.addEventListener('pointerdown', (ev) => { const pad = ev.target.closest('[data-eng-pad]'); if (!pad) return; try { pad.setPointerCapture(ev.pointerId); } catch (e2) { /* ignore */ } movePad(pad, ev); });
-    root.addEventListener('pointermove', (ev) => { const pad = ev.target.closest('[data-eng-pad]'); if (!pad || !(ev.buttons > 0)) return; movePad(pad, ev); });
+    // Reassign handlers so mounting the same target cannot duplicate input.
+    root.onclick = onClick;
+    root.onchange = (ev) => { if (ev.target.matches('[data-engine-sub]')) { MatchEngine.substitute(ev.target.dataset.engineSub, ev.target.value); ev.target.value = ''; } };
+    root.querySelectorAll('[data-dir]').forEach((b) => {
+      b.addEventListener('pointerdown', (ev) => { ev.preventDefault(); MatchEngine.setDir(b.dataset.dir, true); });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach((type) => b.addEventListener(type, () => MatchEngine.setDir(b.dataset.dir, false)));
+    });
+    if (!keysBound) {
+      window.addEventListener('keydown', onKey);
+      window.addEventListener('keyup', onKey);
+      keysBound = true;
+    }
     const canvas = one('canvas');
-    if (canvas) canvas.addEventListener('pointerdown', () => { if (!one('[data-engine-act="swing"]').disabled) MatchEngine.swing(); else MatchEngine.startPitch(); });
-    const port = { context, update, banner, swing: swingFx, clear: () => { if (root) root.innerHTML = ''; } };
+    if (canvas) canvas.addEventListener('pointerdown', () => { if (activeMount !== mounted) return; if (lastView && lastView.canStyle) MatchEngine.swingStyle('west'); else if (lastView && lastView.canStartPitch) MatchEngine.startPitch(); });
+    const port = { context, update, banner, swing: swingFx, clear: () => {
+      if (activeMount !== mounted) return;
+      ['up', 'down', 'left', 'right'].forEach((dir) => MatchEngine.setDir(dir, false));
+      clearTimeout(bannerTimer);
+      root.innerHTML = '';
+      root.onclick = null;
+      root.onchange = null;
+      lastView = null;
+      activeMount = null;
+      root = null;
+    } };
     MatchEngine.mount(port);
     return port;
   }
@@ -4606,16 +4770,19 @@ const MatchFlow = (() => {
     if (!(h.projPoint(false, 0, 0, 0).r > p1.r)) return '投球で球が小さくならない';
     return true;
   });
-  t("段階E ミートカーソルは2Dで芯を判定する", () => {
-    const h = MatchEngine.testHooks;
-    if (h.coreFactor2(0, 0, 0, 0) !== 1) return 'ドンピシャで1でない';
-    if (!(h.coreFactor2(30, 0, 0, 0) < h.coreFactor2(10, 0, 0, 0))) return 'ズレで下がらない';
-    if (!(h.coreFactor2(0, 40, 0, 0) < 0.5)) return '縦ズレが効いていない';
-    MatchEngine.setCursor(100, -100);
-    const cur = h.getCursor();
-    if (cur.x !== 44 || cur.y !== -44) return `カーソルの丸めが違う: ${JSON.stringify(cur)}`;
-    return true;
+  t('段階G 打順補正テーブル', () => [1.1, 0.8, 1.3, 1.3, 1.3, 1, 1, 0.7, 0.7].every((v, i) => MatchEngine.testHooks.orderMultAt(i + 1) === v));
+  t('段階G 到達時間', () => [[140, .474], [125, .531], [110, .604], [90, .738]].every(([v, t]) => Math.abs(MatchEngine.testHooks.flightSeconds(v) - t) < .01));
+  t('段階G タイミング判定', () => [[0,'west',0,'core'],[50,'west',0,'core'],[51,'west',0,'contact'],[110,'west',0,'contact'],[111,'west',0,'miss'],[40,'power',0,'contact'],[30,'power',0,'core'],[55,'hnr',0,'core'],[55,'west',1,'core']].every(([e,s,h,z]) => MatchEngine.testHooks.judgeTiming(e,s,h).zone === z));
+  t('段階G 球種ボタン割当', () => {
+    const f = (sp, u) => MatchEngine.testHooks.pitchButtonsFor({special:sp},u).map((r) => r.pitch);
+    const a = f([],null), b = f(['fork'],null), c = f(['curve','sinker'],null), d = f(['curve'],['fastball']);
+    return a[0] === 'fastball' && a[2] === 'curve' && a[3] === 'slowball' && b[3] === 'fork' && c[1] === 'sinker' && c[2] === 'curve' && d[1] === 'fastball' && d[2] === 'fastball';
   });
+  t('段階G ストライクゾーン判定', () => {
+    const f = MatchEngine.testHooks.isStrikeZone;
+    return f({bx:0,by:0}) && !f({bx:50,by:0}) && !f({bx:0,by:50});
+  });
+  t('段階G THROW_SELECT既定OFF', () => CONFIG.FEATURES.throwSelect === false && !MatchEngine.testHooks.throwSelectEnabled());
   t("段階D 実況テロップが生成できる", () => {
     if (!Commentary.line('hit', { kind: 'HR' }).includes('ホームラン')) return 'HRの実況が違う';
     if (!Commentary.line('steal', { success: true }).includes('成功')) return '盗塁成功の実況が違う';
@@ -4624,11 +4791,6 @@ const MatchFlow = (() => {
   });
   t("段階D 効果音は音響なしでも落ちない", () => {
     try { Sfx.crack(); Sfx.whoosh(); Sfx.crowd(true); } catch (e) { return `例外: ${e.message}`; }
-    return true;
-  });
-  t("段階C 打者位置はスライダー範囲で丸める", () => {
-    const h = MatchEngine.testHooks;
-    if (h.clampShift(100) !== 44 || h.clampShift(-100) !== -44 || h.clampShift(10) !== 10) return '丸めが想定外';
     return true;
   });
   t("段階B' 試合設定に控えが入る", () => League.testScope(() => {
