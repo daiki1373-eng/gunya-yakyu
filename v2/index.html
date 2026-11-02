@@ -172,6 +172,9 @@ button:disabled{cursor:not-allowed}
 .lu-pos{display:grid;place-items:center;height:30px;border-radius:6px;background:var(--navy);border:1px solid var(--line);font-weight:900;font-size:15px}
 .lu-pos.misfit{border-color:var(--red);color:var(--red-text)}
 .lu-main{min-width:0}
+.lu-main[type="button"]{width:100%}
+.lu-edit .lu-pos{cursor:pointer}
+.lu-swap{grid-column:3/5;min-height:32px;margin:0 0 5px 68px;border:1px solid var(--line);border-radius:6px;color:var(--text-2);font-size:11.5px;font-weight:700;text-align:center}
 .lu-main b{display:block;font-size:14.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lu-main small{display:block;font-size:11px;color:var(--text-2)}
 .lu-ovr{font:700 22px/1 var(--f-num);text-align:right}
@@ -368,21 +371,21 @@ button:disabled{cursor:not-allowed}
      → 1 画面遷移（View・Shell・Modals・GameHud・Screens・Router・Actions・App）
      → デバッグ（Debug）→ 自己テストの登録 → 起動
    依存の向き：1 → 2a・2b・3・4 ／ 2a → 3・4 ／ 3 → 4 ／ 2b → なし（試合の通知を出すだけ）
-   localStorage に触れてよいのは Save だけ。段階2は開発用キーだけを使い、本番キーには触れない。
+   localStorage に触れてよいのは Save だけ。段階3は開発用キーだけを使い、本番キーには触れない。
    ===================================================================== */
 
 /* =====================================================================
    共通基盤：定数 CONFIG（バランス値・仮置き値・段階ごとの機能スイッチ・表示名）
    ===================================================================== */
 const CONFIG = Object.freeze({
-  VERSION: '段階2 本実装 0.3',
+  VERSION: '段階3 本実装 0.4',
   FEATURES: Object.freeze({
     persistence: true,     // 段階2：開発用キー gunya.save.v2.dev だけを読み書き
     leagueProgress: true,  // 段階2：試合結果をリーグに記録して節を進める
     leagueRewards: true,   // 段階2：リーグ戦の報酬を試合終了時にまとめて付与
     correction: true,      // 段階2：能力補正を MatchEngine.HOOKS 経由で有効にする
-    growth: false,         // 段階3：経験値・特訓・限界突破・スカウトの排出と消費
-    daily: false,          // 段階4：ログボ・ミッションの付与とリーグ戦以外の1日上限
+    growth: true,          // 段階3：経験値・特訓・限界突破・スカウトの排出と消費
+    daily: true,           // 段階3：ログボ・ミッションの付与とリーグ戦以外の1日上限
   }),
   PROVISIONAL: Object.freeze({  // 仕様書 D の仮置き
     Q1_nonLeagueDailyCap: 300,  // Q1=B：リーグ戦以外のコイン獲得は1日合計300まで
@@ -405,7 +408,11 @@ const CONFIG = Object.freeze({
     costs: Object.freeze({ single: { coins: 300, scoutTickets: 1 }, ten: { coins: 3000 }, guarantee: { guaranteeTickets: 1 } }),
     pity: 50,
   }),
-  GROWTH: Object.freeze({ maxLv: Object.freeze({ 1: 20, 2: 30, 3: 40, 4: 50 }), limitBreakLv: 5, limitBreakMax: 4, trainCost: 100, trainExp: 150, misfitDefense: 0.7 }),
+  GROWTH: Object.freeze({
+    maxLv: Object.freeze({ 1: 20, 2: 30, 3: 40, 4: 50 }), limitBreakLv: 5, limitBreakMax: 4,
+    trainCost: 100, trainExp: 150, appearanceExp: 60, winExp: 40, mvpExp: 100, misfitDefense: 0.7,
+    duplicateCoins: Object.freeze({ 1: 100, 2: 200, 3: 500, 4: 1000 }),
+  }),
   LEAGUE: Object.freeze({ rounds: 10, innings: 3, dayBoundaryHour: 4 }),
   LABELS: Object.freeze({
     pos: Object.freeze({ C: '捕', '1B': '一', '2B': '二', '3B': '三', SS: '遊', LF: '左', CF: '中', RF: '右', DH: '指', P: '投' }),
@@ -463,6 +470,7 @@ const Save = (() => {
   const meta = { createdAt: new Date().toISOString(), migratedFrom: null, migrationReport: [] };
   let last = null;
   let commits = 0;
+  let testDepth = 0;
   const register = (name, api) => { slices.set(name, api); };
   function snapshot() {
     const data = { schemaVersion: 2, meta: { ...meta, updatedAt: new Date().toISOString() } };
@@ -502,6 +510,7 @@ const Save = (() => {
   function commit(reason) {
     last = snapshot();
     last.meta.reason = reason;
+    if (testDepth) return { ok: true, persisted: false, test: true };
     if (!CONFIG.FEATURES.persistence) return { ok: true, persisted: false };
     try {
       const prev = window.localStorage.getItem(KEYS.main);
@@ -540,7 +549,14 @@ const Save = (() => {
       });
     }
   }
-  return { KEYS, register, load, commit, peek, exportText, importText, reset, testPersistence, commitCount: () => commits };
+  function testScope(fn) {
+    const beforeLast = last;
+    const beforeCommits = commits;
+    testDepth += 1;
+    try { return fn(); }
+    finally { testDepth -= 1; last = beforeLast; commits = beforeCommits; }
+  }
+  return { KEYS, register, load, commit, peek, exportText, importText, reset, testPersistence, testScope, commitCount: () => commits };
 })();
 
 /* ---- 共通基盤：自己テスト SelfTest（関数は true か、ずれの説明を返す） ---- */
@@ -623,12 +639,15 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     unlocks: { pitches: ['fastball'], pitchingForms: ['overhand'], battingForms: ['standard'] },
     premium: { pass: false, purchases: [] },
     ads: { dayKey: null, rewardCount: 0 }, // 仕様書 A-10 に未記載。段階4で項目を追記するか決める
-    // デイリーの進捗は仮データ（段階4で通知から数える）
-    missions: { dayKey: null, progress: { playLeague: 0, hits5: 2, k3: 3 }, claimed: {}, allClearClaimed: false, achievements: { firstWin: { claimed: true } } },
+    missions: {
+      dayKey: null, progress: { playLeague: 0, hits5: 0, k3: 0 }, claimed: {}, allClearClaimed: false,
+      achievements: {}, facts: { champion: 0, lv20: 0, legend: 0 },
+    },
     login: { lastDayKey: null, count: 0 },
   };
   let career = { hits: 0, homeruns: 0, strikeouts: 0, leagueWins: 0 };
-  let pendingLeague = null;
+  let pendingMatch = null;
+  let pendingMissions = null;
   let lastMatchRewards = null;
   let loginShownThisSession = false;
 
@@ -646,21 +665,22 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     changed(reason, options.commit !== false);
     return true;
   }
-  function capNonLeague(v) {
-    const k = Util.dayKey();
+  function capNonLeague(v, date) {
+    const k = Util.dayKey(date);
     if (s.dailyCap.dayKey !== k) s.dailyCap = { dayKey: k, nonLeagueEarned: 0 };
     const g = Math.min(v, Math.max(0, CONFIG.PROVISIONAL.Q1_nonLeagueDailyCap - s.dailyCap.nonLeagueEarned));
     s.dailyCap.nonLeagueEarned += g;
     return g;
   }
-  // source：league ／ nonLeague（Q1の1日上限の対象）／ purchase ／ ad ／ debug など
+  // source：nonLeague（非リーグ試合）と ad だけがQ1の1日上限対象。
+  // mission / login / duplicate は各機能に回数制限があるため上限対象外。
   function earn(gain, reason, source = 'other', options = {}) {
     const out = {};
     CURRENCIES.forEach((c) => {
       let v = Math.max(0, Math.floor(gain[c] || 0));
       if (!v) return;
-      if (c === 'coins' && source === 'nonLeague' && CONFIG.FEATURES.daily) v = capNonLeague(v);
       v = Math.min(v, (c === 'coins' ? E.maxCoins : E.maxTickets) - s[c]);
+      if (c === 'coins' && ['nonLeague', 'ad'].includes(source) && CONFIG.FEATURES.daily) v = capNonLeague(v, options.date);
       if (v > 0) { s[c] += v; log(c, v, reason); out[c] = v; }
     });
     if (Object.keys(out).length) changed(reason, options.commit !== false);
@@ -690,34 +710,67 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     return { ok: true, pack: p };
   }
 
-  // 試合の通知を受ける（ヒット・本塁打のコイン。リーグ戦は試合終了時にまとめる）
-  Events.on('match:start', (e) => { pendingLeague = e.mode === 'league' ? { hits: 0, homeruns: 0 } : null; });
+  // リーグ報酬はpendingに置いて終了時だけ確定。非リーグの試合コインは従来どおり即時付与する。
+  Events.on('match:start', (e) => { pendingMatch = e.mode === 'league' ? { mode: e.mode, hits: 0, homeruns: 0 } : null; });
   Events.on('match:hit', (e) => {
     if (e.side !== 'user') return;
     const hr = e.kind === 'HR';
-    if (e.mode === 'league') { if (pendingLeague) pendingLeague[hr ? 'homeruns' : 'hits'] += 1; return; }
-    earn({ coins: hr ? E.homerunCoins : E.hitCoins }, hr ? 'homerun' : 'hit', 'nonLeague');
+    if (e.mode !== 'league') { earn({ coins: hr ? E.homerunCoins : E.hitCoins }, hr ? 'homerun' : 'hit', 'nonLeague'); return; }
+    if (!pendingMatch) return;
+    pendingMatch[hr ? 'homeruns' : 'hits'] += 1;
   });
   function settleMatch(e) {
-    if (e.mode !== 'league' || !pendingLeague) { lastMatchRewards = null; pendingLeague = null; return; }
-    const p = pendingLeague;
+    if (e.mode !== 'league' || !pendingMatch) { lastMatchRewards = null; pendingMatch = null; return null; }
+    const p = pendingMatch;
     const r = { result: e.result, hits: p.hits, hitCoins: p.hits * E.hitCoins, homeruns: p.homeruns, homerunCoins: p.homeruns * E.homerunCoins, resultCoins: E.leagueResultCoins[e.result] || 0, granted: CONFIG.FEATURES.leagueRewards };
     r.total = r.hitCoins + r.homerunCoins + r.resultCoins;
-    if (r.granted) earn({ coins: r.total }, `leagueMatch:${e.result}`, 'league', { commit: false });
+    if (r.granted && r.total) earn({ coins: r.total }, `leagueMatch:${e.result}`, 'league', { commit: false });
     lastMatchRewards = r;
-    pendingLeague = null;
+    pendingMatch = null;
     return { ...r };
   }
-  Events.on('match:aborted', () => { pendingLeague = null; });
+  Events.on('match:aborted', () => { pendingMatch = null; });
   Events.on('record:updated', (c) => { career = { ...career, ...c }; });
 
   const Economy = {
     getWallet: wallet, canSpend, spend, earn,
     getLedger: () => s.ledger.slice(),
+    getDailyCap(date) {
+      const key = Util.dayKey(date);
+      if (s.dailyCap.dayKey !== key) s.dailyCap = { dayKey: key, nonLeagueEarned: 0 };
+      const limit = CONFIG.PROVISIONAL.Q1_nonLeagueDailyCap;
+      return { dayKey: key, earned: s.dailyCap.nonLeagueEarned, limit, remaining: Math.max(0, limit - s.dailyCap.nonLeagueEarned), reached: s.dailyCap.nonLeagueEarned >= limit };
+    },
     getUnlocks, getCatalog, buyUnlock, getPacks, demoPurchase,
     isPremium: () => s.premium.pass,
     getLastMatchRewards: () => (lastMatchRewards ? { ...lastMatchRewards } : null),
     syncCareer: (c) => { career = { ...career, ...c }; }, settleMatch,
+    testScope(fn) {
+      const before = Util.copy(s);
+      const beforeCareer = { ...career };
+      const beforePending = pendingMatch && { ...pendingMatch };
+      const beforeMissionPending = pendingMissions && { ...pendingMissions };
+      const beforeRewards = lastMatchRewards && { ...lastMatchRewards };
+      const beforeShown = loginShownThisSession;
+      return Save.testScope(() => {
+        try { return fn(); }
+        finally {
+          Object.keys(s).forEach((key) => { delete s[key]; }); Object.assign(s, before);
+          career = beforeCareer; pendingMatch = beforePending; pendingMissions = beforeMissionPending; lastMatchRewards = beforeRewards; loginShownThisSession = beforeShown;
+        }
+      });
+    },
+    testDailyCap() {
+      return Economy.testScope(() => {
+        if (s.coins) spend({ coins: s.coins }, 'test:clear');
+        s.dailyCap = { dayKey: null, nonLeagueEarned: 0 };
+        const date = new Date(2026, 10, 2, 12);
+        const a = earn({ coins: 250 }, 'test:cap:a', 'nonLeague', { date });
+        const b = earn({ coins: 100 }, 'test:cap:b', 'nonLeague', { date });
+        const c = earn({ coins: 20 }, 'test:cap:c', 'nonLeague', { date });
+        return { a, b, c, status: Economy.getDailyCap(date), coins: s.coins };
+      });
+    },
   };
 
   function rollAds() { const k = Util.dayKey(); if (s.ads.dayKey !== k) { s.ads.dayKey = k; s.ads.rewardCount = 0; } }
@@ -734,25 +787,57 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
       const d = REWARD[placement];
       if (!d) return { ok: false, reason: '対象外の広告枠です' };
       if (s.ads.rewardCount >= d.perDay) return { ok: false, reason: '今日の回数は終わりました' };
+      if (d.gain.coins && Economy.getDailyCap().remaining <= 0) return { ok: false, reason: '本日のコイン獲得上限に達しています' };
+      const granted = earn(d.gain, `rewardAd:${placement}`, 'ad');
+      if (!Object.keys(granted).length) return { ok: false, reason: '報酬を受け取れませんでした' };
       s.ads.rewardCount += 1;
-      earn(d.gain, `rewardAd:${placement}`, 'ad');
-      return { ok: true, label: d.label };
+      return { ok: true, label: d.label, granted, capped: !!(d.gain.coins && (granted.coins || 0) < d.gain.coins) };
     },
   };
+  Economy.testAdCapGuard = () => Economy.testScope(() => {
+    if (s.coins) spend({ coins: s.coins }, 'test:clear');
+    s.dailyCap = { dayKey: null, nonLeagueEarned: 0 };
+    s.ads = { dayKey: Util.dayKey(), rewardCount: 0 };
+    earn({ coins: CONFIG.PROVISIONAL.Q1_nonLeagueDailyCap }, 'test:fill-cap', 'nonLeague');
+    const before = Ads.rewardStatus('shop');
+    const grant = Ads.grantReward('shop');
+    const after = Ads.rewardStatus('shop');
+    return { before, grant, after };
+  });
 
+  function ensureDaily(date) {
+    const key = Util.dayKey(date);
+    if (s.missions.dayKey !== key) {
+      s.missions.dayKey = key;
+      s.missions.progress = { playLeague: 0, hits5: 0, k3: 0 };
+      s.missions.claimed = {};
+      s.missions.allClearClaimed = false;
+    }
+    return key;
+  }
+  function achievementProgress(m) {
+    return Math.min(m.goal, m.stat ? career[m.stat] || 0 : s.missions.facts[m.id] || 0);
+  }
+  function grantMissionReward(m, bucket, date) {
+    const granted = earn(m.reward, `mission:${m.id}`, 'mission', { commit: false, date });
+    bucket[m.id] = { claimed: true, at: new Date().toISOString(), granted: { ...granted } };
+    Save.commit(`mission:${m.id}`);
+    return { ok: true, mission: m, granted, capped: !!(m.reward.coins && (granted.coins || 0) < m.reward.coins) };
+  }
   const Missions = {
-    list(kind = 'daily') {
+    list(kind = 'daily', date) {
+      ensureDaily(date);
       if (kind === 'daily') {
         return DAILY.map((m) => { const p = Math.min(m.goal, s.missions.progress[m.id] || 0); return { ...m, progress: p, done: p >= m.goal, claimed: !!s.missions.claimed[m.id], rewardText: rewardText(m.reward) }; });
       }
       return ACHIEVEMENTS.map((m) => {
-        const p = Math.min(m.goal, m.stat ? career[m.stat] || 0 : 0);
+        const p = achievementProgress(m);
         const c = s.missions.achievements[m.id];
         return { ...m, progress: p, done: p >= m.goal, claimed: !!(c && c.claimed), rewardText: rewardText(m.reward) };
       });
     },
-    allClear() {
-      const daily = Missions.list('daily');
+    allClear(date) {
+      const daily = Missions.list('daily', date);
       return { ...ALL_CLEAR, goal: daily.length, progress: daily.filter((m) => m.claimed).length, done: daily.every((m) => m.claimed), claimed: s.missions.allClearClaimed, rewardText: rewardText(ALL_CLEAR.reward) };
     },
     unclaimedCount() {
@@ -760,25 +845,126 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
       const ac = Missions.allClear();
       return n + (ac.done && !ac.claimed ? 1 : 0);
     },
-    claim() {
-      if (!CONFIG.FEATURES.daily) return { ok: false, reason: '受け取りは段階4で作ります' };
-      return { ok: false, reason: '段階4で実装' };
+    claim(id, date) {
+      if (!CONFIG.FEATURES.daily) return { ok: false, reason: 'ミッションは無効です' };
+      ensureDaily(date);
+      if (id === ALL_CLEAR.id) {
+        const m = Missions.allClear(date);
+        if (m.claimed) return { ok: false, reason: 'すでに受け取っています' };
+        if (!m.done) return { ok: false, reason: 'まだ条件を達成していません' };
+        const granted = earn(m.reward, `mission:${m.id}`, 'mission', { commit: false, date });
+        s.missions.allClearClaimed = true;
+        Save.commit(`mission:${m.id}`);
+        return { ok: true, mission: m, granted };
+      }
+      const daily = Missions.list('daily', date).find((m) => m.id === id);
+      if (daily) {
+        if (daily.claimed) return { ok: false, reason: 'すでに受け取っています' };
+        if (!daily.done) return { ok: false, reason: 'まだ条件を達成していません' };
+        return grantMissionReward(daily, s.missions.claimed, date);
+      }
+      const achievement = Missions.list('achievements').find((m) => m.id === id);
+      if (!achievement) return { ok: false, reason: 'ミッションが見つかりません' };
+      if (achievement.claimed) return { ok: false, reason: 'すでに受け取っています' };
+      if (!achievement.done) return { ok: false, reason: 'まだ条件を達成していません' };
+      return grantMissionReward(achievement, s.missions.achievements, date);
+    },
+    testClaimScenario() {
+      return Economy.testScope(() => {
+        ensureDaily(new Date(2026, 10, 2, 12));
+        s.missions.progress = { playLeague: 1, hits5: 5, k3: 3 };
+        const first = Missions.claim('playLeague', new Date(2026, 10, 2, 12));
+        const second = Missions.claim('playLeague', new Date(2026, 10, 2, 12));
+        return { first, second, claimed: Missions.list('daily', new Date(2026, 10, 2, 12)).find((m) => m.id === 'playLeague').claimed };
+      });
     },
   };
 
+  // ミッション進捗は全モードでpendingに置き、MatchFlowから終了時だけ確定する。
+  function beginMissionMatch() { pendingMissions = { hits: 0, strikeouts: 0 }; }
+  function trackMissionHit(e) { if (e.side === 'user' && pendingMissions) pendingMissions.hits += 1; }
+  function trackMissionStrikeout(e) { if (e.pitcherSide === 'user' && pendingMissions) pendingMissions.strikeouts += 1; }
+  function settleMissionMatch(e) {
+    if (!CONFIG.FEATURES.daily || !pendingMissions) { pendingMissions = null; return null; }
+    ensureDaily();
+    s.missions.progress.hits5 = Math.min(DAILY[1].goal, (s.missions.progress.hits5 || 0) + pendingMissions.hits);
+    s.missions.progress.k3 = Math.min(DAILY[2].goal, (s.missions.progress.k3 || 0) + pendingMissions.strikeouts);
+    if (e.mode === 'league') s.missions.progress.playLeague = 1;
+    const applied = { ...pendingMissions };
+    pendingMissions = null;
+    return applied;
+  }
+  function abortMissionMatch() { pendingMissions = null; }
+  Events.on('match:start', beginMissionMatch);
+  Events.on('match:hit', trackMissionHit);
+  Events.on('match:strikeout', trackMissionStrikeout);
+  Events.on('match:aborted', abortMissionMatch);
+  Events.on('season:advanced', (e) => { if (e && e.rank === 1) s.missions.facts.champion = 1; });
+  Events.on('growth:level', (e) => { if (e && e.lv >= 20) s.missions.facts.lv20 = 1; });
+  Events.on('growth:acquired', (e) => { if (e && e.rarity === 4) s.missions.facts.legend = 1; });
+
   const LoginBonus = {
     table: () => LOGIN_TABLE.map((d) => ({ ...d, rewardText: rewardText(d.reward) })),
-    check() {
-      const key = Util.dayKey();
-      const already = s.login.lastDayKey !== null && key <= s.login.lastDayKey; // 端末の日付を戻しても受け取れない
-      return { show: !already && !loginShownThisSession, day: (s.login.count % 7) + 1, dayKey: key };
+    check(date) {
+      const key = Util.dayKey(date);
+      const eligible = s.login.lastDayKey === null || key > s.login.lastDayKey; // 端末の日付を戻しても受け取れない
+      return { show: eligible && !loginShownThisSession, eligible, day: (s.login.count % 7) + 1, dayKey: key };
     },
     markShown() { loginShownThisSession = true; },
-    claim() {
-      if (!CONFIG.FEATURES.daily) return { ok: false, reason: '付与は段階4で作ります' };
-      return { ok: false, reason: '段階4で実装' };
+    claim(date) {
+      if (!CONFIG.FEATURES.daily) return { ok: false, reason: 'ログインボーナスは無効です' };
+      const status = LoginBonus.check(date);
+      if (!status.eligible) return { ok: false, reason: '今日はすでに受け取っています' };
+      const entry = LOGIN_TABLE[status.day - 1];
+      const granted = earn(entry.reward, `loginBonus:${status.day}`, 'login', { commit: false, date });
+      s.login.lastDayKey = status.dayKey;
+      s.login.count += 1;
+      loginShownThisSession = true;
+      Save.commit(`loginBonus:${status.day}`);
+      return { ok: true, day: status.day, reward: { ...entry.reward }, granted, capped: !!(entry.reward.coins && (granted.coins || 0) < entry.reward.coins) };
+    },
+    testCycle() {
+      return Economy.testScope(() => {
+        s.login = { lastDayKey: null, count: 0 }; loginShownThisSession = false;
+        const before = LoginBonus.claim(new Date(2026, 10, 2, 3, 59));
+        const sameBusinessDay = LoginBonus.claim(new Date(2026, 10, 2, 3, 59));
+        const afterFour = LoginBonus.claim(new Date(2026, 10, 2, 4, 0));
+        for (let i = 1; i <= 4; i += 1) LoginBonus.claim(new Date(2026, 10, 2 + i, 12));
+        const day7 = LoginBonus.claim(new Date(2026, 10, 7, 12));
+        const next = LoginBonus.check(new Date(2026, 10, 8, 12));
+        return { before, sameBusinessDay, afterFour, day7, next };
+      });
     },
   };
+
+  Missions.settleMatch = settleMissionMatch;
+  Missions.testCapExemptRewards = () => Economy.testScope(() => {
+    const date = new Date(2026, 10, 2, 12);
+    if (s.coins) spend({ coins: s.coins }, 'test:clear');
+    s.dailyCap = { dayKey: null, nonLeagueEarned: 0 };
+    earn({ coins: 300 }, 'test:fill-cap', 'nonLeague', { date });
+    career = { ...career, homeruns: 50 };
+    ensureDaily(date);
+    s.missions.progress = { playLeague: 1, hits5: 5, k3: 3 };
+    s.missions.claimed = {};
+    s.missions.achievements = {};
+    s.login = { lastDayKey: null, count: 0 };
+    loginShownThisSession = false;
+    const achievement = Missions.claim('hr50', date);
+    const daily = Missions.claim('hits5', date);
+    const login = LoginBonus.claim(date);
+    return { achievement, daily, login, wallet: wallet(), cap: Economy.getDailyCap(date) };
+  });
+  Missions.testAbortPending = () => Economy.testScope(() => {
+    const date = new Date(2026, 10, 2, 12);
+    ensureDaily(date);
+    s.missions.progress = { playLeague: 0, hits5: 0, k3: 0 };
+    Events.emit('match:start', { mode: 'practice', userSide: 'away', participants: [] });
+    Events.emit('match:hit', { mode: 'practice', side: 'user', kind: '1B' });
+    Events.emit('match:strikeout', { mode: 'practice', pitcherSide: 'user' });
+    Events.emit('match:aborted', { mode: 'practice' });
+    return { ...s.missions.progress };
+  });
 
   Save.register('economy', {
     exportSlice: () => ({ wallet: wallet(), ledger: s.ledger.slice(), dailyCap: { ...s.dailyCap }, unlocks: getUnlocks(), premium: Util.copy(s.premium), ads: { ...s.ads }, missions: Util.copy(s.missions), login: { ...s.login } }),
@@ -797,8 +983,18 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
       if (data.premium && typeof data.premium === 'object') s.premium = { pass: !!data.premium.pass, purchases: Array.isArray(data.premium.purchases) ? data.premium.purchases.slice() : [] };
       if (data.dailyCap && typeof data.dailyCap === 'object') s.dailyCap = { dayKey: typeof data.dailyCap.dayKey === 'string' ? data.dailyCap.dayKey : null, nonLeagueEarned: Math.max(0, Math.floor(data.dailyCap.nonLeagueEarned || 0)) };
       if (data.ads && typeof data.ads === 'object') s.ads = { dayKey: typeof data.ads.dayKey === 'string' ? data.ads.dayKey : null, rewardCount: Math.max(0, Math.floor(data.ads.rewardCount || 0)) };
-      if (data.missions && typeof data.missions === 'object') s.missions = { ...s.missions, ...Util.copy(data.missions) };
-      if (data.login && typeof data.login === 'object') s.login = { ...s.login, ...Util.copy(data.login) };
+      if (data.missions && typeof data.missions === 'object') {
+        const m = data.missions;
+        s.missions = {
+          dayKey: typeof m.dayKey === 'string' ? m.dayKey : null,
+          progress: { playLeague: Math.max(0, Math.floor(m.progress && m.progress.playLeague || 0)), hits5: Math.max(0, Math.floor(m.progress && m.progress.hits5 || 0)), k3: Math.max(0, Math.floor(m.progress && m.progress.k3 || 0)) },
+          claimed: m.claimed && typeof m.claimed === 'object' ? Util.copy(m.claimed) : {}, allClearClaimed: !!m.allClearClaimed,
+          achievements: m.achievements && typeof m.achievements === 'object'
+            ? Object.fromEntries(Object.entries(m.achievements).filter(([, v]) => v && v.claimed === true && typeof v.at === 'string').map(([k, v]) => [k, Util.copy(v)])) : {},
+          facts: { champion: Math.max(0, Math.floor(m.facts && m.facts.champion || 0)), lv20: Math.max(0, Math.floor(m.facts && m.facts.lv20 || 0)), legend: Math.max(0, Math.floor(m.facts && m.facts.legend || 0)) },
+        };
+      }
+      if (data.login && typeof data.login === 'object') s.login = { lastDayKey: typeof data.login.lastDayKey === 'string' ? data.login.lastDayKey : null, count: Math.max(0, Math.floor(data.login.count || 0)) };
     },
   });
 
@@ -829,8 +1025,23 @@ const Growth = (() => {
     P('S10', '千葉 悠真', 18, 1, { kmh: 138, control: 47, stamina: 50, movement: 46 }, 10, ['slider', 'fork']),
     P('S11', '杉崎 航', 11, 1, { kmh: 134, control: 50, stamina: 46, movement: 48 }, 10, ['curve', 'sinker']),
     P('S12', '間宮 陸', 21, 1, { kmh: 136, control: 44, stamina: 50, movement: 49 }, 10, ['shoot', 'slider']),
-    // スカウト演出の見本（未所持）。プール48人は段階3で足す
+    // スカウトプール（同じレア度内は均等）
     B('B101', '神宮寺 亮', 1, 'CF', 3, { meet: 64, power: 58, speed: 70, defense: 66 }, 18),
+    B('B102', '真田 春樹', 3, 'SS', 3, { meet: 68, power: 55, speed: 66, defense: 70 }, 18),
+    B('B103', '大河 竜司', 25, '3B', 3, { meet: 57, power: 72, speed: 52, defense: 61 }, 18),
+    P('P103', '鳴海 奏', 17, 3, { kmh: 149, control: 65, stamina: 62, movement: 70 }, 18, ['fork', 'slider']),
+    B('B201', '月島 玄', 7, 'RF', 4, { meet: 78, power: 81, speed: 72, defense: 74 }, 16),
+    B('B202', '轟 雷太', 55, '1B', 4, { meet: 72, power: 88, speed: 58, defense: 69 }, 16),
+    B('B203', '白鳥 凛', 6, 'SS', 4, { meet: 82, power: 68, speed: 84, defense: 86 }, 16),
+    P('P204', '黒鉄 剣', 18, 4, { kmh: 156, control: 78, stamina: 82, movement: 80 }, 14, ['slider', 'fork']),
+    B('B301', '相馬 健', 2, 'C', 2, { meet: 54, power: 57, speed: 45, defense: 61 }, 14),
+    B('B302', '藤井 直', 4, '2B', 2, { meet: 58, power: 49, speed: 60, defense: 59 }, 14),
+    B('B303', '川上 達也', 8, 'LF', 2, { meet: 52, power: 60, speed: 56, defense: 51 }, 14),
+    P('P304', '西原 歩', 20, 2, { kmh: 143, control: 57, stamina: 59, movement: 55 }, 14, ['curve']),
+    B('B401', '村瀬 一真', 12, 'C', 1, { meet: 42, power: 44, speed: 38, defense: 47 }, 10),
+    B('B402', '滝本 恵介', 10, '2B', 1, { meet: 46, power: 39, speed: 48, defense: 45 }, 10),
+    B('B403', '松田 雄大', 31, 'LF', 1, { meet: 41, power: 49, speed: 43, defense: 40 }, 10),
+    P('P404', '伊東 淳', 26, 1, { kmh: 136, control: 45, stamina: 47, movement: 43 }, 10, ['shoot']),
   ]);
   const master = (id) => MASTER.find((c) => c.id === id) || null;
   const s = {
@@ -843,8 +1054,10 @@ const Growth = (() => {
     ],
     rotation: ['S10', 'S11', 'S12'],
     nextStarter: 0,
-    scout: { pity: 0, totalPulls: 0, adTicketDayKey: null },
+    scout: { pity: 0, totalPulls: 0, adTicketDayKey: null, history: [] },
   };
+  let matchParticipants = [];
+  let lastExpGain = null;
 
   const rankOf = (v) => (v >= 90 ? 'S' : v >= 80 ? 'A' : v >= 70 ? 'B' : v >= 60 ? 'C' : v >= 50 ? 'D' : v >= 40 ? 'E' : v >= 20 ? 'F' : 'G');
   const kmhScore = (kmh) => Util.clamp((kmh - 120) * 100 / 45, 0, 100);
@@ -892,8 +1105,11 @@ const Growth = (() => {
     return s.lineup.map((slot, i) => {
       const c = getCard(slot.cardId);
       const fit = fits(c, slot.pos);
-      const a = { ...c.abilities, defense: fit ? c.abilities.defense : Math.floor(c.abilities.defense * G.misfitDefense) };
-      return { order: i + 1, cardId: c.id, name: c.name, number: c.number, type: 'B', pos: slot.pos, posLabel: LB.pos[slot.pos], fit, abilities: a, overall: c.overall };
+      return {
+        order: i + 1, cardId: c.id, name: c.name, number: c.number, type: 'B', pos: slot.pos, posLabel: LB.pos[slot.pos], fit,
+        abilities: { ...c.abilities }, defenseFactor: fit ? 1 : G.misfitDefense,
+        effectiveDefense: Math.floor(c.abilities.defense * (fit ? 1 : G.misfitDefense)), overall: c.overall,
+      };
     });
   }
   function getRotation() {
@@ -909,32 +1125,237 @@ const Growth = (() => {
     const bat = lu.reduce((t, b) => t + b.abilities.meet + b.abilities.power, 0) / (lu.length * 2);
     const pit = getRotation().reduce((t, p) => t + p.overall, 0) / s.rotation.length;
     const fl = lu.filter((b) => b.pos !== 'DH');
-    const fld = fl.reduce((t, b) => t + b.abilities.speed + b.abilities.defense, 0) / (fl.length * 2);
+    const fld = fl.reduce((t, b) => t + b.abilities.speed + b.effectiveDefense, 0) / (fl.length * 2);
     return Math.round(bat * 0.4 + pit * 0.4 + fld * 0.2);
   }
-  const getScoutInfo = () => ({ costs: CONFIG.SCOUT.costs, rates: CONFIG.SCOUT.rates, guaranteeRates: CONFIG.SCOUT.guaranteeRates, pityRemaining: CONFIG.SCOUT.pity - s.scout.pity, enabled: CONFIG.FEATURES.growth });
-  function scout() {
-    // 段階3：Economy.spend で支払い、排出・天井・重複処理を行い、growth:acquired を出す
-    return { ok: false, preview: true, results: [{ cardId: 'B101', status: 'NEW' }], reason: '演出の見本です（排出と消費は段階3で作ります）' };
+  const getScoutInfo = () => ({ costs: CONFIG.SCOUT.costs, rates: CONFIG.SCOUT.rates, guaranteeRates: CONFIG.SCOUT.guaranteeRates, pityRemaining: CONFIG.SCOUT.pity - s.scout.pity, totalPulls: s.scout.totalPulls, enabled: CONFIG.FEATURES.growth });
+  function addExp(cardId, amount) {
+    const c = master(cardId); const own = s.owned[cardId];
+    if (!c || !own || !Number.isFinite(amount) || amount <= 0) return { ok: false, reason: '対象の選手がいません' };
+    const fromLv = own.lv;
+    own.exp += Math.floor(amount);
+    while (own.lv < maxLvOf(c, own.lb) && own.exp >= expToNext(own.lv)) { own.exp -= expToNext(own.lv); own.lv += 1; }
+    if (own.lv >= maxLvOf(c, own.lb)) own.exp = 0;
+    if (own.lv > fromLv) Events.emit('growth:level', { cardId, fromLv, lv: own.lv });
+    return { ok: true, cardId, amount: Math.floor(amount), fromLv, lv: own.lv, exp: own.exp };
   }
-  const train = () => ({ ok: false, reason: '特訓は段階3で作ります' });
+  function train(cardId) {
+    if (!CONFIG.FEATURES.growth) return { ok: false, reason: '育成は無効です' };
+    const c = getCard(cardId);
+    if (!c || !c.owned) return { ok: false, reason: '所持していない選手です' };
+    if (c.lv >= c.maxLv) return { ok: false, reason: 'レベル上限です' };
+    if (!Economy.spend({ coins: G.trainCost }, `training:${cardId}`, { commit: false })) return { ok: false, reason: 'コインが足りません' };
+    const gain = addExp(cardId, G.trainExp);
+    Save.commit(`training:${cardId}`);
+    return { ok: true, card: getCard(cardId), gain };
+  }
+  function rarityRoll(rng, guaranteed) {
+    if (s.scout.pity >= CONFIG.SCOUT.pity - 1) return 4;
+    const x = rng();
+    if (guaranteed) return x < CONFIG.SCOUT.guaranteeRates[4] ? 4 : 3;
+    if (x < CONFIG.SCOUT.rates[4]) return 4;
+    if (x < CONFIG.SCOUT.rates[4] + CONFIG.SCOUT.rates[3]) return 3;
+    if (x < CONFIG.SCOUT.rates[4] + CONFIG.SCOUT.rates[3] + CONFIG.SCOUT.rates[2]) return 2;
+    return 1;
+  }
+  function acquire(cardId, options = {}) {
+    const c = master(cardId); const own = s.owned[cardId];
+    if (!c) return null;
+    let status = 'NEW'; let coins = 0;
+    if (!own) s.owned[cardId] = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
+    else if (own.lb < G.limitBreakMax) { own.lb += 1; status = `限界突破 +${own.lb}`; }
+    else {
+      const requested = G.duplicateCoins[c.rarity];
+      const granted = Economy.earn({ coins: requested }, `duplicate:${cardId}`, 'duplicate', { commit: false, date: options.date });
+      coins = granted.coins || 0; status = `コイン変換 +${coins}`;
+    }
+    const out = { cardId, rarity: c.rarity, status, coins };
+    Events.emit('growth:acquired', { ...out, isNew: !own });
+    return out;
+  }
+  function scout(kind = 'single', options = {}) {
+    if (!CONFIG.FEATURES.growth) return { ok: false, reason: 'スカウトは無効です' };
+    const count = kind === 'ten' ? 10 : 1;
+    let cost;
+    if (kind === 'single') cost = options.payment === 'coins' || Economy.getWallet().scoutTickets < 1 ? { coins: 300 } : { scoutTickets: 1 };
+    else if (kind === 'ten') cost = { coins: 3000 };
+    else if (kind === 'guarantee') cost = { guaranteeTickets: 1 };
+    else return { ok: false, reason: 'スカウトの種類が不正です' };
+    if (!Economy.spend(cost, `scout:${kind}`, { commit: false })) return { ok: false, reason: 'コインまたはチケットが足りません' };
+    const rng = options.rng || (Number.isFinite(options.seed) ? Util.seeded(options.seed) : Math.random);
+    const results = [];
+    for (let i = 0; i < count; i += 1) {
+      const rarity = rarityRoll(rng, kind === 'guarantee' || (kind === 'ten' && i === 9));
+      s.scout.totalPulls += 1;
+      s.scout.pity = rarity === 4 ? 0 : s.scout.pity + 1;
+      const pool = MASTER.filter((c) => !c.id.startsWith('S') && c.rarity === rarity);
+      const picked = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
+      const result = acquire(picked.id, options);
+      results.push(result);
+      s.scout.history.unshift({ at: new Date().toISOString(), kind, ...result });
+    }
+    if (s.scout.history.length > 50) s.scout.history.length = 50;
+    Save.commit(`scout:${kind}`);
+    return { ok: true, kind, cost, results, pity: s.scout.pity, totalPulls: s.scout.totalPulls };
+  }
+  function settleMatch(e) {
+    if (e.mode === 'league' && s.rotation.length) s.nextStarter = (s.nextStarter + 1) % s.rotation.length;
+    if (!CONFIG.FEATURES.growth || !matchParticipants.length) { lastExpGain = null; matchParticipants = []; return null; }
+    const rows = matchParticipants.map((id) => {
+      let amount = G.appearanceExp + (e.result === 'W' ? G.winExp : 0);
+      if (e.mvp === id) amount += G.mvpExp;
+      return addExp(id, amount);
+    });
+    lastExpGain = { result: e.result, mvp: e.mvp, rows };
+    matchParticipants = [];
+    return Util.copy(lastExpGain);
+  }
+  Events.on('match:start', (e) => { matchParticipants = Array.isArray(e.participants) ? [...new Set(e.participants.filter((id) => s.owned[id]))] : []; });
+  Events.on('match:aborted', () => { matchParticipants = []; });
+
+  function setLineupPosition(index, pos) {
+    if (!Number.isInteger(index) || !s.lineup[index] || !['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'].includes(pos)) return false;
+    const other = s.lineup.findIndex((x) => x.pos === pos); const old = s.lineup[index].pos;
+    s.lineup[index].pos = pos; if (other >= 0 && other !== index) s.lineup[other].pos = old;
+    Save.commit('lineupPosition');
+    return true;
+  }
+  function cycleLineupPosition(index) {
+    const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
+    const slot = s.lineup[index]; if (!slot) return false;
+    return setLineupPosition(index, positions[(positions.indexOf(slot.pos) + 1) % positions.length]);
+  }
+  function cycleLineupPlayer(index) {
+    const slot = s.lineup[index];
+    if (!slot) return false;
+    const cards = getOwnedCards('overall').filter((c) => c.type === 'B');
+    const active = new Set(s.lineup.filter((_, i) => i !== index).map((x) => x.cardId));
+    const at = cards.findIndex((c) => c.id === slot.cardId);
+    const next = Array.from({ length: cards.length }, (_, n) => cards[(at + n + 1) % cards.length]).find((c) => !active.has(c.id));
+    if (!next || next.id === slot.cardId) return false;
+    slot.cardId = next.id;
+    Save.commit('lineupPlayer');
+    return true;
+  }
+  function cycleRotationPlayer(index) {
+    if (!Number.isInteger(index) || !s.rotation[index]) return false;
+    const cards = getOwnedCards('overall').filter((c) => c.type === 'P');
+    const active = new Set(s.rotation.filter((_, i) => i !== index));
+    const at = cards.findIndex((c) => c.id === s.rotation[index]);
+    const next = Array.from({ length: cards.length }, (_, n) => cards[(at + n + 1) % cards.length]).find((c) => !active.has(c.id));
+    if (!next || next.id === s.rotation[index]) return false;
+    s.rotation[index] = next.id;
+    Save.commit('rotationPlayer');
+    return true;
+  }
+  function autoLineup() {
+    const batters = getOwnedCards('overall').filter((c) => c.type === 'B');
+    const pitchers = getOwnedCards('overall').filter((c) => c.type === 'P');
+    if (batters.length < 9) return { ok: false, reason: '野手が9人必要です' };
+    if (pitchers.length < 3) return { ok: false, reason: '投手が3人必要です' };
+    const used = new Set(); const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
+    s.lineup = positions.map((pos) => {
+      const pick = batters.find((c) => !used.has(c.id) && (pos === 'DH' || c.pos === pos)) || batters.find((c) => !used.has(c.id));
+      used.add(pick.id); return { cardId: pick.id, pos };
+    });
+    s.rotation = pitchers.slice(0, 3).map((p) => p.id);
+    s.nextStarter = Util.clamp(s.nextStarter, 0, s.rotation.length - 1);
+    Save.commit('autoLineup');
+    return { ok: true };
+  }
+
+  function testScope(fn) {
+    const before = Util.copy(s); const beforeParticipants = matchParticipants.slice(); const beforeGain = lastExpGain && Util.copy(lastExpGain);
+    return Economy.testScope(() => Save.testScope(() => {
+      try { return fn(); }
+      finally {
+        Object.keys(s).forEach((key) => { delete s[key]; }); Object.assign(s, before);
+        matchParticipants = beforeParticipants; lastExpGain = beforeGain;
+      }
+    }));
+  }
+  function testTrainingAndExp() {
+    return testScope(() => {
+      const start = Economy.getWallet().coins; if (start) Economy.spend({ coins: start }, 'test:clear');
+      Economy.earn({ coins: 200 }, 'test:fund', 'debug');
+      const before = getCard('S01'); const bought = train('S01'); const after = getCard('S01');
+      const rest = Economy.getWallet().coins; if (rest) Economy.spend({ coins: rest }, 'test:clear2');
+      const poor = train('S01');
+      addExp('S02', 50); const level = getCard('S02');
+      return { before, bought, after, poor, level, ledger: Economy.getLedger().slice() };
+    });
+  }
+  function testDuplicate() {
+    return testScope(() => {
+      const coins = Economy.getWallet().coins; if (coins) Economy.spend({ coins }, 'test:clear');
+      const results = [];
+      for (let i = 0; i < 5; i += 1) results.push(acquire('S01', { date: new Date(2099, 0, 1, 12) }));
+      return { results, card: getCard('S01'), wallet: Economy.getWallet() };
+    });
+  }
+  function testMatchExp() {
+    return testScope(() => {
+      matchParticipants = ['S01', 'S02'];
+      const gain = settleMatch({ result: 'W', mvp: 'S01' });
+      return { gain, mvp: getCard('S01'), other: getCard('S02') };
+    });
+  }
+  function testScout() {
+    return testScope(() => {
+      const coins = Economy.getWallet().coins; if (coins) Economy.spend({ coins }, 'test:clear');
+      Economy.earn({ coins: 10000 }, 'test:fund', 'debug');
+      s.scout.pity = 0;
+      const singleA = scout('single', { seed: 12345, payment: 'coins' });
+      s.scout.pity = 0;
+      const singleB = scout('single', { seed: 12345, payment: 'coins' });
+      const ten = scout('ten', { seed: 24680 });
+      s.scout.pity = 49;
+      const pity = scout('single', { seed: 7, payment: 'coins' });
+      return { singleA, singleB, ten, pity };
+    });
+  }
+  function testRotationAdvance() {
+    return testScope(() => {
+      const before = getRotation().find((p) => p.isNext).cardId;
+      matchParticipants = [];
+      settleMatch({ mode: 'league', result: 'D', mvp: null });
+      const after = getRotation().find((p) => p.isNext).cardId;
+      return { before, after };
+    });
+  }
+  function testAutoPitchers() {
+    return testScope(() => {
+      s.owned.P204 = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
+      s.owned.P103 = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
+      const expected = getOwnedCards('overall').filter((c) => c.type === 'P').slice(0, 3).map((c) => c.id);
+      const result = autoLineup();
+      return { result, expected, actual: s.rotation.slice() };
+    });
+  }
 
   Save.register('growth', {
     exportSlice: () => ({ team: { name: s.teamName, lineup: Util.copy(s.lineup), rotation: s.rotation.slice(), nextStarter: s.nextStarter }, cards: Util.copy(s.owned), scout: { ...s.scout } }),
     importSlice: (data) => {
-      const team = data.team;
-      if (team && typeof team === 'object') {
-        if (typeof team.name === 'string' && team.name.trim()) s.teamName = team.name.trim().slice(0, 20);
-        if (Array.isArray(team.lineup) && team.lineup.length === 9 && team.lineup.every((x) => x && master(x.cardId) && x.pos in LB.pos)) s.lineup = team.lineup.map((x) => ({ cardId: x.cardId, pos: x.pos }));
-        if (Array.isArray(team.rotation) && team.rotation.length && team.rotation.every((id) => { const c = master(id); return c && c.type === 'P'; })) s.rotation = team.rotation.slice(0, 3);
-        if (Number.isInteger(team.nextStarter)) s.nextStarter = Util.clamp(team.nextStarter, 0, s.rotation.length - 1);
-      }
       if (data.cards && typeof data.cards === 'object') Object.keys(data.cards).forEach((id) => {
         const c = master(id); const own = data.cards[id];
         if (!c || !own || typeof own !== 'object') return;
         s.owned[id] = { lv: Math.floor(Util.clamp(own.lv || 1, 1, maxLvOf(c, own.lb || 0))), exp: Math.max(0, Math.floor(own.exp || 0)), lb: Math.floor(Util.clamp(own.lb || 0, 0, G.limitBreakMax)), fatigue: Math.max(0, Math.floor(own.fatigue || 0)) };
       });
-      if (data.scout && typeof data.scout === 'object') s.scout = { ...s.scout, pity: Math.max(0, Math.floor(data.scout.pity || 0)), totalPulls: Math.max(0, Math.floor(data.scout.totalPulls || 0)), adTicketDayKey: typeof data.scout.adTicketDayKey === 'string' ? data.scout.adTicketDayKey : null };
+      const team = data.team;
+      if (team && typeof team === 'object') {
+        if (typeof team.name === 'string' && team.name.trim()) s.teamName = team.name.trim().slice(0, 20);
+        const lineupPos = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
+        if (Array.isArray(team.lineup) && team.lineup.length === 9
+          && team.lineup.every((x) => { const c = x && master(x.cardId); return c && c.type === 'B' && s.owned[x.cardId] && lineupPos.includes(x.pos); })
+          && new Set(team.lineup.map((x) => x.cardId)).size === 9 && new Set(team.lineup.map((x) => x.pos)).size === 9) s.lineup = team.lineup.map((x) => ({ cardId: x.cardId, pos: x.pos }));
+        if (Array.isArray(team.rotation) && team.rotation.length === 3 && new Set(team.rotation).size === 3 && team.rotation.every((id) => { const c = master(id); return c && c.type === 'P' && s.owned[id]; })) s.rotation = team.rotation.slice();
+        if (Number.isInteger(team.nextStarter)) s.nextStarter = Util.clamp(team.nextStarter, 0, s.rotation.length - 1);
+      }
+      if (data.scout && typeof data.scout === 'object') s.scout = {
+        ...s.scout, pity: Math.floor(Util.clamp(data.scout.pity || 0, 0, CONFIG.SCOUT.pity - 1)), totalPulls: Math.max(0, Math.floor(data.scout.totalPulls || 0)),
+        adTicketDayKey: typeof data.scout.adTicketDayKey === 'string' ? data.scout.adTicketDayKey : null,
+        history: Array.isArray(data.scout.history) ? data.scout.history.filter((x) => x && master(x.cardId)).slice(0, 50).map((x) => ({ ...x })) : [],
+      };
     },
   });
 
@@ -943,7 +1364,9 @@ const Growth = (() => {
     abilityAt: (id, lv) => abilityAtCard(master(id), lv),
     getLineup, getRotation, getTeamSnapshot, teamOverall,
     getTeamName: () => s.teamName,
-    getScoutInfo, scout, train,
+    getScoutInfo, scout, train, addExp, settleMatch, getLastExpGain: () => lastExpGain && Util.copy(lastExpGain),
+    setLineupPosition, cycleLineupPosition, cycleLineupPlayer, cycleRotationPlayer, autoLineup,
+    testScope, testTrainingAndExp, testDuplicate, testMatchExp, testScout, testRotationAdvance, testAutoPitchers,
   };
 })();
 
@@ -1144,12 +1567,13 @@ const { League, Correction } = (() => {
     });
   }
   function getNextMatch() {
+    if (s.round >= CONFIG.LEAGUE.rounds) return null;
     const r = Math.min(s.round, CONFIG.LEAGUE.rounds - 1);
     const g = s.schedule[r].find((x) => x.home === 0 || x.away === 0);
     const home = g.home === 0;
     return { round: r + 1, opponentId: home ? g.away : g.home, home };
   }
-  const getSeason = () => ({ season: s.season, played: s.round, nextRound: Math.min(s.round + 1, CONFIG.LEAGUE.rounds), rounds: CONFIG.LEAGUE.rounds });
+  const getSeason = () => ({ season: s.season, played: s.round, nextRound: s.round < CONFIG.LEAGUE.rounds ? s.round + 1 : null, rounds: CONFIG.LEAGUE.rounds, complete: s.round >= CONFIG.LEAGUE.rounds });
 
   // 試合設定（仕様書 A-12 の約束）。倍率はここで計算し、エンジン本体は掛けるだけ
   function buildMatchConfig(mode = 'league') {
@@ -1164,7 +1588,8 @@ const { League, Correction } = (() => {
     const lineup = snap.lineup.map((b) => ({
       order: b.order, cardId: b.cardId, name: b.name, number: b.number, pos: b.pos,
       abilities: { meet: b.abilities.meet, power: b.abilities.power, speed: b.abilities.speed, defense: b.abilities.defense },
-      mult: { contact: m3(b.abilities.meet), power: m3(b.abilities.power), speed: m3(b.abilities.speed), defense: m3(b.abilities.defense) },
+      // 適性外の-30%は能力値を書き換えず、この倍率から MatchEngine.HOOKS.fielderRange へ通す。
+      mult: { contact: m3(b.abilities.meet), power: m3(b.abilities.power), speed: m3(b.abilities.speed), defense: m3(b.abilities.defense) * b.defenseFactor },
     }));
     const st = snap.starter;
     const a = st.abilities;
@@ -1206,12 +1631,10 @@ const { League, Correction } = (() => {
     if (e.side !== 'user' || !pending) return;
     pending.hits += 1;
     if (e.kind === 'HR') pending.homeruns += 1;
-    if (e.mode !== 'league') flush();
   });
   Events.on('match:strikeout', (e) => {
     if (e.pitcherSide !== 'user' || !pending) return;
     pending.strikeouts += 1;
-    if (e.mode !== 'league') flush();
   });
   function settleMatch(e) {
     if (!current) return;
@@ -1260,8 +1683,8 @@ const { League, Correction } = (() => {
     s.lastResult = null;
     current = null;
     pending = null;
+    Events.emit('season:advanced', { season: s.season, rank: reward.rank, reward: granted });
     Save.commit('seasonAdvance');
-    Events.emit('season:advanced', { season: s.season, reward: granted });
     return { ok: true, rank: reward.rank, reward: granted, season: s.season };
   }
 
@@ -1400,9 +1823,9 @@ const MatchEngine = (() => {
     emit('match:atBat', { side, order: (game.order[side] % 9) + 1, cardId: b.cardId });
     setUi(userBatting() ? '投球開始を押し、球を引きつけてスイング' : '球種を選んで投球開始');
   }
-  function pitchDefinition(id) {
+  function pitchDefinition(id, useUserSettings = false) {
     const d = { ...(PITCHES[id] || PITCHES.fastball) };
-    if (id === 'mypitch') {
+    if (id === 'mypitch' && useUserSettings) {
       const amt = ((cfg.play && cfg.play.myPitch.amount) || 50) / 50;
       const dir = (cfg.play && cfg.play.myPitch.direction) || 'down';
       d.bx = dir === 'left' ? -38 * amt : dir === 'right' ? 38 * amt : 0;
@@ -1414,16 +1837,18 @@ const MatchEngine = (() => {
     if (state !== 'running' || game.phase !== 'ready') return;
     const ps = pitchingSide();
     const p = pitcher(ps);
-    const ids = cfg.unlockedPitches && cfg.unlockedPitches.length ? cfg.unlockedPitches : ['fastball'];
-    const id = ps === 'user' ? selectedPitch : ids[Math.floor(rng() * ids.length)];
-    const d = pitchDefinition(id);
+    const userIds = cfg.unlockedPitches && cfg.unlockedPitches.length ? cfg.unlockedPitches : ['fastball'];
+    const cpuIds = [...new Set(['fastball', ...(p.special || [])])].filter((id) => PITCHES[id]);
+    const id = ps === 'user' ? selectedPitch : cpuIds[Math.floor(rng() * cpuIds.length)];
+    const d = pitchDefinition(id, ps === 'user');
     game.pitches[ps] += 1;
     const x = { pitch: id, count: game.pitches[ps] };
     const kmh = clamp(HOOKS.pitchSpeed((p.kmh || 142) * d.speed, p, cfg, x), 105, 170);
     const breakM = clamp(HOOKS.pitchBreak(1, p, cfg, x), 0.55, 1.55);
     const scatter = clamp(HOOKS.pitchScatter(14, p, cfg, x), 4, 32);
-    const motion = (cfg.play && cfg.play.motion) || { armSwing: 50, release: 50, swingSpeed: 50 };
-    const form = (cfg.play && cfg.play.pitchingForm) || 'overhand';
+    const play = ps === 'user' ? cfg.play : null;
+    const motion = (play && play.motion) || { armSwing: 50, release: 50, swingSpeed: 50 };
+    const form = (play && play.pitchingForm) || 'overhand';
     const formY = form === 'under' ? 30 : form === 'side' ? 18 : form === 'threeQuarter' ? 8 : form === 'tornado' ? -8 : 0;
     const formX = form === 'side' ? 13 : form === 'under' ? 8 : form === 'tornado' ? -7 : 0;
     ball = { x: 222, y: 300 + formY + (motion.release - 50) * 0.16, t: 0, id, name: d.name, kmh, bx: d.bx * breakM + formX + (rng() - 0.5) * scatter, by: d.by * breakM + (rng() - 0.5) * scatter, releaseY: formY + (motion.release - 50) * 0.16, wind: 0.22 + (100 - motion.armSwing) * 0.002, flight: clamp(0.93 - (kmh - 105) / 180, 0.54, 0.93), hit: false };
@@ -1497,12 +1922,14 @@ const MatchEngine = (() => {
     emit('match:out', { side, label });
     if (port) port.banner(label, `${game.outs}アウト`);
     if (cfg.mode === 'challenge10' && game.attempts >= 10) { finish(); return; }
-    if (!matchMode()) { game.outs = 0; game.phase = 'between'; game.nextAt = clock + 0.75; setUi(label); return; }
+    if (!matchMode()) { game.outs = 0; game.bases[side].fill(0); game.phase = 'between'; game.nextAt = clock + 0.75; setUi(label); return; }
     if (game.outs >= 3) { changeHalf(); return; }
     game.phase = 'between'; game.nextAt = clock + 0.75; setUi(label);
   }
   function changeHalf() {
     game.outs = 0;
+    game.bases.user.fill(0);
+    game.bases.opponent.fill(0);
     if (game.half === 'top') {
       if (game.inning >= cfg.innings && game.score.home > game.score.away) { finish(); return; }
       game.half = 'bottom';
@@ -1591,14 +2018,17 @@ const MatchEngine = (() => {
     g.fillStyle = '#173C2B'; g.beginPath(); g.moveTo(0, H); g.lineTo(410, 245); g.lineTo(960, H); g.closePath(); g.fill();
     g.strokeStyle = '#D7C59B'; g.lineWidth = 3; g.beginPath(); g.moveTo(720, 350); g.lineTo(450, 244); g.lineTo(897, 325); g.stroke();
     FIELD_HOME.forEach((f, i) => { const q = fielders[i] || f; player(g, q.x, q.y + 55, '#2F8F4E', Math.sin(clock * 4 + i) * 0.08); });
-    const motion = cfg.play && cfg.play.motion || { armSwing: 50, release: 50, swingSpeed: 50 };
-    const pitchForm = cfg.play && cfg.play.pitchingForm || 'overhand';
+    const pitchPlay = pitchingSide() === 'user' ? cfg.play : null;
+    const pitchMotion = pitchPlay && pitchPlay.motion || { armSwing: 50, release: 50, swingSpeed: 50 };
+    const pitchForm = pitchPlay && pitchPlay.pitchingForm || 'overhand';
     const formPose = pitchForm === 'under' ? -0.58 : pitchForm === 'side' ? -0.32 : pitchForm === 'threeQuarter' ? 0.18 : pitchForm === 'tornado' ? 0.72 : 0.38;
-    const pPose = formPose + (game.phase === 'windup' ? Math.sin(clamp(ball.t / ball.wind, 0, 1) * Math.PI) * (0.7 + motion.armSwing / 180) : 0);
+    const pPose = formPose + (game.phase === 'windup' ? Math.sin(clamp(ball.t / ball.wind, 0, 1) * Math.PI) * (0.7 + pitchMotion.armSwing / 180) : 0);
     player(g, 218, 353, '#255FA8', pPose);
-    const form = cfg.play && cfg.play.battingForm || 'standard';
+    const batPlay = userBatting() ? cfg.play : null;
+    const batMotion = batPlay && batPlay.motion || { armSwing: 50, release: 50, swingSpeed: 50 };
+    const form = batPlay && batPlay.battingForm || 'standard';
     const batPose = form === 'open' ? -0.28 : form === 'closed' ? 0.25 : form === 'oneLeg' ? 0.48 : form === 'sway' ? Math.sin(clock * 5) * 0.22 : 0;
-    const sw = swingAt !== null && game.phase === 'pitch' ? clamp((ball.t - swingAt) * (5 + motion.swingSpeed / 18), 0, 1) : 0;
+    const sw = swingAt !== null && game.phase === 'pitch' ? clamp((ball.t - swingAt) * (5 + batMotion.swingSpeed / 18), 0, 1) : 0;
     player(g, 790, 382, '#C23B32', batPose + sw * 1.2);
     g.save(); g.translate(794, 303); g.rotate(-1.7 + sw * 2.4); g.strokeStyle = '#B98242'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(78, 0); g.stroke(); g.restore();
     if (ball) { g.fillStyle = '#FFF'; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 7 : 9, 0, 7); g.fill(); g.strokeStyle = '#D74437'; g.lineWidth = 2; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 5 : 7, 0.4, 2.4); g.stroke(); }
@@ -1615,7 +2045,8 @@ const MatchEngine = (() => {
     cfg = matchConfig; state = 'running'; rng = (() => { let s = (cfg.seed || 1) >>> 0; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
     selectedPitch = (cfg.unlockedPitches && cfg.unlockedPitches[0]) || 'fastball';
     game = { inning: 1, half: 'top', outs: 0, score: { home: 0, away: 0 }, order: { user: 0, opponent: 0 }, pitches: { user: 0, opponent: 0 }, bases: { user: [0, 0, 0], opponent: [0, 0, 0] }, batting: {}, k: 0, attempts: 0, phase: 'ready', nextAt: 0 };
-    fielders = FIELD_HOME.map((f) => ({ ...f })); clock = 0; last = 0; emit('match:start', { userSide: cfg.userSide }); atBat();
+    const participants = cfg.teams ? [...cfg.teams.user.lineup.map((b) => b.cardId), cfg.teams.user.pitcher.cardId] : [];
+    fielders = FIELD_HOME.map((f) => ({ ...f })); clock = 0; last = 0; emit('match:start', { userSide: cfg.userSide, participants }); atBat();
     if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
   }
   function choosePitch(id) { if (PITCHES[id] && (cfg.unlockedPitches || []).includes(id)) { selectedPitch = id; setUi('球種を選びました'); } }
@@ -1680,10 +2111,11 @@ const View = (() => {
     return row(away, '先攻') + row(home, '後攻');
   }
   const lineupRow = (b) => `<button class="lu" type="button" data-go="player" data-id="${b.cardId}"><span class="lu-no">${b.order}</span><span class="lu-pos${b.fit ? '' : ' misfit'}">${b.posLabel}</span><span class="lu-main"><b>${esc(b.name)}</b><span class="mini-abs">${miniAbs(b)}</span>${b.fit ? '' : '<small class="warn">守備 −30%（適性外）</small>'}</span><span class="lu-ovr">${b.overall}</span></button>`;
-  const rotationRow = (p) => `<button class="lu" type="button" data-go="player" data-id="${p.cardId}"><span class="lu-no">${p.slot}</span><span class="lu-pos">投</span><span class="lu-main"><b>${esc(p.name)}${p.isNext ? '<span class="next-tag">次の先発</span>' : ''}</b><span class="mini-abs">${miniAbs(p)}</span><small>得意球種：${p.specialNames.join('・')}${p.fatigued ? '　疲労 −15%' : ''}</small></span><span class="lu-ovr">${p.overall}</span></button>`;
+  const lineupEditRow = (b, index) => `<div class="lu lu-edit"><span class="lu-no">${b.order}</span><button class="lu-pos${b.fit ? '' : ' misfit'}" type="button" data-act="cyclePosition" data-index="${index}" aria-label="${b.order}番 ${esc(b.name)}の守備位置を変更">${b.posLabel}</button><button class="lu-main" type="button" data-go="player" data-id="${b.cardId}"><b>${esc(b.name)}</b><span class="mini-abs">${miniAbs(b)}</span>${b.fit ? '<small>守備位置を押すと交代</small>' : '<small class="warn">守備 −30%（適性外）</small>'}</button><span class="lu-ovr">${b.overall}</span><button class="lu-swap" type="button" data-act="cycleLineupPlayer" data-index="${index}">控え野手と交代</button></div>`;
+  const rotationRow = (p, index) => `<div class="lu"><span class="lu-no">${p.slot}</span><span class="lu-pos">投</span><button class="lu-main" type="button" data-go="player" data-id="${p.cardId}"><b>${esc(p.name)}${p.isNext ? '<span class="next-tag">次の先発</span>' : ''}</b><span class="mini-abs">${miniAbs(p)}</span><small>得意球種：${p.specialNames.join('・')}${p.fatigued ? '　疲労 −15%' : ''}</small></button><span class="lu-ovr">${p.overall}</span><button class="lu-swap" type="button" data-act="cycleRotationPlayer" data-index="${index}">所持投手と交代</button></div>`;
   const standingsTable = (rows) => `<div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>位</th><th class="t-team">球団</th><th>勝</th><th>敗</th><th>分</th><th>勝率</th><th>差</th></tr></thead><tbody>${rows.map((r) => `<tr class="${r.isUser ? 'me' : ''}"><td>${r.rank}</td><td class="t-team">${esc(r.short)}</td><td>${r.w}</td><td>${r.l}</td><td>${r.d}</td><td>${r.pctText}</td><td>${r.gbText}</td></tr>`).join('')}</tbody></table></div>`;
   const seg = (items, key, cur, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([k, t]) => `<button type="button" data-act="setParam" data-key="${key}" data-val="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
-  return { icon, draft, lockNote, pageHead, card, oppPitcherCard, boardRows, lineupRow, rotationRow, standingsTable, seg, miniAbs, LB };
+  return { icon, draft, lockNote, pageHead, card, oppPitcherCard, boardRows, lineupRow, lineupEditRow, rotationRow, standingsTable, seg, miniAbs, LB };
 })();
 
 /* ---- 1 画面遷移：試合キャンバスのDOMアダプター ---- */
@@ -1802,7 +2234,7 @@ const Shell = (() => {
     const w = Economy.getWallet();
     const season = League.getSeason();
     $('hdr-name').textContent = Growth.getTeamName();
-    $('hdr-sub').textContent = `シーズン${season.season}　第${season.nextRound}節`;
+    $('hdr-sub').textContent = season.complete ? `シーズン${season.season}　全10節終了` : `シーズン${season.season}　第${season.nextRound}節`;
     countUp($('hdr-coins'), shownCoins === null ? w.coins : shownCoins, w.coins);
     shownCoins = w.coins;
     $('hdr-tickets').textContent = Util.fmt(w.scoutTickets);
@@ -1861,7 +2293,7 @@ const Modals = (() => {
     loginBonus() {
       const lb = LoginBonus.check();
       const days = LoginBonus.table().map((d) => { const [n, unit] = big(d.reward); return `<div class="lb-day${d.day === lb.day ? ' today' : ''}${d.day < lb.day ? ' done' : ''}${d.day === 7 ? ' big' : ''}"><small>${d.day}日目</small><b>${n}</b><span>${unit}</span></div>`; }).join('');
-      return sheet(`<h2>ログインボーナス</h2><p>今日は${lb.day}日目の報酬です。受け取った日数で進み、7日目の次は1日目に戻ります。</p><div class="lb-grid">${days}</div><button class="btn btn-amber" type="button" data-act="claimLoginBonus">受け取る</button>`, 'closeModal');
+      return sheet(`<h2>ログインボーナス</h2><p>${lb.eligible ? `今日は${lb.day}日目の報酬です。` : '今日の報酬は受取済みです。'}受け取った日数で進み、7日目の次は1日目に戻ります。</p><div class="lb-grid">${days}</div><button class="btn btn-amber" type="button" data-act="claimLoginBonus"${lb.eligible ? '' : ' disabled'}>受け取る</button>`, 'closeModal');
     },
     pause: () => sheet(`<h2>一時停止</h2><p>試合は止まっています。</p><button class="btn btn-turf" type="button" data-act="resume">再開</button><button class="btn btn-line" type="button" data-act="askQuit">試合をやめる</button>`, 'resume'),
     confirm: (p) => sheet(`<h2>${Util.esc(p.title)}</h2><p>${Util.esc(p.body)}</p><div class="btn-row"><button class="btn btn-line" type="button" data-act="closeModal">${Util.esc(p.cancelLabel || 'やめておく')}</button><button class="btn ${p.danger ? 'btn-danger' : 'btn-amber'}" type="button" data-act="confirmOk">${Util.esc(p.okLabel)}</button></div>`, 'closeModal'),
@@ -1902,12 +2334,12 @@ const GameHud = (() => {
     if (!el) return;
     if (!cfg.teams) { el.innerHTML = `<div class="strip-card wide"><span class="sc-main"><b>${CONFIG.LABELS.mode[cfg.mode]}</b><small>現行モード（能力補正なし）</small></span></div>`; return; }
     const userBat = e.side === 'user';
-    const b = userBat ? cfg.teams.user.lineup.find((x) => x.cardId === e.cardId) : null;
+    const b = cfg.teams[e.side].lineup.find((x) => x.cardId === e.cardId);
     pitcherSide = userBat ? 'opponent' : 'user';
     const p = cfg.teams[pitcherSide === 'user' ? 'user' : 'opponent'].pitcher;
     const bat = b
       ? `<span class="sc-pos">${CONFIG.LABELS.pos[b.pos]}</span><span class="sc-main"><b>${e.order}番 ${Util.esc(b.name)}</b><small>ミ${b.abilities.meet} パ${b.abilities.power} 走${b.abilities.speed}</small></span>`
-      : `<span class="sc-pos">打</span><span class="sc-main"><b>${e.order}番 相手打者</b><small>段階2で表示</small></span>`;
+      : `<span class="sc-pos">打</span><span class="sc-main"><b>${e.order}番 打者</b><small>能力データなし</small></span>`;
     el.innerHTML = `<div class="strip-card">${bat}</div><div class="strip-card"><span class="sc-pos">投</span><span class="sc-main"><b>${Util.esc(p.name)}</b><small><span id="g-kmh">${p.kmh}</span>km/h　球数 <span id="g-count">0</span></small></span></div>`;
   }
   function bind(config) {
@@ -1924,7 +2356,11 @@ const GameHud = (() => {
     ];
   }
   function unbind() { offs.forEach((off) => off()); offs = []; }
-  return { bind, unbind };
+  function describeBatter(e, config) {
+    const b = config && config.teams && config.teams[e.side] && config.teams[e.side].lineup.find((x) => x.cardId === e.cardId);
+    return b ? `${e.order}番 ${b.name} ${CONFIG.LABELS.pos[b.pos]} ミ${b.abilities.meet} パ${b.abilities.power} 走${b.abilities.speed}` : '';
+  }
+  return { bind, unbind, describeBatter };
 })();
 
 /* ---- 1 画面遷移：13画面（ホーム／試合ハブ／編成／スカウト／ショップ／ミッション／設定／試合前／試合／試合結果／シーズン終了／選手詳細／スカウト演出） ---- */
@@ -1943,16 +2379,20 @@ const Screens = (() => {
     const starter = Growth.getCard(Growth.getRotation().find((p) => p.isNext).cardId);
     const cleanup = Growth.getCard(Growth.getLineup()[3].cardId);
     const daily = Missions.list('daily');
+    const cap = Economy.getDailyCap();
     const badge = Missions.unclaimedCount();
+    const board = next
+      ? `<div class="board" role="group" aria-label="次の試合"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, League.getTeams(), ovr)}<div class="board-foot"><span>数字はチーム総合力</span><span>${next.home ? 'ホーム' : 'ビジター'}</span></div></div>`
+      : '<div class="board" role="group" aria-label="シーズン全日程終了"><div class="board-head"><span>全10節終了</span><span>シーズン結果待ち</span></div><p class="note">全日程を消化しました。シーズン結果へ進んで順位報酬を受け取れます。</p></div>';
     return `<section class="screen">
       <div class="status"><div class="ovr"><small>チーム総合力</small><b>${ovr}</b></div>
         <dl class="facts"><div class="fact"><dt>順位</dt><dd><b>${me.rank}</b>位</dd></div><div class="fact"><dt>勝率</dt><dd><b>${me.pctText}</b></dd></div>
         <div class="fact wide"><dt>成績（${season.played}試合）</dt><dd><b>${me.w}</b>勝 <b>${me.l}</b>敗 <b>${me.d}</b>分</dd></div></dl></div>
-      <div class="board" role="group" aria-label="次の試合"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, League.getTeams(), ovr)}<div class="board-foot"><span>数字はチーム総合力</span><span>${next.home ? 'ホーム' : 'ビジター'}</span></div></div>
+      ${board}
       <button class="btn btn-turf" type="button" data-act="startLeague">${League.isSeasonComplete() ? 'シーズン結果へ' : '試合開始'}</button>
       <div class="sec-h"><h2>先発予定と4番打者</h2><p>押すと詳細</p></div>
       <div class="cards2">${View.card(starter, { go: true, caption: '先発予定' })}${View.card(cleanup, { go: true, caption: '4番' })}</div>
-      <button class="row-link" type="button" data-go="missions">${View.icon('checklist')}<span><b>ミッション</b><small>デイリー ${daily.filter((m) => m.done).length}/${daily.length} 達成</small></span>${badge ? `<span class="badge" aria-label="未受取 ${badge}件">${badge}</span>` : '<span></span>'}${View.icon('chevron')}</button>
+      <button class="row-link" type="button" data-go="missions">${View.icon('checklist')}<span><b>ミッション</b><small>デイリー ${daily.filter((m) => m.done).length}/${daily.length} 達成${cap.reached ? '　非リーグ試合・広告は上限' : ''}</small></span>${badge ? `<span class="badge" aria-label="未受取 ${badge}件">${badge}</span>` : '<span></span>'}${View.icon('chevron')}</button>
     </section>`;
   };
 
@@ -1962,14 +2402,17 @@ const Screens = (() => {
     const teams = League.getTeams();
     const sched = League.getSchedule().map((rd) => {
       const u = rd.user;
-      const isNext = rd.round === next.round;
+      const isNext = !!next && rd.round === next.round;
       const res = u.result ? `<span class="res ${u.result}">${{ W: '勝', L: '負', D: '分' }[u.result]} ${u.us}-${u.them}</span>` : `<span class="res${isNext ? ' next' : ''}">${isNext ? '次' : '—'}</span>`;
       return `<div class="sched-row${isNext ? ' is-next' : ''}"><span class="rd">第${rd.round}節</span><span class="vs">${esc(teams[u.opponentId].name)}</span><span class="ha">${u.home ? 'ホーム' : 'ビジター'}</span>${res}</div>`;
     }).join('');
+    const board = next
+      ? `<div class="board"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, teams, Growth.teamOverall())}</div>`
+      : '<div class="board"><div class="board-head"><span>全10節終了</span><span>シーズン結果待ち</span></div><p class="note">日程の全試合が確定しています。</p></div>';
     const mode = (m, title, sub) => `<button class="mode" type="button" data-act="playMode" data-mode="${m}">${View.icon('ball')}<span><b>${title}</b><small>${sub}</small></span><span></span>${View.icon('chevron')}</button>`;
     return `<section class="screen">
       <div class="sec-h first"><h2>シーズン${season.season}</h2><p>第${season.played}節まで消化</p></div>
-      <div class="board"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, teams, Growth.teamOverall())}</div>
+      ${board}
       <button class="btn btn-turf" type="button" data-act="startLeague">${League.isSeasonComplete() ? 'シーズン結果へ' : '試合開始'}</button>
       <div class="sec-h"><h2>順位表</h2><p>勝率は引き分けを除く</p></div>${View.standingsTable(League.getStandings())}
       <div class="sec-h"><h2>日程</h2><p>自チームの10試合</p></div><div class="panel">${sched}</div>
@@ -1979,6 +2422,7 @@ const Screens = (() => {
   };
 
   S.pregame = () => {
+    if (League.isSeasonComplete()) return `<section class="screen">${View.pageHead('試合前')}<div class="board"><div class="board-head"><span>全10節終了</span><span>シーズン結果待ち</span></div><p class="note">次の試合はありません。シーズン結果へ進んでください。</p></div><button class="btn btn-turf" type="button" data-go="season">シーズン結果へ</button></section>`;
     const cfg = League.buildMatchConfig('league');
     const next = League.getNextMatch();
     const u = cfg.teams.user;
@@ -2004,6 +2448,7 @@ const Screens = (() => {
     if (!r) return `<section class="screen">${View.pageHead('試合結果')}<p class="note">表示できる結果がありません。</p><button class="btn btn-line" type="button" data-go="match">試合ハブへ</button></section>`;
     const league = r.mode === 'league';
     const rw = Economy.getLastMatchRewards();
+    const gx = Growth.getLastExpGain();
     const row = (label, value) => `<div class="kv"><span>${label}</span><b class="num">${value}</b></div>`;
     const rewards = league && rw ? `<div class="sec-h"><h2>コイン</h2><p>${rw.granted ? '付与済み' : '表示のみ（リーグ報酬は未実装）'}</p></div><div class="panel">${row(`ヒット ${rw.hits}本 ×${CONFIG.ECONOMY.hitCoins}`, fmt(rw.hitCoins))}${row(`本塁打 ${rw.homeruns}本 ×${CONFIG.ECONOMY.homerunCoins}`, fmt(rw.homerunCoins))}${row(`試合報酬（${RESULT[rw.result]}）`, fmt(rw.resultCoins))}${row('合計', fmt(rw.total))}</div>` : '';
     const mvp = league && r.mvp ? Growth.getCard(r.mvp) : null;
@@ -2013,7 +2458,8 @@ const Screens = (() => {
         <div class="board-row"><span class="board-side">先攻</span><span class="board-team${r.userSide === 'away' ? ' me' : ''}">${esc(r.awayName)}</span><span class="board-num led">${r.score.away}</span></div>
         <div class="board-row"><span class="board-side">後攻</span><span class="board-team${r.userSide === 'home' ? ' me' : ''}">${esc(r.homeName)}</span><span class="board-num led">${r.score.home}</span></div></div>
       ${league ? rewards : '<p class="note">現行モードでは、ヒットと本塁打のコインはその場で入ります。</p>'}
-      ${mvp ? `<div class="sec-h"><h2>MVP</h2><p>押すと詳細</p></div><div class="cards2">${View.card(mvp, { go: true, caption: 'MVP' })}<p class="note">経験値は段階3で付与します。出場した10人に＋60、勝ったら＋40、MVPに＋100です。</p></div>` : ''}
+      ${gx ? `<div class="sec-h"><h2>育成</h2><p>経験値付与済み</p></div><div class="panel">${row('出場選手', `${gx.rows.length}人`)}${row('出場', `+${CONFIG.GROWTH.appearanceExp}`)}${r.result === 'W' ? row('勝利', `+${CONFIG.GROWTH.winExp}`) : ''}${r.mvp ? row('MVP', `+${CONFIG.GROWTH.mvpExp}`) : ''}</div>` : ''}
+      ${mvp ? `<div class="sec-h"><h2>MVP</h2><p>押すと詳細</p></div><div class="cards2">${View.card(mvp, { go: true, caption: 'MVP' })}<p class="note">出場で＋60、勝利で＋40、MVPで＋100の経験値を獲得しました。</p></div>` : ''}
       <div class="stack">${league ? (League.resultDestination(r) === 'season' ? '<button class="btn btn-turf" type="button" data-go="season">シーズン結果へ</button>' : '<button class="btn btn-turf" type="button" data-act="startLeague">次の試合へ</button>') : ''}<div class="btn-row"><button class="btn btn-line" type="button" data-go="match">試合ハブ</button><button class="btn btn-line" type="button" data-go="home">ホーム</button></div></div>
     </section>`;
   };
@@ -2038,15 +2484,15 @@ const Screens = (() => {
     const sort = p.sort || 'overall';
     let body;
     if (tab === 'pitchers') {
-      body = `<div class="sec-h"><h2>先発ローテ</h2><p>順番に先発します</p></div><div class="panel lineup">${Growth.getRotation().map(View.rotationRow).join('')}</div>${View.lockNote('ローテの入れ替えは段階3で作ります')}`;
+      body = `<div class="sec-h"><h2>先発ローテ</h2><p>リーグ戦ごとに順番に先発</p></div><div class="panel lineup">${Growth.getRotation().map(View.rotationRow).join('')}</div><p class="note">各枠の「所持投手と交代」で、ローテ外の総合力上位投手と入れ替えます。</p>`;
     } else if (tab === 'list') {
       const chips = [['overall', '総合力'], ['rarity', 'レア度'], ['lv', 'Lv'], ['pos', '守備位置']].map(([k, t]) => `<button class="chip-btn" type="button" data-act="setParam" data-key="sort" data-val="${k}" aria-pressed="${sort === k}">${t}</button>`).join('');
       const cards = Growth.getOwnedCards(sort);
       body = `<div class="sec-h"><h2>所持選手</h2><p>${cards.length}人</p></div><div class="chips" role="group" aria-label="並べ替え">${chips}</div><div class="grid3">${cards.map((c) => View.card(c, { go: true, size: 'is-mini' })).join('')}</div>`;
     } else {
-      body = `<div class="sec-h"><h2>スタメン</h2><p>チーム総合力 ${Growth.teamOverall()}</p></div><div class="panel lineup">${Growth.getLineup().map(View.lineupRow).join('')}</div><button class="btn btn-line" type="button" disabled>おまかせ編成</button>${View.lockNote('打順の入れ替え・守備位置の変更・おまかせ編成は段階3で作ります')}`;
+      body = `<div class="sec-h"><h2>スタメン</h2><p>8守備位置＋DH　総合力 ${Growth.teamOverall()}</p></div><div class="panel lineup">${Growth.getLineup().map(View.lineupEditRow).join('')}</div><button class="btn btn-line" type="button" data-act="autoLineup">おまかせ編成</button><p class="note">守備位置ボタンで位置を交代し、「控え野手と交代」でスタメン外の総合力上位選手と入れ替えます。適性外は守備範囲が30%低下します。おまかせ編成は投手ローテも更新します。</p>`;
     }
-    return `<section class="screen"><div class="sec-h first"><h2>編成</h2><p>${View.draft()}</p></div>${View.seg([['order', 'オーダー'], ['pitchers', '投手'], ['list', '選手一覧']], 'tab', tab, '編成の表示')}${body}</section>`;
+    return `<section class="screen"><div class="sec-h first"><h2>編成</h2><p>8守備位置＋DH</p></div>${View.seg([['order', 'オーダー'], ['pitchers', '投手'], ['list', '選手一覧']], 'tab', tab, '編成の表示')}${body}</section>`;
   };
 
   S.player = (p) => {
@@ -2059,8 +2505,8 @@ const Screens = (() => {
       <div class="panel detail"><div class="kv"><span>レベル</span><b class="num">Lv${c.lv}<small> / ${c.maxLv}</small></b></div><div class="kv"><span>経験値</span><b class="num">${c.exp}<small> / ${c.expNext}</small></b></div><span class="prog"><i style="width:${pct}%"></i></span>
         <div class="kv"><span>限界突破</span><span class="pips" aria-label="限界突破 ${c.lb}/${CONFIG.GROWTH.limitBreakMax}">${pips}</span></div>
         ${c.type === 'P' ? `<div class="kv"><span>得意球種</span><b>${c.specialNames.join('・')}</b></div>` : `<div class="kv"><span>守備位置</span><b>${c.posLabel}（${c.posName}）</b></div>`}</div>
-      <button class="btn btn-amber" type="button" disabled>特訓（100コインで経験値＋150）</button>
-      ${View.lockNote(`特訓と限界突破は段階3で作ります${c.owned ? '' : '。この選手は未所持の見本です'}`)}
+      <button class="btn btn-amber" type="button" data-act="train" data-id="${c.id}"${c.owned && c.lv < c.maxLv ? '' : ' disabled'}>特訓（100コインで経験値＋150）</button>
+      <p class="note">重複獲得で限界突破が1段階進みます。上限4回の後はコインへ変換します。</p>
     </section>`;
   };
 
@@ -2069,14 +2515,14 @@ const Screens = (() => {
     const pct = (v) => `${Math.round(v * 100)}%`;
     const rateRow = (r) => `<tr><td class="t-team">${'★'.repeat(r)} ${LB.rarity[r]}</td><td>${pct(info.rates[r])}</td><td>${info.guaranteeRates[r] ? pct(info.guaranteeRates[r]) : '—'}</td></tr>`;
     return `<section class="screen">
-      <div class="sec-h first"><h2>スカウト</h2><p>${View.draft('演出の枠')}</p></div>
+      <div class="sec-h first"><h2>スカウト</h2><p>累計 ${info.totalPulls || 0}回</p></div>
       <div class="scout-hero"><div class="scout-pity"><span>★4確定まで</span><b class="led">${info.pityRemaining}</b><span>回</span></div><p class="note">★4が出ないまま50回目のスカウトは★4が確定します</p></div>
       <div class="scout-btns">
         <button class="btn btn-amber two-line" type="button" data-act="scout" data-kind="single"><span>単発スカウト</span><span class="cost">${View.icon('coin', 'ic-coin sm')} 300 または ${View.icon('ticket', 'sm')} 1枚</span></button>
         <button class="btn btn-amber two-line" type="button" data-act="scout" data-kind="ten"><span>10連スカウト</span><span class="cost">${View.icon('coin', 'ic-coin sm')} 3,000　10人目は★3以上</span></button>
         <button class="btn btn-line two-line" type="button" data-act="scout" data-kind="guarantee"><span>確定チケットを使う</span><span class="cost">★3以上を1人</span></button>
       </div>
-      ${View.lockNote('段階1は演出の流れだけを見られます。コインとチケットは減らず、排出は段階3で作ります')}
+      <p class="note">単発はスカウトチケットを優先し、なければ300コインを使います。</p>
       <div class="sec-h"><h2>提供割合</h2><p>同じレア度の中は均等</p></div>
       <div class="panel tbl-wrap"><table class="tbl"><thead><tr><th class="t-team">レア度</th><th>通常</th><th>確定枠</th></tr></thead><tbody>${[4, 3, 2, 1].map(rateRow).join('')}</tbody></table></div>
       <button class="btn btn-line" type="button" disabled>広告を見てチケット1枚（1日1回）</button>
@@ -2087,18 +2533,20 @@ const Screens = (() => {
     const res = (p.results || [])[0];
     const c = res ? Growth.getCard(res.cardId) : null;
     if (!c) return `<section class="screen">${View.pageHead('スカウト')}<p class="note">結果がありません。</p></section>`;
+    const summary = (p.results || []).map((x) => { const card = Growth.getCard(x.cardId); return `<button class="kv" type="button" data-go="player" data-id="${esc(x.cardId)}"><span>${card ? esc(card.name) : esc(x.cardId)}　${card ? '★'.repeat(card.rarity) : ''}</span><b>${esc(x.status)}　詳細へ</b></button>`; }).join('');
     return `<section class="reveal">
-      <p class="reveal-kind">${KIND[p.kind] || 'スカウト'}${p.preview ? '（演出の見本）' : ''}</p>
-      <button class="flip r${c.rarity}" type="button" id="flip" data-act="flipCard" aria-label="カードをめくる"><span class="flip-in"><span class="flip-face flip-back">${View.icon('ball')}<span>タップでめくる</span></span><span class="flip-face flip-front">${View.card(c, { tag: 'span' })}</span></span></button>
-      <div class="reveal-after" id="reveal-after" hidden><p class="reveal-tag"><span class="new">${res.status}</span>${esc(c.name)}　${'★'.repeat(c.rarity)}${c.rarityName}</p>
+      <p class="reveal-kind">${KIND[p.kind] || 'スカウト'}</p>
+      <button class="flip r${c.rarity}${p.opened ? ' is-open' : ''}" type="button" id="flip" data-act="flipCard" aria-label="カードをめくる"><span class="flip-in"><span class="flip-face flip-back">${View.icon('ball')}<span>タップでめくる</span></span><span class="flip-face flip-front">${View.card(c, { tag: 'span' })}</span></span></button>
+      <div class="reveal-after" id="reveal-after"${p.opened ? '' : ' hidden'}><p class="reveal-tag"><span class="new">${res.status}</span>${esc(c.name)}　${'★'.repeat(c.rarity)}${c.rarityName}</p>${p.results && p.results.length > 1 ? `<div class="panel">${summary}</div>` : ''}
         <div class="btn-row"><button class="btn btn-line" type="button" data-act="back">スカウトに戻る</button><button class="btn btn-amber" type="button" data-go="player" data-id="${c.id}">選手詳細</button></div></div>
-      <button class="skip" type="button" id="skip" data-act="flipCard">スキップ</button>
+      <button class="skip" type="button" id="skip" data-act="flipCard"${p.opened ? ' hidden' : ''}>スキップ</button>
     </section>`;
   };
 
   S.shop = () => {
     const cat = Economy.getCatalog();
     const ad = Ads.rewardStatus('shop');
+    const cap = Economy.getDailyCap();
     const item = (i) => `<div class="shop-item"><span><b>${i.name}</b><small>${i.initial ? '最初から使える' : i.unlocked ? '解禁済み' : i.affordable ? '未解禁' : '未解禁　コインが足りません'}</small></span>${i.unlocked ? '<span class="owned">使える</span>' : `<button class="btn-s btn-amber" type="button" data-act="buyUnlock" data-id="${i.id}"${i.affordable ? '' : ' disabled'} aria-label="${i.name}を${i.price}コインで解禁">${View.icon('coin', 'sm')}<span class="num">${fmt(i.price)}</span></button>`}</div>`;
     const group = (kind, title) => { const items = cat.filter((i) => i.kind === kind); return `<div class="sec-h"><h2>${title}</h2><p>${items.filter((i) => i.unlocked).length}/${items.length} 解禁</p></div><div class="panel">${items.map(item).join('')}</div>`; };
     const pack = (p) => `<div class="shop-item"><span><b>${p.name}</b><small>${p.premium ? 'デモ広告が出なくなります' : `${fmt(p.coins)}コイン`}</small></span>${p.owned ? '<span class="owned">購入済み</span>' : `<button class="btn-s btn-line" type="button" data-act="demoPurchase" data-id="${p.id}">デモ購入</button>`}</div>`;
@@ -2107,12 +2555,13 @@ const Screens = (() => {
       ${group('pitch', '球種')}${group('pitchingForm', '投球フォーム')}${group('battingForm', '打撃フォーム')}
       <div class="sec-h"><h2>デモ課金</h2><p>実際の支払いは発生しません</p></div><div class="panel">${Economy.getPacks().map(pack).join('')}</div>
       <div class="sec-h"><h2>リワード広告（デモ）</h2><p>今日あと${ad.left}回</p></div>
-      <button class="btn btn-line" type="button" data-act="rewardAd"${ad.left ? '' : ' disabled'}>広告を見て${ad.label}を受け取る</button>
+      <button class="btn btn-line" type="button" data-act="rewardAd"${ad.left ? '' : ' disabled'}>広告を見て${ad.label}を受け取る</button><p class="note${cap.reached ? ' warn' : ''}">非リーグ試合・広告の本日コイン ${cap.earned} / ${cap.limit}${cap.reached ? '　上限のためコイン付与停止中' : ''}</p>
     </section>`;
   };
 
   S.missions = (p) => {
     const tab = p.tab || 'daily';
+    const cap = Economy.getDailyCap();
     const row = (m) => `<div class="mission"><span><b>${m.name}</b><small>${m.scope ? `${m.scope}　` : ''}報酬 ${m.rewardText}</small><span class="prog" aria-hidden="true"><i style="width:${Math.round((m.progress / m.goal) * 100)}%"></i></span><small class="num">${m.progress} / ${m.goal}</small></span>${m.claimed ? '<span class="owned">受取済み</span>' : `<button class="btn-s ${m.done ? 'btn-amber' : 'btn-line'}" type="button" data-act="claimMission" data-id="${m.id}"${m.done ? '' : ' disabled'}>受け取る</button>`}</div>`;
     let body;
     if (tab === 'achievements') {
@@ -2123,7 +2572,7 @@ const Screens = (() => {
     } else {
       body = `<div class="sec-h"><h2>デイリー</h2><p>午前4時にリセット</p></div><div class="panel">${Missions.list('daily').map(row).join('')}${row(Missions.allClear())}</div>`;
     }
-    return `<section class="screen">${View.pageHead('ミッション')}<p class="note">${View.draft()}　受け取りと進捗の記録は段階4で作ります</p>${View.seg([['daily', 'デイリー'], ['achievements', '通算'], ['login', 'ログボ']], 'tab', tab, 'ミッションの表示')}${body}</section>`;
+    return `<section class="screen">${View.pageHead('ミッション')}<p class="note${cap.reached ? ' warn' : ''}">非リーグ試合・広告の本日コイン ${cap.earned} / ${cap.limit}（ミッション・ログボは対象外）</p>${View.seg([['daily', 'デイリー'], ['achievements', '通算'], ['login', 'ログボ']], 'tab', tab, 'ミッションの表示')}${body}</section>`;
   };
 
   S.config = () => {
@@ -2239,7 +2688,7 @@ const Actions = {
     Shell.confirm(
       { title: '試合をやめますか', body: '途中でやめた試合は未消化のまま残り、記録・コイン・経験値は増えません。同じ試合はやり直せます。', okLabel: '試合をやめる', cancelLabel: '続ける', danger: true },
       () => { MatchEngine.abort(); Router.replace('match'); Shell.toast('試合をやめました。記録は残りません'); },
-      () => MatchEngine.resume(),
+      () => Shell.openModal('pause', {}, { onClose: () => MatchEngine.resume() }),
     );
   },
   confirmOk: () => Shell.confirmOk(),
@@ -2261,7 +2710,7 @@ const Actions = {
   rewardAd() {
     const st = Ads.rewardStatus('shop');
     if (!st.left) { Shell.toast('今日の回数は終わりました'); return; }
-    const grant = () => { const r = Ads.grantReward('shop'); Shell.toast(r.ok ? `${r.label}を受け取りました` : r.reason); Router.refresh(); };
+    const grant = () => { const r = Ads.grantReward('shop'); Shell.toast(r.ok ? (r.capped ? '1日300コインの上限に達しているため付与されません' : `${r.label}を受け取りました`) : r.reason); Router.refresh(); };
     if (st.skipAd) grant(); else Shell.showDemoAd(st.seconds, 'リワード広告（デモ）').then(grant);
   },
   confirmSettings() {
@@ -2276,9 +2725,9 @@ const Actions = {
     const done = () => Shell.toast('設定を確定しました');
     if (ad.show) Shell.showDemoAd(ad.seconds, '設定変更のデモ広告').then(done); else done();
   },
-  claimMission(el) { const r = Missions.claim(el.dataset.id); Shell.toast(r.ok ? '受け取りました' : r.reason); Router.refresh(); },
+  claimMission(el) { const r = Missions.claim(el.dataset.id); Shell.toast(r.ok ? (r.capped ? '受取済み。1日上限のためコインは付与されません' : '受け取りました') : r.reason); Router.refresh(); },
   openLoginBonus() { LoginBonus.markShown(); Shell.openModal('loginBonus'); },
-  claimLoginBonus() { const r = LoginBonus.claim(); Shell.closeModal('ui'); Shell.toast(r.ok ? '受け取りました' : r.reason); },
+  claimLoginBonus() { const r = LoginBonus.claim(); Shell.closeModal('ui'); Shell.toast(r.ok ? (r.capped ? '受取済み。1日上限のためコインは付与されません' : '受け取りました') : r.reason); Shell.refreshHeader(); },
   claimSeason() {
     const r = League.advanceSeason();
     if (!r.ok) { Shell.toast(r.reason); return; }
@@ -2288,12 +2737,33 @@ const Actions = {
   scout(el) {
     const r = Growth.scout(el.dataset.kind);
     if (!r.results || !r.results.length) { Shell.toast(r.reason); return; }
-    Router.go('reveal', { kind: el.dataset.kind, results: r.results, preview: !!r.preview });
-    if (r.preview) Shell.toast(r.reason);
+    Router.go('reveal', { kind: el.dataset.kind, results: r.results });
+  },
+  train(el) {
+    const r = Growth.train(el.dataset.id);
+    Shell.toast(r.ok ? `特訓完了　経験値＋${CONFIG.GROWTH.trainExp}` : r.reason);
+    Router.refresh();
+  },
+  autoLineup() {
+    const r = Growth.autoLineup(); Shell.toast(r.ok ? 'おまかせ編成を反映しました' : r.reason); Router.refresh();
+  },
+  cyclePosition(el) {
+    const ok = Growth.cycleLineupPosition(Number(el.dataset.index));
+    Shell.toast(ok ? '守備位置を交代しました' : '守備位置を変更できません'); Router.refresh();
+  },
+  cycleLineupPlayer(el) {
+    const ok = Growth.cycleLineupPlayer(Number(el.dataset.index));
+    Shell.toast(ok ? '控え野手と交代しました' : '交代できる控え野手がいません'); Router.refresh();
+  },
+  cycleRotationPlayer(el) {
+    const ok = Growth.cycleRotationPlayer(Number(el.dataset.index));
+    Shell.toast(ok ? 'ローテ投手を交代しました' : '交代できる所持投手がいません'); Router.refresh();
   },
   flipCard() {
     const f = document.getElementById('flip');
     if (!f || f.classList.contains('is-open')) return;
+    const route = Router.current();
+    if (route.name === 'reveal') route.params.opened = true;
     f.classList.add('is-open');
     const skip = document.getElementById('skip');
     if (skip) skip.hidden = true;
@@ -2340,15 +2810,17 @@ const Debug = (() => {
   return { enabled: () => enabled, mount, toggleFps };
 })();
 
-/* ---- 段階2：試合終了トランザクション（報酬→リーグ→保存を固定順で1回） ---- */
+/* ---- 試合終了トランザクション（通算記録→ミッション→報酬→育成→保存を固定順で1回） ---- */
 const MatchFlow = (() => {
   let last = null;
   Events.on('match:end', (event) => {
     const before = Save.commitCount();
-    const rewards = Economy.settleMatch(event);
     const result = League.settleMatch(event);
+    const missions = Missions.settleMatch(event);
+    const rewards = Economy.settleMatch(event);
+    const growth = Growth.settleMatch(event);
     const saved = Save.commit('matchEnd');
-    last = { rewards, result, saved, commits: Save.commitCount() - before };
+    last = { result, missions, rewards, growth, saved, commits: Save.commitCount() - before };
     Events.emit('match:settled', { event, ...last });
   });
   return { last: () => (last ? { ...last } : null) };
@@ -2358,6 +2830,11 @@ const MatchFlow = (() => {
 (() => {
   const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   const t = SelfTest.add;
+  const engineConfig = () => {
+    const batter = (side, i) => ({ order: i + 1, cardId: `${side}-${i}`, name: `${side === 'user' ? '自軍' : '相手'}${i + 1}`, number: i + 1, pos: ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'][i], abilities: { meet: 50, power: 50, speed: 50, defense: 50 }, mult: { contact: 1, power: 1, speed: 1, defense: 1 } });
+    const pitcher = (side) => ({ cardId: `${side}-P`, name: `${side === 'user' ? '自軍' : '相手'}投手`, number: 18, kmh: 142, abilities: { control: 50, stamina: 50, movement: 50 }, mult: { velocity: 1, control: 1, movement: 1 }, staminaThreshold: 25, special: side === 'opponent' ? ['curve'] : ['slider'], fatigued: false });
+    return { mode: 'exhibition', innings: 3, seed: 1, userSide: 'away', unlockedPitches: ['fastball'], play: { pitchingForm: 'tornado', battingForm: 'open', myPitch: { direction: 'up', amount: 100 }, motion: { armSwing: 0, release: 0, swingSpeed: 0 } }, correction: { enabled: false }, teams: { user: { name: '自軍', lineup: Array.from({ length: 9 }, (_, i) => batter('user', i)), pitcher: pitcher('user') }, opponent: { name: '相手', lineup: Array.from({ length: 9 }, (_, i) => batter('opponent', i)), pitcher: pitcher('opponent') } } };
+  };
   t('CARD-01 ランクの境界', () => {
     const bad = [[99, 'S'], [90, 'S'], [89, 'A'], [80, 'A'], [79, 'B'], [70, 'B'], [69, 'C'], [60, 'C'], [59, 'D'], [50, 'D'], [49, 'E'], [40, 'E'], [39, 'F'], [20, 'F'], [19, 'G'], [1, 'G']].filter(([v, r]) => Growth.rankOf(v) !== r);
     return bad.length ? `${bad.map(([v]) => v).join('・')} のランクが違う` : true;
@@ -2456,6 +2933,96 @@ const MatchFlow = (() => {
     return (!x || x.commits === 1) || `保存${x.commits}回`;
   });
   t('ECO-02 財布の記録は直近50件', () => Economy.getLedger().length <= CONFIG.ECONOMY.ledgerSize || `記録${Economy.getLedger().length}件`);
+  t('段階3 出場・勝利・MVP経験値とレベル計算', () => {
+    const x = Growth.testMatchExp(); const rows = Object.fromEntries(x.gain.rows.map((r) => [r.cardId, r]));
+    return (rows.S01.amount === 200 && rows.S02.amount === 100 && x.mvp.lv === 4 && x.mvp.exp === 20 && x.other.lv === 2 && x.other.exp === 50) || JSON.stringify(x);
+  });
+  t('段階3 特訓の購入と残高不足', () => {
+    const x = Growth.testTrainingAndExp();
+    const reason = x.ledger.some((r) => r.reason === 'training:S01' && r.delta === -CONFIG.GROWTH.trainCost);
+    return (x.bought.ok && x.after.lv === 3 && x.after.exp === 40 && !x.poor.ok && /足り/.test(x.poor.reason) && x.level.lv === 2 && reason) || JSON.stringify(x);
+  });
+  t('段階3 重複の限界突破と上限後変換', () => {
+    const x = Growth.testDuplicate(); const last = x.results[4];
+    return (x.card.lb === 4 && x.results.slice(0, 4).every((r, i) => r.status === `限界突破 +${i + 1}`) && last.coins === CONFIG.GROWTH.duplicateCoins[1] && /100/.test(last.status)) || JSON.stringify(x);
+  });
+  t('段階3 適性外-30%をHOOKS経由で適用', () => Growth.testScope(() => {
+    Growth.setLineupPosition(0, 'C');
+    const raw = Growth.getCard('S07').abilities.defense;
+    const cfg = League.buildMatchConfig('league'); const b = cfg.teams.user.lineup[0];
+    const actual = MatchEngine.HOOKS.fielderRange(100, b, cfg);
+    const expected = Math.round(Correction.multiplier(raw) * 1000) / 1000 * CONFIG.GROWTH.misfitDefense * 100;
+    return (Growth.getLineup()[0].fit === false && near(actual, expected, 1e-9)) || `${actual}/${expected}`;
+  }));
+  t('段階3 シード固定スカウト・10連確定・天井50回', () => {
+    const x = Growth.testScout(); const a = x.singleA.results[0]; const b = x.singleB.results[0]; const tenth = x.ten.results[9]; const pity = x.pity.results[0];
+    return (a.cardId === 'B402' && a.rarity === 1 && a.cardId === b.cardId && a.rarity === b.rarity && x.ten.results.length === 10 && tenth.rarity >= 3 && pity.rarity === 4 && x.pity.pity === 0) || JSON.stringify(x);
+  });
+  t('段階3 ミッション手動受取と二重受取防止', () => {
+    const x = Missions.testClaimScenario();
+    return (x.first.ok && !x.second.ok && /すでに/.test(x.second.reason) && x.claimed) || JSON.stringify(x);
+  });
+  t('段階3 ログボの4時区切りと7日周期', () => {
+    const x = LoginBonus.testCycle();
+    return (x.before.ok && x.before.day === 1 && !x.sameBusinessDay.ok && x.afterFour.ok && x.afterFour.day === 2 && x.day7.ok && x.day7.day === 7 && x.day7.reward.guaranteeTickets === 1 && x.next.day === 1) || JSON.stringify(x);
+  });
+  t('段階3 リーグ戦以外の1日300コイン上限', () => {
+    const x = Economy.testDailyCap();
+    return (x.a.coins === 250 && x.b.coins === 50 && !x.c.coins && x.coins === 300 && x.status.reached && x.status.remaining === 0) || JSON.stringify(x);
+  });
+  t('修正便 上限対象外の通算ミッションを満額受取', () => {
+    const x = Missions.testCapExemptRewards();
+    return (x.achievement.ok && x.achievement.granted.coins === 1000 && x.cap.earned === 300) || JSON.stringify(x);
+  });
+  t('修正便 上限後もミッション・ログボの権利と満額を保持', () => {
+    const x = Missions.testCapExemptRewards();
+    return (x.daily.ok && x.daily.granted.coins === 100 && x.login.ok && x.login.granted.coins === 100 && x.wallet.coins === 1500) || JSON.stringify(x);
+  });
+  t('修正便 上限後の広告は回数を消費しない', () => {
+    const x = Economy.testAdCapGuard();
+    return (!x.grant.ok && x.before.left === x.after.left) || JSON.stringify(x);
+  });
+  t('修正便 3アウト交代で両軍の走者を消去', () => Economy.testScope(() => {
+    let runs = 0;
+    const off = Events.on('match:run', (e) => { if (e.side === 'user') runs += e.runs; });
+    try {
+      MatchEngine.start(engineConfig());
+      MatchEngine.debugAct('hit'); MatchEngine.debugAct('hit');
+      MatchEngine.debugAct('out'); MatchEngine.debugAct('out'); MatchEngine.debugAct('out');
+      MatchEngine.debugAct('out'); MatchEngine.debugAct('out'); MatchEngine.debugAct('out');
+      MatchEngine.debugAct('hit');
+      MatchEngine.abort();
+      return runs === 0 || `次イニングの単打で${runs}点入った`;
+    } finally { off(); if (MatchEngine.isRunning()) MatchEngine.abort(); }
+  }));
+  t('修正便 リーグ戦完了で先発ローテが進む', () => {
+    const x = Growth.testRotationAdvance();
+    return (x.before !== x.after) || JSON.stringify(x);
+  });
+  t('修正便 おまかせ編成が投手上位3人を選ぶ', () => {
+    const x = Growth.testAutoPitchers();
+    return (x.result.ok && JSON.stringify(x.actual) === JSON.stringify(x.expected)) || JSON.stringify(x);
+  });
+  t('修正便 放棄ではミッション進捗を確定しない', () => {
+    const x = Missions.testAbortPending();
+    return (x.playLeague === 0 && x.hits5 === 0 && x.k3 === 0) || JSON.stringify(x);
+  });
+  t('修正便 相手打者を実名・守備位置・能力で表示', () => {
+    const cfg = engineConfig(); const b = cfg.teams.opponent.lineup[0];
+    const text = GameHud.describeBatter({ side: 'opponent', order: 1, cardId: b.cardId }, cfg);
+    return (text.includes(b.name) && text.includes('捕') && text.includes('ミ50') && !text.includes('相手打者')) || text;
+  });
+  t('修正便 CPU球種プールはユーザー解禁と無関係', () => Economy.testScope(() => {
+    const cfg = engineConfig();
+    let pitch = null;
+    const off = Events.on('match:pitch', (e) => { if (e.side === 'opponent') pitch = e.pitch; });
+    try {
+      MatchEngine.start(cfg);
+      MatchEngine.startPitch();
+      MatchEngine.abort();
+      return pitch === 'curve' || `ユーザー解禁がfastballのみのときCPU球種=${pitch}`;
+    } finally { off(); if (MatchEngine.isRunning()) MatchEngine.abort(); }
+  }));
 })();
 
 /* ---- 1 画面遷移：起動と組み立て ---- */
