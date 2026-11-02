@@ -316,6 +316,10 @@ button{ touch-action:manipulation }
 .eng-banner{transition:transform .16s cubic-bezier(.2,1.4,.4,1),opacity .16s ease;transform:scale(.85);opacity:0}
 .eng-banner.show{transform:scale(1);opacity:1}
 .eng-range{flex:1;accent-color:var(--amber);height:34px}
+.eng-commentary{min-height:20px;font-size:14px;font-weight:900;color:var(--amber);letter-spacing:.02em}
+.eng-commentary.pop{animation:cmtPop .25s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes cmtPop{from{opacity:0;transform:translateY(4px) scale(.97)}to{opacity:1;transform:none}}
+.eng-canvas{image-rendering:pixelated}
 .hdr-in{padding-top:env(safe-area-inset-top)}
 #tabs{padding-bottom:env(safe-area-inset-bottom)}
 .eng-controls{padding-bottom:calc(9px + env(safe-area-inset-bottom))}
@@ -2638,6 +2642,7 @@ const MatchEngine = (() => {
   let batterShift = 0; // 打者の左右位置（芯合わせ）-44..44
   let shiftShown = 0; // 表示用（イージング）
   let trail = []; // 球の軌跡
+  let bufC = null; // 低解像度レンダリング用バッファ
   let sparks = []; // 打撃時の火花
   let shakeT = 0; // 画面シェイク残り時間
   const clampShift = (v) => clamp(Math.round(v), -44, 44);
@@ -2963,17 +2968,26 @@ const MatchEngine = (() => {
     g.lineWidth = 16; g.beginPath(); g.moveTo(0, -56); g.lineTo(Math.sin(pose) * 14, -16); g.stroke();
     g.lineWidth = 9; g.beginPath(); g.moveTo(-2, -44); g.lineTo(-24, -24 + pose * 8); g.moveTo(4, -43); g.lineTo(25, -30 - pose * 8); g.stroke();
     g.strokeStyle = '#E8EDF2'; g.lineWidth = 11; g.beginPath(); g.moveTo(0, -16); g.lineTo(-15, 18); g.moveTo(0, -16); g.lineTo(17, 18); g.stroke();
+    g.fillStyle = '#EDF1F4'; g.fillRect(-12, -58, 24, 38);
+    g.strokeStyle = color; g.lineWidth = 2; g.beginPath(); g.moveTo(-5, -58); g.lineTo(-5, -20); g.moveTo(5, -58); g.lineTo(5, -20); g.stroke();
     g.beginPath(); g.arc(0, -72, 11, 0, 7); g.fill(); g.fillStyle = color; g.fillRect(-12, -82, 24, 7); g.restore();
   }
   function draw() {
     if (!port || !game) return;
-    const g = port.context();
-    if (!g) return;
+    const g0 = port.context();
+    if (!g0) return;
+    if (!bufC) { bufC = document.createElement('canvas'); bufC.width = 480; bufC.height = 270; }
+    const g = bufC.getContext('2d');
+    g.save();
+    g.scale(0.5, 0.5);
     if (shakeT > 0) { g.save(); g.translate((rng() - 0.5) * 9 * shakeT * 4, (rng() - 0.5) * 7 * shakeT * 4); }
     const W = 960, H = 540;
     g.clearRect(0, 0, W, H); g.fillStyle = '#07152B'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#132A48'; g.fillRect(0, 74, W, 150);
     g.fillStyle = '#F8D77B'; for (let i = 0; i < 8; i += 1) { g.globalAlpha = 0.16 + (i % 2) * 0.08; g.fillRect(55 + i * 122, 34, 58, 7); } g.globalAlpha = 1;
+    for (let i = 0; i < 150; i += 1) { const cx = (i * 67) % 960; const cy = 86 + ((i * 41) % 118); g.fillStyle = ['#3E5F8A', '#8A3E4E', '#C8A24A', '#4E7A5A', '#D8D3C3'][(i * 7) % 5]; g.globalAlpha = 0.5 + ((i * 13) % 10) / 22; g.fillRect(cx, cy, 4, 4); }
+    g.globalAlpha = 1;
+    ['ぐにゃ銀行', 'やきゅうドリンク', '全国高校野球', 'タマゴヤ電機'].forEach((bt, i) => { const bx = 30 + i * 232; g.fillStyle = '#0B2138'; g.fillRect(bx, 196, 210, 26); g.strokeStyle = '#33507A'; g.lineWidth = 2; g.strokeRect(bx, 196, 210, 26); g.fillStyle = '#F8D77B'; g.font = '700 17px sans-serif'; g.textAlign = 'center'; g.fillText(bt, bx + 105, 215); g.textAlign = 'left'; });
     g.fillStyle = '#173C2B'; g.beginPath(); g.moveTo(0, H); g.lineTo(410, 245); g.lineTo(960, H); g.closePath(); g.fill();
     g.strokeStyle = '#D7C59B'; g.lineWidth = 3; g.beginPath(); g.moveTo(720, 350); g.lineTo(450, 244); g.lineTo(897, 325); g.stroke();
     FIELD_HOME.forEach((f, i) => { const q = fielders[i] || f; player(g, q.x, q.y + 55, '#2F8F4E', Math.sin(clock * 4 + i) * 0.08); });
@@ -3002,6 +3016,13 @@ const MatchEngine = (() => {
     const dia = [[268, 30], [284, 40], [252, 40]];
     dia.forEach(([dx, dy], i) => { g.save(); g.translate(dx, dy); g.rotate(Math.PI / 4); g.fillStyle = bsNow[i] ? '#FFB020' : 'rgba(255,255,255,.25)'; g.fillRect(-6, -6, 12, 12); g.restore(); });
     for (let i = 0; i < 3; i += 1) { g.beginPath(); g.arc(312 + i * 14, 35, 5, 0, 7); g.fillStyle = i < game.outs ? '#FF5A4E' : 'rgba(255,255,255,.25)'; g.fill(); }
+    g.restore();
+    g0.imageSmoothingEnabled = false;
+    g0.clearRect(0, 0, 960, 540);
+    const zoom = game.phase === 'windup' || game.phase === 'pitch' ? 1.07 : 1;
+    const swd = 480 / zoom;
+    const shg = 270 / zoom;
+    g0.drawImage(bufC, (480 - swd) / 2 + 30, (270 - shg) / 2 + 8, swd, shg, 0, 0, 960, 540);
   }
   function frame(now) {
     if (state === 'idle') return;
@@ -3126,6 +3147,62 @@ const Anthem = (() => {
   return { TUNES, play };
 })();
 
+/* ---- 効果音（WebAudio生成：バット音・スイング音・歓声） ---- */
+const Sfx = (() => {
+  let actx = null;
+  let noise = null;
+  function ac() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      return actx;
+    } catch (e) { return null; }
+  }
+  function noiseBuf(c) {
+    if (noise) return noise;
+    const b = c.createBuffer(1, c.sampleRate * 1.5, c.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i += 1) d[i] = Math.random() * 2 - 1;
+    noise = b;
+    return b;
+  }
+  function burst(dur, type, f0, f1, vol) {
+    const c = ac(); if (!c) return;
+    const t = c.currentTime;
+    const src = c.createBufferSource(); src.buffer = noiseBuf(c);
+    const fl = c.createBiquadFilter(); fl.type = type;
+    fl.frequency.setValueAtTime(f0, t);
+    fl.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(fl); fl.connect(g); g.connect(c.destination);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+  return {
+    crack: () => burst(0.09, 'highpass', 900, 500, 0.5),
+    whoosh: () => burst(0.16, 'bandpass', 1400, 300, 0.22),
+    crowd: (big) => burst(big ? 1.5 : 0.7, 'lowpass', 500, 240, big ? 0.34 : 0.18),
+  };
+})();
+
+/* ---- 実況テロップ ---- */
+const Commentary = (() => {
+  function line(type, d = {}) {
+    switch (type) {
+      case 'pitch': return `投げた！ ${d.name || 'ストレート'} ${d.kmh ? `${d.kmh}km/h` : ''}`;
+      case 'atBat': return `${d.order || ''}番 ${d.name || '打者'}、打席に入ります`;
+      case 'hit': return d.kind === 'HR' ? '打ったー！ 大きい、大きい！ 入った、ホームラン！' : d.kind === '2B' ? '鋭い当たり！ ツーベースヒット！' : '打った！ ヒット！ チャンスが広がります';
+      case 'strikeout': return '三振！ 球場がどよめきます';
+      case 'out': return `${d.label || 'アウト'}！ 守備がさばいた`;
+      case 'run': return `${d.runs || 1}点が入った！ スタンドが沸いています`;
+      case 'steal': return d.success ? '盗塁成功！ 足でかき回します' : '盗塁失敗！ タッチアウト';
+      default: return '';
+    }
+  }
+  return { line };
+})();
+
 /* ---- 触覚フィードバック（アプリ版はCapacitor Haptics、Webはvibrate） ---- */
 const NativeFeel = (() => {
   function fire(style) {
@@ -3150,6 +3227,7 @@ const GameSurface = (() => {
       <div class="eng-stage"><canvas class="eng-canvas" width="960" height="540" aria-label="ぐにゃ野球の試合画面"></canvas><div class="eng-banner" aria-live="polite"><b></b><span></span></div></div>
       <div class="eng-controls">
         <p class="eng-status" aria-live="polite">試合を準備しています</p>
+        <p class="eng-commentary" aria-live="polite"></p>
         <div class="eng-pitch-row"><select class="eng-select" data-engine-pitch aria-label="球種"></select><button class="eng-action main" type="button" data-engine-act="pitch">投球開始</button></div>
         <button class="eng-action swing" type="button" data-engine-act="swing">スイング</button>
         <div class="eng-row" data-eng-shift hidden><button class="eng-action" type="button" data-engine-act="shiftL">左へ寄る</button><input class="eng-range" type="range" min="-44" max="44" step="1" value="0" data-eng-range aria-label="打者位置スライダー"><span class="eng-shift-val">打者位置 0</span><button class="eng-action" type="button" data-engine-act="shiftR">右へ寄る</button></div>
@@ -3218,6 +3296,21 @@ const GameSurface = (() => {
     b.classList.add('pulse');
     setTimeout(() => b.classList.remove('pulse'), 100);
   }
+  function say(text) {
+    const el = one('.eng-commentary');
+    if (!el || !text) return;
+    el.textContent = text;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+  }
+  Events.on('match:pitch', (e) => say(Commentary.line('pitch', e)));
+  Events.on('match:atBat', (e) => say(Commentary.line('atBat', e)));
+  Events.on('match:hit', (e) => { say(Commentary.line('hit', e)); Sfx.crack(); Sfx.crowd(e.kind === 'HR'); });
+  Events.on('match:strikeout', () => say(Commentary.line('strikeout')));
+  Events.on('match:out', (e) => say(Commentary.line('out', e)));
+  Events.on('match:run', (e) => say(Commentary.line('run', e)));
+  Events.on('match:steal', (e) => { say(Commentary.line('steal', e)); if (e.success) Sfx.crowd(false); });
   function context() {
     const c = one('canvas');
     if (!c || /jsdom/i.test(navigator.userAgent)) return null;
@@ -3228,7 +3321,7 @@ const GameSurface = (() => {
     if (!b || b.disabled) return;
     if (b.dataset.aim) { const [ax, ay] = b.dataset.aim.split(',').map(Number); MatchEngine.setAim(ax, ay); return; }
     if (b.dataset.engineAct === 'pitch') MatchEngine.startPitch();
-    else if (b.dataset.engineAct === 'swing') { NativeFeel.tap(); MatchEngine.swing(); }
+    else if (b.dataset.engineAct === 'swing') { NativeFeel.tap(); Sfx.whoosh(); MatchEngine.swing(); }
     else if (b.dataset.engineAct === 'shiftL') MatchEngine.setShift(-1);
     else if (b.dataset.engineAct === 'shiftR') MatchEngine.setShift(1);
     else if (b.dataset.engineAct === 'bunt') MatchEngine.setTactic('bunt');
@@ -4417,6 +4510,16 @@ const MatchFlow = (() => {
     const tunes = Object.values(Anthem.TUNES);
     if (tunes.length !== 3) return '曲数が3でない';
     if (tunes.some((x) => !Array.isArray(x.notes) || x.notes.length < 5)) return '音符が不足';
+    return true;
+  });
+  t("段階D 実況テロップが生成できる", () => {
+    if (!Commentary.line('hit', { kind: 'HR' }).includes('ホームラン')) return 'HRの実況が違う';
+    if (!Commentary.line('steal', { success: true }).includes('成功')) return '盗塁成功の実況が違う';
+    if (!Commentary.line('pitch', { name: 'カーブ', kmh: 110 }).includes('110km/h')) return '投球の実況が違う';
+    return true;
+  });
+  t("段階D 効果音は音響なしでも落ちない", () => {
+    try { Sfx.crack(); Sfx.whoosh(); Sfx.crowd(true); } catch (e) { return `例外: ${e.message}`; }
     return true;
   });
   t("段階C 打者位置はスライダー範囲で丸める", () => {
