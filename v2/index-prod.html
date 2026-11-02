@@ -13,7 +13,7 @@
   受け渡し先：Claude Code（実装・検証）
   含むもの：13画面、試合の物理演算・投打・オート守備、フォーム・球種・モーション設定、デモ広告
   含まないもの：リーグ進行・育成・スカウト・ミッションの本実装、実広告SDK、実課金
-  仮置き：Q1=B（リーグ戦以外のコインは1日300まで）、Q2=B（k=0.30）、Q3=A（全画面を縦で統一）
+  仮置き：Q1=B（リーグ戦以外のコインは1日300まで）、Q2=B（k=0.30）、Q3（横向き推奨）
   デバッグ：URL の末尾に ?debug=1
 -->
 <style>
@@ -365,8 +365,53 @@ button{ touch-action:manipulation }
 .ad-count{font:700 52px/1 var(--f-num);color:var(--amber)}
 .toast-layer{position:fixed;left:0;right:0;bottom:calc(var(--tab-h) + var(--safe-b) + 12px);z-index:90;display:flex;justify-content:center;pointer-events:none}
 .toast{max-width:min(380px,calc(100% - 28px));padding:11px 16px;border-radius:10px;background:var(--text);color:var(--navy);font-size:13.5px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.rotate{display:none}
-@media (orientation:landscape) and (max-height:500px){.rotate{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:24px;background:var(--navy);text-align:center}.rotate b{font-size:18px;font-weight:900}}
+/* 段階H：縦向きは従来の操作盤、横向きは左右の親指で操作する。 */
+.eng-rotate-hint{display:none;font-size:11px;line-height:1.3;color:var(--text-2);text-align:center}
+@media (orientation:portrait){.eng-rotate-hint{display:block}}
+@media (orientation:landscape){
+  .app{max-width:none;padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+  .screen{max-width:720px;width:100%;margin-inline:auto}
+  .hdr-in,.tabs{width:100%;max-width:720px;margin-inline:auto}
+  /* 上部48px＋上セーフエリア。下セーフエリアは .eng だけで確保する。 */
+  .game-top{height:calc(48px + var(--safe-t));padding:calc(2px + var(--safe-t)) 6px 2px 10px;align-items:center}
+  .game-top .sb{border-width:1px;padding:0 6px}
+  .game-top .sb th{font-size:9px;line-height:10px;padding:0}
+  .game-top .sb td{font-size:12px;line-height:11px}
+  .game-top .sb td.t{font-size:10px;line-height:11px}
+  .game-top .sb-meta{font-size:10px;line-height:10px;margin-top:0}
+  .game-strip{display:none;margin-bottom:0}
+  .engine-mount{overflow:hidden}
+  .eng{display:grid;height:100%;min-height:0;grid-template-columns:clamp(164px,23%,240px) minmax(0,1fr) clamp(164px,23%,240px);grid-template-rows:minmax(0,1fr);column-gap:6px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));background:var(--stand)}
+  .eng-controls{display:contents}
+  /* 同じグリッドセルに重ね、表示切替でステージ高を変えない。 */
+  .eng-status,.eng-commentary{grid-area:1/2;align-self:start;z-index:1;min-width:0;height:20px;min-height:0;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;pointer-events:none;background:rgba(7,21,43,.75)}
+  .eng-commentary{margin-top:20px}
+  .eng-stage{grid-area:1/2;min-width:0;min-height:0;display:grid;place-items:center}
+  .eng-canvas{position:absolute;inset:0;width:100%;height:100%;min-width:0;min-height:0;object-fit:contain}
+  .eng-diamond{grid-area:1/3/-1/4;align-self:center;max-width:none;margin:0;grid-template-columns:repeat(3,minmax(52px,1fr));grid-template-rows:repeat(3,minmax(52px,auto))}
+  .eng-diamond .eng-action{min-width:52px;min-height:52px}
+  [data-eng-dpad]{grid-area:1/1/-1/2;align-self:center;display:grid;max-width:none;margin:0 0 56px;gap:4px;grid-template-columns:repeat(3,minmax(52px,1fr));grid-template-rows:64px 52px 64px}
+  [data-eng-dpad] .eng-action{min-width:52px;min-height:52px;padding:0;font-size:22px}
+  [data-dir="up"]{grid-area:1/2}[data-dir="down"]{grid-area:3/2}
+  [data-dir="left"]{grid-area:2/1}[data-dir="right"]{grid-area:2/3}
+  [data-eng-dpad]:has([data-dir="left"][hidden]):has([data-dir="right"][hidden]) [data-dir="up"],
+  [data-eng-dpad]:has([data-dir="left"][hidden]):has([data-dir="right"][hidden]) [data-dir="down"]{grid-column:1/-1}
+  [data-eng-startrow],[data-eng-throw]{grid-area:1/2;align-self:end;z-index:2;margin-bottom:14px}
+  [data-eng-throw]{gap:4px;flex-wrap:nowrap}
+  [data-eng-subs]{grid-area:1/1;align-self:end;z-index:2;gap:4px;flex-wrap:nowrap}
+  [data-eng-subs] .eng-select{flex:1;min-width:0;width:100%;height:48px;min-height:48px;padding:0 4px}
+  .eng-meter{grid-area:1/2;align-self:end;z-index:1;margin:0;height:6px}
+  [data-engine-act="finish"]{grid-area:1/2;align-self:end;z-index:2;margin:0 0 70px;min-height:48px}
+  [data-eng-startrow] .eng-action,[data-eng-throw] .eng-action{height:48px;min-height:48px;min-width:0;padding:0 4px}
+}
+@media (orientation:landscape) and (max-height:420px){
+  [data-eng-dpad]{grid-template-rows:52px 48px 52px}
+  [data-eng-dpad] .eng-action{min-height:48px}
+  .eng-diamond{grid-template-rows:repeat(3,48px)}
+  .eng-diamond .eng-action{min-height:48px;font-size:11px;line-height:13px;padding:2px}
+  .eng-diamond .eng-symbol{font-size:16px}
+}
+
 .dbg-fab{position:fixed;right:max(10px,calc(50% - 205px));bottom:calc(var(--tab-h) + var(--safe-b) + 70px);z-index:60;min-height:44px;padding:0 14px;border-radius:22px;background:#000;border:1px solid var(--amber);color:var(--amber);font-size:12.5px;font-weight:700}
 .fps{position:fixed;left:8px;top:calc(var(--safe-t) + 62px);z-index:70;padding:3px 7px;border-radius:5px;background:#000;color:var(--turf-text);font:600 12px/1.2 var(--f-num);pointer-events:none}
 .dbg-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -385,7 +430,6 @@ button{ touch-action:manipulation }
 <div id="layer-overlay"></div>
 <div class="toast-layer" id="layer-toast" aria-live="polite"></div>
 <div id="layer-debug"></div>
-<div class="rotate" role="alert"><div><b>縦向きでお使いください</b><p class="note">このゲームは縦画面で遊ぶように作っています</p></div></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
     <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 4.5h14v8.2L12 19.5 5 12.7z"/></symbol>
@@ -449,7 +493,7 @@ const CONFIG = Object.freeze({
   PROVISIONAL: Object.freeze({  // 仕様書 D の仮置き
     Q1_nonLeagueDailyCap: 300,  // Q1=B：リーグ戦以外のコイン獲得は1日合計300まで
     Q2_correctionK: 0.30,       // Q2=B：能力の効き具合 k
-    Q3_orientation: 'portrait', // Q3=A：全画面を縦で統一（横向きのスマホでは案内を出す）
+    Q3_orientation: 'landscape', // 横向き推奨（縦向きは従来レイアウト＋案内）
   }),
   ECONOMY: Object.freeze({
     startCoins: 100, startScoutTickets: 3, hitCoins: 20, homerunCoins: 50,
@@ -3422,6 +3466,7 @@ const GameSurface = (() => {
     return `<div class="eng">
       <div class="eng-stage"><canvas class="eng-canvas" width="960" height="540" aria-label="ぐにゃ野球の試合画面"></canvas><div class="eng-banner" aria-live="polite"><b></b><span></span></div></div>
       <div class="eng-controls">
+        <p class="eng-rotate-hint">横向きがおすすめです</p>
         <p class="eng-status" aria-live="polite">試合を準備しています</p>
         <p class="eng-commentary" aria-live="polite"></p>
         <div class="eng-row" data-eng-startrow><button class="eng-action main" type="button" data-engine-act="pitch">投球開始</button></div>
@@ -4074,7 +4119,7 @@ const Screens = (() => {
         ${range('myAmt', 'マイ変化球の変化量', ps.myPitch.amount)}${range('arm', '腕の振り', ps.motion.armSwing)}${range('rel', 'リリース', ps.motion.release)}${range('swing', 'スイング速度', ps.motion.swingSpeed)}
       </div>
       <button class="btn btn-amber" type="button" data-act="confirmSettings">設定を確定</button>
-      <div class="sec-h"><h2>画面</h2></div><div class="panel"><div class="kv"><span>画面の向き</span><b>縦で統一（Q3=A 仮置き）</b></div></div>
+      <div class="sec-h"><h2>画面</h2></div><div class="panel"><div class="kv"><span>画面の向き</span><b>横向き推奨</b></div></div>
       <div class="sec-h"><h2>データ管理</h2><p>JSON形式</p></div>
       <div class="panel">
         <div class="data-btns"><button class="btn-s btn-line" type="button" data-act="exportData">セーブを書き出す</button></div>
