@@ -12,9 +12,10 @@ html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Hira
 #hud{position:absolute;inset:0;display:none;pointer-events:none;z-index:10;text-shadow:2px 2px 0 #000;font-weight:bold}
 .hb{position:absolute;background:rgba(0,0,70,.85);border:2px solid #fff;padding:5px 9px}
 #sb{left:8px;top:8px;min-width:200px;font-size:18px;line-height:24px}
-#sb div{display:flex;justify-content:space-between;gap:16px}#sb .cur{color:#ffe14a}
+#sb div{display:flex;justify-content:space-between;gap:8px}#sb .cur{color:#ffe14a}
 #sb .inn{justify-content:center;border-top:1px solid #88a;margin-top:2px;padding-top:2px;color:#9df}
 #cnt{right:8px;top:8px;font-size:16px;line-height:22px}#cnt .cr{display:flex;gap:10px;align-items:center}
+.gg{display:inline-block;width:54px;height:7px;background:#222;border:1px solid #99a;vertical-align:middle}.gg i{display:block;height:100%;background:linear-gradient(90deg,#f80,#ffe14a)}
 .lamp{display:inline-block;width:14px;height:14px;border-radius:50%;margin-left:3px;background:#222;border:1px solid #99a;vertical-align:-2px}
 .lamp.on.s{background:#fd2}.lamp.on.b{background:#3d3}.lamp.on.o{background:#f33}
 .dia{position:relative;width:70px;height:52px}
@@ -74,6 +75,16 @@ function playMel(){const a=ac();if(!a||mute)return null;const mg=a.createGain();
  MEL.forEach(([n,d])=>[[0,'triangle',.15],[-12,'sine',.07]].forEach(([o,ty,v])=>{const os=a.createOscillator(),g=a.createGain();os.type=ty;os.frequency.value=440*2**((n+o-69)/12);g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d*bt*.95);os.connect(g);g.connect(mg);os.start(t);os.stop(t+d*bt)})||(t+=0)||0);
  return mg}
 /* ===== データ ===== */
+const SPK={vanish:{k:'pitch',n:'消える魔球バニッシュ'},boomerang:{k:'pitch',n:'二重変化ブーメラン'},spin:{k:'bat',n:'ぐるぐるトルネード打法'},giant:{k:'bat',n:'デカバットブレイカー'}};
+const GGAIN={hit:30,hr:55,k:40,strike:10,out:15};
+const addGauge=(side,n)=>{if(G)G.gauge[side]=cl(G.gauge[side]+n,0,100)};
+const SPEC={human:{n:'人間',mods:{}},beetle:{n:'カブトムシ',mods:{power:16,meet:4,speed:-14}},dog:{n:'イヌ',mods:{speed:16,field:6,meet:2,power:-8}},panda:{n:'パンダ',mods:{velo:-8,ctrl:14,brk:16,stam:4}}};
+const spModOf=p=>(SPEC[p&&p.sp]||SPEC.human).mods;
+function applySp(p){const m=spModOf(p);for(const k in m)p[k]=cl((p[k]||0)+m[k],5,99);return p}
+const SPCH=[{name:'カブト丸',pos:3,sp:'beetle',st:{meet:48,power:58,speed:44,field:42,arm:44,velo:30,ctrl:30,brk:10,stam:45}},
+{name:'ワンタ',pos:8,sp:'dog',st:{meet:53,power:46,speed:56,field:56,arm:48,velo:32,ctrl:30,brk:10,stam:48}},
+{name:'パン太',pos:1,sp:'panda',st:{meet:30,power:28,speed:35,field:40,arm:42,velo:56,ctrl:44,brk:46,stam:51}}];
+function spChar(c){return Object.assign({name:c.name,pos:c.pos,num:c.pos,side:R()<.5?'R':'L',thr:'R',pc:0,sp:c.sp},c.st)}
 const KEY='koushien_psx97_v1';
 const PN=['','投手','捕手','一塁手','二塁手','三塁手','遊撃手','左翼手','中堅手','右翼手'],PA_=['','ピッチャー','キャッチャー','ファースト','セカンド','サード','ショート','レフト','センター','ライト'];
 const FP=[null,[0,18.4],[0,-1.8],[17,21],[8,33],[-17,22],[-9,33],[-40,68],[0,86],[40,68]],BP=[[0,0],[19.4,19.4],[0,38.8],[-19.4,19.4],[0,0]];
@@ -87,18 +98,18 @@ const CM={strike:['ストライク！','見逃しました！','コースいっ�
 let S=null,G=null;const SCH=()=>SCHOOLS[S.sc];
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 const ef=(v,f)=>v*(1-.5*Math.max(0,(f-30)/70));
-function newHero(name,pos,thr,bat){const h={name,pos,thr,bat,fat:0,inj:0,meet:38,power:36,speed:40,field:40,arm:40,velo:40,ctrl:38,brk:20,stam:40,yrs:[],best:0,rec:{ab:0,h:0,hr:0,rbi:0,sb:0,outs:0,k:0,ra:0,w:0,g:0}};
+function newHero(name,pos,thr,bat,sp){const h={name,pos,thr,bat,sp:sp||'human',fat:0,inj:0,meet:38,power:36,speed:40,field:40,arm:40,velo:40,ctrl:38,brk:20,stam:40,yrs:[],best:0,rec:{ab:0,h:0,hr:0,rbi:0,sb:0,outs:0,k:0,ra:0,w:0,g:0}};
  if(pos==1){h.velo+=14;h.ctrl+=8;h.brk+=22;h.stam+=14;h.meet-=6;h.power-=4}else if(pos==2){h.arm+=10;h.field+=10;h.power+=4}else if(pos==3){h.power+=12;h.meet+=2;h.speed-=6}else if(pos==4||pos==6){h.field+=12;h.speed+=6;h.meet+=3}else if(pos==5){h.power+=6;h.arm+=8;h.field+=6}else{h.speed+=8;h.arm+=4;h.meet+=3}return h}
-function heroP(h){const e=v=>Math.round(ef(v,h.fat));return{name:h.name,pos:h.pos,num:h.pos,hero:true,ref:h,side:h.bat,thr:h.thr,pc:0,meet:e(h.meet),power:e(h.power),speed:e(h.speed),field:e(h.field),arm:e(h.arm),velo:e(h.velo),ctrl:e(h.ctrl),brk:e(h.brk),stam:e(h.stam)}}
+function heroP(h){const mods=spModOf(h),e=k=>Math.round(ef(cl(h[k]+(mods[k]||0),5,99),h.fat));return{sp:h.sp||'human',name:h.name,pos:h.pos,num:h.pos,hero:true,ref:h,side:h.bat,thr:h.thr,pc:0,meet:e('meet'),power:e('power'),speed:e('speed'),field:e('field'),arm:e('arm'),velo:e('velo'),ctrl:e('ctrl'),brk:e('brk'),stam:e('stam')}}
 function mkPlayer(pos,St,used){const v=()=>cl(Math.round(St+ri(-9,9)),12,97);let nm;do{nm=pick(SUR)}while(used&&used.has(nm)&&used.size<38);used&&used.add(nm);
  const p={name:nm,pos,num:pos,side:R()<.8?'R':'L',thr:R()<.85?'R':'L',pc:0,meet:v(),power:v(),speed:v(),field:v(),arm:v(),velo:v(),ctrl:v(),brk:v(),stam:v()};
  if(pos===1){p.velo=cl(p.velo+8,20,97);p.ctrl=cl(p.ctrl+5,20,97);p.brk=cl(p.brk+6,20,97);p.stam=cl(p.stam+6,20,97);p.meet-=8;p.power-=8}return p}
 const mkTeam=(name,short,c,c2,St,mine)=>({name,short,color:c,color2:c2,S:St,mine,lineup:[],relief:[]});
 const orderLine=a=>{const hero=a.find(p=>p.hero),rest=a.filter(p=>p!==hero).sort((x,y)=>(y.meet+y.power)-(x.meet+x.power));if(hero)rest.splice(3,0,hero);return rest};
-function genMates(){const used=new Set([S.hero.name]);S.mates={};for(let p=1;p<=9;p++)if(p!==S.hero.pos)S.mates[p]=mkPlayer(p,S.tS,used);S.relief=mkPlayer(1,S.tS-3,used)}
+function genMates(){const used=new Set([S.hero.name]);S.mates={};for(let p=1;p<=9;p++)if(p!==S.hero.pos)S.mates[p]=mkPlayer(p,S.tS,used);S.relief=mkPlayer(1,S.tS-3,used);SPCH.forEach(c=>{if(R()<.5){if(c.pos!==S.hero.pos)S.mates[c.pos]=spChar(c);else if(c.pos===1&&R()<.5)S.relief=spChar(c)}})}
 function buildMine(){const sc=SCH(),t=mkTeam(sc.n,sc.s,sc.c,sc.c2,S.tS,true),h=S.hero,a=[];
- for(let p=1;p<=9;p++){if(p===h.pos)a.push(h.inj>0?Object.assign(mkPlayer(p,S.tS-4),{sub:1}):heroP(h));else a.push(Object.assign({},S.mates[p],{pc:0}))}
- t.lineup=orderLine(a);t.relief=[Object.assign({},S.relief,{pc:0})];return t}
+ for(let p=1;p<=9;p++){if(p===h.pos)a.push(h.inj>0?Object.assign(mkPlayer(p,S.tS-4),{sub:1}):heroP(h));else a.push(applySp(Object.assign({},S.mates[p],{pc:0})))}
+ t.lineup=orderLine(a);t.relief=[applySp(Object.assign({},S.relief,{pc:0}))];return t}
 function mkOpp(r){const St=[36,42,48,56,64,72][r]+(S.grade-1)*2+Math.min(6,S.gen-1),pr=pick(PRE);let cc;do{cc=pick(COLS)}while(cc[0]===SCH().c);
  const t=mkTeam(pr+pick(SUF),pr,cc[0],cc[1],St,false),used=new Set(),a=[];for(let p=1;p<=9;p++)a.push(mkPlayer(p,St,used));t.lineup=orderLine(a);t.relief=[mkPlayer(1,St-4,used),mkPlayer(1,St-6,used)];return t}
 /* ===== 描画 ===== */
@@ -137,27 +148,39 @@ const V={mode:'yard',pit:null,bat:null,f:null,k:null,spark:0,dcol:'#c33'};
 const clouds=[{x:20,y:8,w:34,s:.6},{x:110,y:20,w:44,s:.4},{x:210,y:6,w:38,s:.7},{x:280,y:24,w:30,s:.5}];
 function drawClouds(t,yo=0){clouds.forEach(c=>{const x=((c.x+t*c.s*4)%380)-40;P(x+3,c.y+yo+3,c.w-6,4,'#fff');P(x+8,c.y+yo,c.w-18,5,'#fff');P(x,c.y+yo+5,c.w,3,'#e4f0fa')})}
 function drawBatter(t){const s=V.bat;if(!s)return;const dir=s.side==='R'?1:-1,fx=s.side==='R'?116:204,fy=166,sk='#f1c18c',c1=s.col,c2=s.col2;
- const pr=(lx,ly,w,h,c)=>P(dir>0?fx+lx:fx-lx-w,fy-ly-h,w,h,c),pt=(lx,ly)=>[dir>0?fx+lx:fx-lx,fy-ly];
+ let bend=0;const nowT=nw();
+ if(s.pose==='swing'){const e2=nowT-s.t0;if(e2>130)bend=Math.min(.55,(e2-130)/260*.55)}
+ if(s.bendT&&nowT-s.bendT<480){const u=(nowT-s.bendT)/480;bend-=Math.sin(u*Math.PI)*.9}
+ if(s.twistT&&nowT-s.twistT<420){const u=(nowT-s.twistT)/420;bend+=Math.sin(u*22)*(1-u)*.5}
+ const pr=(lx,ly,w,h,c)=>P((dir>0?fx+lx:fx-lx-w)+Math.round(bend*ly*.32),fy-ly-h,w,h,c),pt=(lx,ly)=>[(dir>0?fx+lx:fx-lx)+Math.round(bend*ly*.32),fy-ly];
  let hx=8,hy=50,ang=108,len=48;const e=t*1000-s.t0;
- if(s.pose==='swing'){const u=Math.min(1,e/150),w=Math.min(1,u*1.6);ang=165-235*u;hx=8+6*w;hy=50-14*w}else if(s.pose==='bunt'){hx=17;hy=38;ang=10;len=40}else hy+=Math.round(Math.sin(t*4));
+ if(s.pose==='swing'){const u=Math.min(1,e/150),w=Math.min(1,u*1.6);ang=158-268*u;if(G&&G.fx==='spin')ang-=360*u;hx=8+6*w;hy=50-14*w}else if(s.pose==='bunt'){hx=17;hy=38;ang=10;len=40}else hy+=Math.round(Math.sin(t*4));
+ const giant=G&&(G.arm[s.mine?'me':'you']==='giant'||G.fx==='giant');if(giant)len=105;
  pr(-13,0,8,34,'#f4f4f4');pr(2,0,8,34,'#f4f4f4');pr(-14,0,10,4,'#222');pr(1,0,10,4,'#222');pr(-10,32,22,3,'#222');pr(-10,34,22,26,c1);pr(-12,53,26,7,c1);pr(-10,41,22,2,c2);
  pr(-6,60,12,12,sk);pr(-7,68,15,5,c1);pr(6,68,8,2,c1);pr(-8,61,4,9,c1);pr(3,64,2,2,'#222');
+ if(s.sp==='beetle'){const a=pt(0,72),z=pt(0,87),l=pt(-5,92),r=pt(5,92);LN(...a,...z,'#5a3418',2);LN(...z,...l,'#5a3418',2);LN(...z,...r,'#5a3418',2)}
+ else if(s.sp==='dog'){pr(-12,62,5,11,'#8a5a28');pr(9,62,5,11,'#8a5a28')}
+ else if(s.sp==='panda'){pr(-10,72,5,5,'#222');pr(6,72,5,5,'#222');pr(-5,63,4,4,'#222');pr(3,63,4,4,'#222')}
  const[sx,sy]=pt(6,56),[hxx,hyy]=pt(hx,hy);LN(sx,sy,hxx,hyy,c1,4);const tx=hxx+dir*Math.cos(ang*rad)*len,ty=hyy-Math.sin(ang*rad)*len;
- LN(hxx,hyy,tx,ty,'#e0b878',3);LN(hxx,hyy,hxx+(tx-hxx)*.15,hyy+(ty-hyy)*.15,'#6a3a1a',3);P(hxx-2,hyy-2,5,5,sk)}
+ if(G&&G.fx==='spin'&&s.pose==='swing')for(const a of[ang-40,ang-80])LN(hxx,hyy,hxx+dir*Math.cos(a*rad)*len,hyy-Math.sin(a*rad)*len,'#c8a060',3);
+ LN(hxx,hyy,tx,ty,'#e0b878',giant?7:3);LN(hxx,hyy,hxx+(tx-hxx)*.15,hyy+(ty-hyy)*.15,'#6a3a1a',3);P(hxx-2,hyy-2,5,5,sk)}
 function drawPitcher(t){const pi=V.pit,col=pi?pi.col:V.dcol,fx=160,fy=86,sd=pi?pi.sd:1;let hx=5,hy=14;
- if(pi){const e=t*1000-pi.t0;if(e>=0){const u=e/pi.wind;if(u<.5){hy=14+u*28;hx=4}else if(u<1){hy=28-(u-.5)*16;hx=5+(u-.5)*6}else{hy=20-Math.min(1,(u-1)*3)*10;hx=8}}}
+ if(pi){const e=t*1000-pi.t0;if(e>=0){const u=e/pi.wind;if(u<.5){hy=14+u*34;hx=4}else if(u<1){hy=31-(u-.5)*18;hx=5+(u-.5)*6}else{hy=22-Math.min(1,(u-1)*3)*13;hx=10}}}
  P(fx-3,fy-8,3,8,'#eee');P(fx,fy-8,3,8,'#eee');P(fx-4,fy-1,4,2,'#222');P(fx,fy-1,4,2,'#222');P(fx-4,fy-17,9,9,col);P(fx-4,fy-9,9,1,'#222');P(fx-2,fy-22,5,5,'#f1c18c');P(fx-3,fy-24,7,3,col);
+ if(pi&&(pi.sp==='dog'||pi.sp==='panda')){const c=pi.sp==='dog'?'#8a5a28':'#222';P(fx-4,fy-26,2,2,c);P(fx+3,fy-26,2,2,c)}else if(pi&&pi.sp==='beetle')P(fx,fy-29,1,6,'#5a3418');
  const hp=fx+sd*(3+hx),hq=fy-hy;LN(fx+sd*4,fy-16,hp,hq,col,2);P(hp-1,hq-1,3,3,'#f1c18c');LN(fx-sd*4,fy-15,fx-sd*7,fy-12,col,2);P(fx-sd*8-1,fy-14,3,4,'#6a3a1a')}
 function drawBall(t){const pi=V.pit;if(!pi||pi.hit)return;const p=pi.p,e=t*1000-pi.t0-pi.wind;if(e<0)return;const pr=e/(p.T*1000);if(pr>1.2)return;
  const u=Math.min(1,pr)**2,g=u**1.4,sx=160+pi.sd*9,sy=74,ex=160+p.cx*11,ey=132-p.cy*12,nx=160+(p.cx-p.bx)*11,ny=132-(p.cy-p.by)*12;
- let x=sx+(nx-sx)*u+p.bx*11*g,y=sy+(ny-sy)*u-p.by*12*g;if(pr>1){x=ex;y=ey;if(pr<1.15){P(ex-5,ey,11,1,'#ff0');P(ex,ey-5,1,11,'#ff0')}}
+ const bx=p.sp==='boomerang'&&pr>=.5?-p.bx*.85:p.bx;let x=sx+(nx-sx)*u+bx*11*g,y=sy+(ny-sy)*u-p.by*12*g;if(pr>1){x=ex;y=ey;if(pr<1.15){P(ex-5,ey,11,1,'#ff0');P(ex,ey-5,1,11,'#ff0')}}
+ if(p.sp==='vanish'&&pr>=.3&&pr<=.72){P(x-3,y,1,1,'#ffe14a');P(x+2,y-2,1,1,'#ffe14a');P(x+1,y+3,1,1,'#ffe14a');return}
  const d=Math.round(3+5*Math.min(1,u));disc(x,y,d,'#fff');if(d>4)P(x+1,y,1,1,'#d33')}
-const guy=(x,y,c)=>{x=Math.round(x);y=Math.round(y);P(x-1,y-2,1,2,'#eee');P(x+1,y-2,1,2,'#eee');P(x-2,y-6,5,4,c);P(x-1,y-8,3,2,'#f1c18c');P(x-2,y-9,5,2,c)};
+const guy=(x,y,c,sp)=>{x=Math.round(x);y=Math.round(y);P(x-1,y-2,1,2,'#eee');P(x+1,y-2,1,2,'#eee');P(x-2,y-6,5,4,c);P(x-1,y-8,3,2,'#f1c18c');P(x-2,y-9,5,2,c);if(sp==='dog'||sp==='panda'){const ec=sp==='dog'?'#8a5a28':'#222';P(x-2,y-10,1,1,ec);P(x+2,y-10,1,1,ec)}};
+function guyDive(x,y,c){x=Math.round(x);y=Math.round(y);P(x-4,y-4,8,2,c);P(x+3,y-5,2,2,'#f1c18c');P(x+5,y-4,3,1,c);P(x-6,y-3,2,1,'#eee');P(x-7,y-5,2,1,'#eee')}
 function pathPos(a,b2,u){const f=a+(b2-a)*u,i=Math.min(3,Math.floor(f)),fr=f-i,p=BP[i],q=BP[i+1];return[p[0]+(q[0]-p[0])*fr,p[1]+(q[1]-p[1])*fr]}
 function drawField(t){b.drawImage(fsC,0,0);drawClouds(t,6);b.drawImage(ffC,0,0);const f=V.f,E=[];
- for(let p=1;p<=9;p++)E.push({x:f.fl[p][0],y:f.fl[p][1],c:f.dcol});
- f.runners.forEach(r=>{if(!r.vis)return;const q=pathPos(r.a,r.b,r.u);E.push({x:q[0],y:q[1],c:f.ocol})});
- E.sort((a,c)=>c.y-a.y).forEach(e=>guy(SXf(e.x,e.y),SY(e.y),e.c));
+ for(let p=1;p<=9;p++)E.push({x:f.fl[p][0],y:f.fl[p][1],c:f.dcol,p,sp:f.sp[p]});
+ f.runners.forEach(r=>{if(!r.vis)return;const q=pathPos(r.a,r.b,r.u);E.push({x:q[0],y:q[1],c:f.ocol,sp:r.id.sp})});
+ E.sort((a,c)=>c.y-a.y).forEach(e=>(f.dive===e.p?guyDive:guy)(SXf(e.x,e.y),SY(e.y),e.c,e.sp));
  const bl=f.ball;if(bl.vis){const sx=SXf(bl.x,bl.y),sy=SY(bl.y);P(sx-1,sy,3,1,'rgba(0,0,0,.4)');disc(sx,sy-bl.z*1.7-1,3,'#fff')}}
 function drawBat(t){b.drawImage(skyC,0,0);drawClouds(t);b.drawImage(frC,0,0);drawPitcher(t);drawBatter(t);drawBall(t);
  if(V.spark&&nw()-V.spark<140){P(150,128,21,2,'#ff8');P(160,118,2,22,'#ff8');P(154,122,13,13,'rgba(255,255,200,.7)')}}
@@ -172,9 +195,11 @@ const hudOn=()=>$('#hud').style.display='block',hudOff=()=>{$('#hud').style.disp
 function tel1(s){const e=$('#tel1');e.style.display='block';e.textContent=s}
 function tel2(s){const e=$('#tel2');e.style.display='block';e.textContent=s}
 function flash(s){const e=$('#flash');e.classList.remove('show');void e.offsetWidth;e.textContent=s;e.classList.add('show')}
+function fxSpecial(name){flash('必殺！');tel1('必殺！ '+name);sndFan();const c=$('#cv');let n=0;c.style.transition='transform .15s';const iv=setInterval(()=>{n++;c.style.transform=n<6?`scale(1.22) translate(${ri(-5,5)}px,${ri(-4,4)}px)`:'scale(1)';if(n>=7){clearInterval(iv);c.style.transform=''}},45)}
+function armBtn(kind){if(!G||G.arm.me||G.gauge.me<100)return;const id=pick(kind==='bat'?['spin','giant']:['vanish','boomerang']);G.arm.me=id;G.gauge.me=0;fxSpecial(SPK[id].n);updHUD();if(kind==='bat')setBtns('swing');else if(G.lastPt)setBtns('pitch',G.lastPt)}
 function info(bt,pt){$('#info').textContent=`投手 ${pt.name}（${pt.pc||0}球）　打者 ${bt.name}`}
 function updHUD(){const home=G.myTop?'you':'me',away=G.myTop?'me':'you';
- $('#sb').innerHTML=[away,home].map(k=>`<div class="${(G.top===(k===away))?'cur':''}"><span>${G[k].short}</span><b>${G.sc[k]}</b></div>`).join('')+`<div class="inn">${G.inn}回${G.top?'表':'裏'}</div>`;
+ $('#sb').innerHTML=[away,home].map(k=>`<div class="${(G.top===(k===away))?'cur':''}"><span>${G[k].short}</span><b>${G.sc[k]}</b></div>`).join('')+`<div class="inn">${G.inn}回${G.top?'表':'裏'}</div>`+['me','you'].map(k=>`<div><span>${k==='me'?'自軍':'相手'}必殺</span><span class="gg"><i style="width:${G.gauge[k]}%"></i></span><b>${G.arm[k]?'構え中':G.gauge[k]>=100?'READY':G.gauge[k]}</b></div>`).join('');
  const L=(n,m,c)=>Array.from({length:m},(_,i)=>`<i class="lamp ${i<n?'on ':''}${c}"></i>`).join('');
  $('#cnt').innerHTML=`<div class="cr"><div><div>S${L(G.s,2,'s')}</div><div>B${L(G.b,3,'b')}</div><div>O${L(G.outs,2,'o')}</div></div><div class="dia"><i class="bs ${G.bases[1]?'on':''}" style="left:26px;top:2px"></i><i class="bs ${G.bases[2]?'on':''}" style="left:4px;top:24px"></i><i class="bs ${G.bases[0]?'on':''}" style="left:48px;top:24px"></i></div></div>`}
 function situ(){const bs=G.bases.map((r,i)=>r?`${i+1}`:'').join('');return `${G.outs}アウト ${bs?bs+'塁にランナー':'ランナーなし'}　${G.sc.me}-${G.sc.you}`}
@@ -186,15 +211,15 @@ function pitchBtn(i,e){if(!pitchRes||!pitchAv.includes(i))return;let fx=.5,fy=.5
  const r=pitchRes;pitchRes=null;r({i,ax:(fx-.5)*2.8,ay:(.5-fy)*2.8})}
 function stealBtn(el){G.steal=!G.steal;el.classList.toggle('on',G.steal)}
 const canSteal=()=>{const B=G.bases;return !!((B[0]&&!B[1])||(B[1]&&!B[2]))};
-function setBtns(m,pt){const L=$('#bl'),Rr=$('#br');L.innerHTML='';Rr.innerHTML='';
+function setBtns(m,pt){const L=$('#bl'),Rr=$('#br');L.innerHTML='';Rr.innerHTML='';if(m==='swing'||m==='pitch')L.innerHTML=G.arm.me?`<button class="gb" style="background:#722">必殺：${SPK[G.arm.me].n}</button>`:G.gauge.me>=100?`<button class="gb" style="background:#a33" onpointerdown="armBtn('${m==='swing'?'bat':'pitch'}')">必殺！</button>`:'';
  if(m==='swing'){Rr.innerHTML=[[0,'通常打ち','#d33'],[1,'長打狙い','#e80'],[3,'流し打ち','#27c'],[2,'バント','#2a5']].map(([i,n,c])=>`<button class="gb" style="background:${c}" onpointerdown="swingBtn(${i})">${n}</button>`).join('');
-  if(canSteal())L.innerHTML=`<button class="gb st ${G.steal?'on':''}" onpointerdown="stealBtn(this)">盗塁</button>`}
+  if(canSteal())L.innerHTML+=`<button class="gb st ${G.steal?'on':''}" onpointerdown="stealBtn(this)">盗塁</button>`}
  else if(m==='pitch'){pitchAv=PT.map((t,i)=>i).filter(i=>pt.brk*pf(pt)>=PT[i].th);Rr.innerHTML=pitchAv.map(i=>`<button class="gb" style="background:${['#d33','#27c','#2a8','#a5c','#e80'][i]}" onpointerdown="pitchBtn(${i},event)">${PT[i].n}</button>`).join('')}}
 addEventListener('keydown',e=>{const k=e.key,i='zxcv'.indexOf(k);if(i>=0)swingBtn([0,1,3,2][i]);else if('12345'.includes(k)&&k)pitchBtn(+k-1,null)});
 addEventListener('pointerdown',()=>ac());
 /* ===== 投打ロジック ===== */
 const pit=t=>t.lineup.find(p=>p.pos===1),lim=p=>55+p.stam*.9,pf=p=>{const l=lim(p),c=p.pc||0;return c>l*.75?Math.max(.72,1-(c-l*.75)/(l*.25)*.28):1};
-const mkRun=p=>({name:p.name,speed:p.speed,hero:p.hero,ref:p.ref});
+const mkRun=p=>({name:p.name,speed:p.speed,hero:p.hero,ref:p.ref,sp:p.sp||'human'});
 function relieve(t){const i=t.lineup.findIndex(p=>p.pos===1),old=t.lineup[i],n=t.relief.length?t.relief.shift():mkPlayer(1,t.S-4);n.pos=1;n.num=1;n.pc=0;const li=t.lineup.findIndex(p=>p.pos===7);
  if(old.hero&&li>=0){old.pos=7;t.lineup[li]=n}else t.lineup[i]=n}
 function mkPitch(i,ax,ay,pt){const ty=PT[i],f=pf(pt),sig=.1+(100-pt.ctrl*f)/100*.55,sd=pt.thr==='L'?-1:1,kmh=(105+pt.velo*f*.5)*ty.sp,sc=.55+pt.brk*f/200;
@@ -203,16 +228,17 @@ function cpuPick(pt,bt){const av=PT.map((t,i)=>i).filter(i=>pt.brk*pf(pt)>=PT[i]
  let pb=.3;if(G.s===2)pb=.55;if(G.b>=2&&G.s<2)pb=.12;if(G.b===3)pb=.06;let ax,ay;
  if(R()<pb){ax=(R()<.5?-1:1)*(1.15+R()*.45);ay=(R()*2-1)*1.4;if(i===3)ay=-1.3-R()*.3}else{ax=(R()*2-1)*.8;ay=(R()*2-1)*.8}return mkPitch(i,ax,ay,pt)}
 function swingEval(bt,p,st,tr){const d=(tr-(p.T-.06))*1000,zd=Math.max(Math.abs(p.cx),Math.abs(p.cy));let W=130*(.8+bt.meet/250)*[1,.82,1.25,1.1][st];
- W*=1-(zd>1?Math.min(.85,(zd-1)*.95):0);W*=1-(p.stuff-50)/400;if(Math.abs(d)>W)return null;const t=d/W;return{t,q:cl(1-Math.abs(t)*.85+(bt.meet-50)/400,0,1),cx:p.cx,cy:p.cy,style:st}}
+ W*=1-(zd>1?Math.min(.85,(zd-1)*.95):0);W*=1-(p.stuff-50)/400;if(p.sp==='vanish')W*=.55;else if(p.sp==='boomerang')W*=.72;if(G.fx==='spin')W*=1.35;else if(G.fx==='giant')W*=1.6;if(Math.abs(d)>W)return null;const t=d/W,res={t,q:cl(1-Math.abs(t)*.85+(bt.meet-50)/400,0,1),cx:p.cx,cy:p.cy,style:st};if(G.fx==='giant')res.q=Math.max(res.q,.6);return res}
 function mkHit(bt,c){const sg=bt.side==='R'?-1:1,st=c.style,h={q:c.q,bunt:st===2,hitrun:G.stealNow};
  if(h.bunt){h.q=.05;h.th=(R()-.5)*54;h.V=8+R()*7;h.L=-4+R()*6;return h}
  let th=sg*(-c.t)*38+(st===1?sg*6:0)+(st===3?-sg*24:0)+g3()*4+sg*(bt.side==='R'?-c.cx:c.cx)*6;if(c.q<.22&&R()<.5)th=(R()<.5?-1:1)*(55+R()*20);
  const pw=bt.power*[1,1.3,.3,.8][st];h.th=th;h.V=Math.min(52,18+28*Math.pow(c.q,.9)*(.72+pw/150)*[1,1.12,.5,.88][st]);
+ if(G.fx==='spin')h.V=Math.min(58,h.V*1.15);
  let L=13+c.cy*9+(R()-.5)*16+[0,9,0,-3][st];if(c.q<.4)L+=(R()<.5?-1:1)*(.4-c.q)/.4*22;h.L=L;return h}
-function cpuBat(bt,p,pt){const zd=Math.max(Math.abs(p.cx),Math.abs(p.cy)),zone=zd<=1,stf=p.stuff;let ps=zone?.62+bt.meet/500:.2+bt.meet/800;
- if(G.s===2)ps+=zone?.2:.14;if(G.b===3&&!zone)ps*=.4;if(!R||R()>ps)return{swing:false};
- if(R()>cl(.74+(bt.meet-stf)/180-(zone?0:(zd-1)*.9),.06,.92))return{swing:true};
- const q=cl(.12+R()*.6+(bt.meet-stf)/350-(zone?0:.1),0,1);return{swing:true,hit:mkHit(bt,{q,t:(R()*2-1)*(1-q*.6),style:R()<.2?1:0,cx:p.cx,cy:p.cy})}}
+function cpuBat(bt,p,pt){let spFx=null;if(G.arm.you&&SPK[G.arm.you].k==='bat')spFx=G.arm.you;const zd=Math.max(Math.abs(p.cx),Math.abs(p.cy)),zone=zd<=1,stf=p.stuff;let ps=zone?.62+bt.meet/500:.2+bt.meet/800;
+ if(G.s===2)ps+=zone?.2:.14;if(G.b===3&&!zone)ps*=.4;if(p.sp==='vanish')ps*=.72;if(!R||R()>ps)return{swing:false};
+ if(R()>cl(.74+(bt.meet-stf)/180-(zone?0:(zd-1)*.9),.06,.92)){if(spFx){G.fx=spFx;G.arm.you=null}return{swing:true}}
+ const q=cl(.12+R()*.6+(bt.meet-stf)/350-(zone?0:.1)+(p.sp==='vanish'?-.16:p.sp==='boomerang'?-.08:0)+(spFx?.12:0),0,1);if(spFx){G.fx=spFx;G.arm.you=null}return{swing:true,hit:mkHit(bt,{q,t:(R()*2-1)*(1-q*.6),style:R()<.2?1:0,cx:p.cx,cy:p.cy})}}
 const hold=()=>G.bases.map((r,i)=>r?{r,from:i+1,to:i+1}:null).filter(Boolean);
 function mvHit(n,bat,bonus=0){const mv=[];let lim2=99;for(let i=2;i>=0;i--){const r=G.bases[i];if(!r)continue;const c=i+1;let to=Math.min(4,c+n);
  if(n===1){if(c===2&&R()<.5+r.speed/300+bonus)to=4;else if(c===1&&R()<.15+r.speed/400+bonus)to=3}if(n===2&&c===1&&R()<.35+r.speed/300+bonus)to=4;
@@ -252,32 +278,32 @@ function applyRes(r,bt,pt,k){let runs=0,outs=0;const nb=[null,null,null];
  if(G.outs+outs>=3)runs=0;G.outs+=outs;G.bases=G.outs>=3?[null,null,null]:nb;G.sc[k]+=runs;G.line[k][G.inn-1]=(G.line[k][G.inn-1]||0)+runs;
  const rbi=(r.err||r.dp)?0:runs;if(bt.hero&&bt.ref){const c=bt.ref.rec;if(r.ab)c.ab++;if(r.hit)c.h++;if(r.hr)c.hr++;c.rbi+=rbi}
  if(pt.hero&&pt.ref){const c=pt.ref.rec;c.outs+=outs;c.ra+=runs;if(r.k)c.k++}
- const home=G.myTop?'you':'me',away=G.myTop?'me':'you';if(!G.top&&G.inn>=G.maxInn&&G.sc[home]>G.sc[away])G.over=true;return{runs,outs}}
+ const home=G.myTop?'you':'me',away=G.myTop?'me':'you';if(!G.top&&G.inn>=G.maxInn&&G.sc[home]>G.sc[away])G.over=true;if(r.hr)addGauge(k,GGAIN.hr);else if(r.hit)addGauge(k,GGAIN.hit);return{runs,outs}}
 /* ===== アニメ ===== */
-function initField(off,def){V.f={ball:{x:0,y:0,z:0,vis:false},fl:{},runners:[],ocol:off.color,dcol:def.color};for(let p=1;p<=9;p++)V.f.fl[p]=FP[p].slice();G.bases.forEach((r,i)=>{if(r)V.f.runners.push({id:r,a:i+1,b:i+1,u:1,vis:true})})}
-async function playAnim(r,off,def){initField(off,def);V.mode='field';const f=V.f,bl=f.ball;bl.vis=true;bl.x=0;bl.y=.5;bl.z=1;await sleep(100);const fl=r.fl;
-if(fl){const to=fl.to,fp=r.fp&&f.fl[r.fp]?r.fp:0,from=fp?f.fl[fp].slice():null;if(r.hr)sndCheer();
-await tween(fl.dur,u=>{bl.x=to[0]*u;bl.y=to[1]*u+.5;bl.z=fl.type==='fly'?4*fl.H*u*(1-u)+1:Math.abs(Math.sin(u*Math.PI*3))*(1-u)*1.5;if(fp&&!r.hr){const tu=Math.min(1,u*1.2);f.fl[fp]=[from[0]+(to[0]-from[0])*tu,from[1]+(to[1]-from[1])*tu]}})}
+function initField(off,def){V.f={ball:{x:0,y:0,z:0,vis:false},fl:{},runners:[],ocol:off.color,dcol:def.color,sp:Object.fromEntries(def.lineup.map(p=>[p.pos,p.sp||'human']))};for(let p=1;p<=9;p++)V.f.fl[p]=FP[p].slice();G.bases.forEach((r,i)=>{if(r)V.f.runners.push({id:r,a:i+1,b:i+1,u:1,vis:true})})}
+async function playAnim(r,off,def){initField(off,def);V.mode='field';const SF=()=>(G&&G.fx)?1.7:1;const f=V.f,bl=f.ball;bl.vis=true;bl.x=0;bl.y=.5;bl.z=1;await sleep(100);const fl=r.fl;
+if(fl){const to=fl.to,fp=r.fp&&f.fl[r.fp]?r.fp:0,from=fp?f.fl[fp].slice():null;if(fl.type==='fly'&&fp&&!r.hit&&!r.foul&&Math.hypot(FP[fp][0]-to[0],FP[fp][1]-to[1])>16)f.dive=fp;if(r.hr)sndCheer();
+await tween(fl.dur*SF(),u=>{bl.x=to[0]*u;bl.y=to[1]*u+.5;bl.z=fl.type==='fly'?4*fl.H*u*(1-u)+1:Math.abs(Math.sin(u*Math.PI*3))*(1-u)*1.5;if(fp&&!r.hr){const tu=Math.min(1,u*1.2);f.fl[fp]=[from[0]+(to[0]-from[0])*tu,from[1]+(to[1]-from[1])*tu]}})}
 flash(r.text);tel1(r.text);if(r.hit)sndCheer(.5);else if(!r.foul)sndOut();await sleep(500);if(r.foul)return;
 bl.vis=false;const items=r.mv.map(m=>{let it=f.runners.find(x=>x.id===m.r);if(!it){it={id:m.r,a:0,b:0,u:0,vis:!(m.out&&m.to===0)};f.runners.push(it)}it.a=m.from;it.b=m.to;it.out=m.out;return it});
-const md=Math.max(0,...items.map(it=>Math.abs(it.b-it.a)));if(md>0)await tween(500+md*380,u=>items.forEach(it=>{it.u=u}));items.forEach(it=>{if(it.out)it.vis=false});await sleep(350)}
-async function finishPlay(r,bt,pt,off,def,k){await playAnim(r,off,def);const{runs}=applyRes(r,bt,pt,k);updHUD();
-tel2(runs>0?`${runs}点が入りました！ ${G.sc.me}-${G.sc.you}`:pick(['打球は…','守備陣が落ち着いて処理！','次の打者へ！']));V.mode='bat';V.f=null;await sleep(1100)}
-async function contact(h,bt,off,def){V.pit.hit=true;V.spark=nw();sndHit(h.q);const r=resolveHit(h,bt,def);await sleep(120);
+const md=Math.max(0,...items.map(it=>Math.abs(it.b-it.a)));if(md>0)await tween((500+md*380)*SF(),u=>items.forEach(it=>{it.u=u}));items.forEach(it=>{if(it.out)it.vis=false});await sleep(350)}
+async function finishPlay(r,bt,pt,off,def,k){await playAnim(r,off,def);const{runs,outs}=applyRes(r,bt,pt,k);if(outs>0)addGauge(k==='me'?'you':'me',GGAIN.out*outs);updHUD();
+tel2(runs>0?`${runs}点が入りました！ ${G.sc.me}-${G.sc.you}`:pick(['打球は…','守備陣が落ち着いて処理！','次の打者へ！']));V.mode='bat';V.f=null;await sleep(1100);G.fx=null}
+async function contact(h,bt,off,def){if(h.q>=.72)V.bat.bendT=nw();V.pit.hit=true;V.spark=nw();sndHit(h.q);const r=resolveHit(h,bt,def);await sleep(120);
 if(r.foul){await playAnim(r,off,def);V.mode='bat';V.f=null;return{t:'foul',r,bunt:h.bunt}}return{t:'play',r}}
 function cpuSteal(){const B=G.bases;if(G.outs>=2)return false;const i=B[1]&&!B[2]?1:(B[0]&&!B[1]?0:-1);return i>=0&&R()<.04+B[i].speed/900}
-async function pitchOnce(bt,pt,off,def,mine){V.bat.pose='stand';V.pit=null;V.spark=0;let p;G.stealGo=false;G.stealNow=false;
-if(mine){G.stealGo=G.steal&&canSteal();G.stealNow=G.stealGo;p=cpuPick(pt,bt);setBtns('swing')}
-else{G.stealGo=cpuSteal();setBtns('pitch',pt);const s=await waitPitch();setBtns('');p=mkPitch(s.i,s.ax,s.ay,pt)}
+async function pitchOnce(bt,pt,off,def,mine){G.lastPt=pt;G.fx=null;V.bat.pose='stand';V.pit=null;V.spark=0;let p;G.stealGo=false;G.stealNow=false;
+if(mine){G.stealGo=G.steal&&canSteal();G.stealNow=G.stealGo;if(G.gauge.you>=100&&!G.arm.you){G.arm.you=pick(['vanish','boomerang']);G.gauge.you=0;fxSpecial(SPK[G.arm.you].n)}updHUD();p=cpuPick(pt,bt);if(G.arm.you){p.sp=G.arm.you;G.arm.you=null;p.T*=1.5}setBtns('swing')}
+else{G.stealGo=cpuSteal();setBtns('pitch',pt);const s=await waitPitch();setBtns('');p=mkPitch(s.i,s.ax,s.ay,pt);if(G.arm.me&&SPK[G.arm.me].k==='pitch'){p.sp=G.arm.me;G.arm.me=null;p.T*=1.5}}
 G.steal=false;pt.pc=(pt.pc||0)+1;if(pt.hero)G.heroPC=pt.pc;info(bt,pt);
-const t0=nw(),W=650,rel=t0+W,arr=rel+p.T*1000;V.pit={t0,wind:W,p,hit:false,col:def.color,sd:pt.thr==='L'?-1:1};G.lp=p;
+const t0=nw(),W=650,rel=t0+W,arr=rel+p.T*1000;V.pit={t0,wind:W,p,sp:pt.sp||'human',hit:false,col:def.color,sd:pt.thr==='L'?-1:1};G.lp=p;
 const zd=Math.max(Math.abs(p.cx),Math.abs(p.cy)),zone=zd<=1;let ev;
 if(mine){const sw=await waitSwing(arr+160-nw());setBtns('');
 if(!sw){await sleepTo(arr+50);sndMitt();ev={t:zone?'strike':'ball'}}
-else{V.bat.pose=sw.st===2?'bunt':'swing';V.bat.t0=sw.t;sndSwing();const c=swingEval(bt,p,sw.st,(sw.t-rel)/1000);
-if(!c){await sleepTo(arr+60);ev={t:'strike',miss:1}}else{await sleep(70);ev=await contact(mkHit(bt,c),bt,off,def)}}}
+else{if(sw.st!==2&&G.arm.me&&SPK[G.arm.me].k==='bat'){G.fx=G.arm.me;G.arm.me=null}V.bat.pose=sw.st===2?'bunt':'swing';V.bat.t0=sw.t;sndSwing();const c=swingEval(bt,p,sw.st,(sw.t-rel)/1000);
+if(!c){await sleepTo(arr+60);V.bat.twistT=nw();ev={t:'strike',miss:1}}else{await sleep(70);ev=await contact(mkHit(bt,c),bt,off,def)}}}
 else{const d=cpuBat(bt,p,pt);if(d.swing){await sleepTo(arr-110);V.bat.pose='swing';V.bat.t0=nw();sndSwing();await sleepTo(arr-30)}
-if(d.swing&&d.hit)ev=await contact(d.hit,bt,off,def);else if(d.swing){await sleepTo(arr+60);ev={t:'strike',miss:1}}else{await sleepTo(arr+50);sndMitt();ev={t:zone?'strike':'ball'}}}
+if(d.swing&&d.hit)ev=await contact(d.hit,bt,off,def);else if(d.swing){await sleepTo(arr+60);V.bat.twistT=nw();ev={t:'strike',miss:1}}else{await sleepTo(arr+50);sndMitt();ev={t:zone?'strike':'ball'}}}
 if(ev.t==='strike'||ev.t==='ball'){flash(ev.t==='ball'?'ボール':ev.miss?'空振り！':'ストライク！')}
 if(ev.t!=='play'){tel2(`${p.type.n} ${Math.round(p.kmh)}km/h　${pick(ev.t==='strike'?(ev.miss?CM.miss:CM.strike):ev.t==='ball'?CM.ball:CM.foul)}`);await sleep(550)}return ev}
 async function stealRun(def){const B=G.bases,i=(B[1]&&!B[2])?1:((B[0]&&!B[1])?0:-1);if(i<0)return;const r=B[i],c=def.lineup.find(x=>x.pos===2)||{arm:50};
@@ -285,23 +311,23 @@ const ps=cl(.55+(r.speed-c.arm)/150+(G.lp&&G.lp.type.sp<.85?.08:0)-(G.lp&&G.lp.k
 if(R()<ps){B[i+1]=r;B[i]=null;if(r.hero&&r.ref)r.ref.rec.sb++;flash('盗塁成功！');tel1(`${r.name}、盗塁成功！`);sndCheer(.4)}else{B[i]=null;G.outs++;flash('盗塁失敗…');tel1(`${r.name}、盗塁死！`);sndOut()}updHUD();await sleep(900)}
 async function PA(k,o){const off=G[k],def=G[o],mine=k==='me';let pt=pit(def);
 if((pt.pc||0)>lim(pt)){const old=pt.name;relieve(def);pt=pit(def);tel1(`${def.short}、ピッチャー交代。${pt.name}くん`);tel2(`${old}くん、お疲れさま！`);await sleep(1800)}
-const bt=off.lineup[G.idx[k]];G.b=0;G.s=0;updHUD();V.mode='bat';V.f=null;V.pit=null;V.dcol=def.color;V.bat={side:bt.side,col:off.color,col2:off.color2,pose:'stand',t0:0};
+const bt=off.lineup[G.idx[k]];G.b=0;G.s=0;updHUD();V.mode='bat';V.f=null;V.pit=null;V.dcol=def.color;V.bat={side:bt.side,col:off.color,col2:off.color2,pose:'stand',t0:0,sp:bt.sp||'human',mine:k==='me'};if(k==='you'&&G.gauge.you>=100&&!G.arm.you){G.arm.you=pick(['spin','giant']);G.gauge.you=0;fxSpecial(SPK[G.arm.you].n)}updHUD();
 tel1(`${G.idx[k]+1}番、${PA_[bt.pos]}、${bt.name}くん。背番号${bt.num}`);tel2(situ());info(bt,pt);await sleep(1800);
 for(;;){const ev=await pitchOnce(bt,pt,off,def,mine);let end=false;
 if(ev.t==='ball'){G.b++;if(G.b>=4){end=true;const r={ab:false,mv:mvWalk(mkRun(bt))};flash('フォアボール');tel1('フォアボール！');tel2(pick(CM.BB));await sleep(500);applyRes(r,bt,pt,k);updHUD();await sleep(800)}}
-else if(ev.t==='strike'||(ev.t==='foul'&&ev.bunt&&G.s===2)){G.s++;if(G.s>=3){end=true;const r={ab:true,k:true,mv:[{r:mkRun(bt),from:0,to:0,out:true}].concat(hold())};sndOut();flash('三振！');tel1(`${bt.name}くん、三振！`);tel2(pick(CM.K));applyRes(r,bt,pt,k);updHUD();await sleep(1100)}}
-else if(ev.t==='foul'){if(G.s<2)G.s++}
+else if(ev.t==='strike'||(ev.t==='foul'&&ev.bunt&&G.s===2)){G.s++;if(G.s>=3){addGauge(o,GGAIN.k);end=true;const r={ab:true,k:true,mv:[{r:mkRun(bt),from:0,to:0,out:true}].concat(hold())};sndOut();flash('三振！');tel1(`${bt.name}くん、三振！`);tel2(pick(CM.K));applyRes(r,bt,pt,k);updHUD();await sleep(1100)}else addGauge(o,GGAIN.strike);G.fx=null}
+else if(ev.t==='foul'){if(G.s<2)G.s++;G.fx=null}
 else if(ev.t==='play'){end=true;await finishPlay(ev.r,bt,pt,off,def,k)}
 updHUD();if(G.over)return;
 if(!end&&G.stealGo&&ev.t!=='foul'){await stealRun(def)}
 if(end){G.idx[k]=(G.idx[k]+1)%9;return}if(G.outs>=3)return}}
-async function half(){const k=G.top===G.myTop?'me':'you',o=k==='me'?'you':'me',off=G[k];G.outs=0;G.b=0;G.s=0;G.bases=[null,null,null];G.line[k][G.inn-1]=0;
+async function half(){G.arm.me=null;G.arm.you=null;G.fx=null;const k=G.top===G.myTop?'me':'you',o=k==='me'?'you':'me',off=G[k];G.outs=0;G.b=0;G.s=0;G.bases=[null,null,null];G.line[k][G.inn-1]=0;
 if(G.inn>G.maxInn){const L=off.lineup,i=G.idx[k];G.bases[1]=mkRun(L[(i+8)%9]);G.bases[0]=mkRun(L[(i+7)%9])}
 V.mode='bat';V.pit=null;V.bat=null;updHUD();tel1(`${G.inn}回${G.top?'表':'裏'}　${off.name}の攻撃`);tel2(G.inn>G.maxInn?'タイブレーク！ 一・二塁から':situ());await sleep(1700);
 while(G.outs<3&&!G.over)await PA(k,o);if(G.over)return;const home=G.myTop?'you':'me',away=G.myTop?'me':'you';
 if(G.top){G.top=false;if(G.inn>=G.maxInn&&G.sc[home]>G.sc[away])G.over=true}
 else{G.top=true;if(G.inn>=G.maxInn&&G.sc[home]!==G.sc[away])G.over=true;else if(G.inn>=5&&Math.abs(G.sc.me-G.sc.you)>=10){G.over=true;G.called=true}else G.inn++}}
-async function playMatch(opp,label){const me=buildMine();G={me,you:opp,myTop:R()<.5,inn:1,top:true,outs:0,b:0,s:0,bases:[null,null,null],sc:{me:0,you:0},line:{me:[],you:[]},idx:{me:0,you:0},maxInn:S.inn,over:false,steal:false,heroOut:S.hero.inj>0,heroPC:0,rec0:Object.assign({},S.hero.rec)};
+async function playMatch(opp,label){const me=buildMine();G={gauge:{me:0,you:0},arm:{me:null,you:null},fx:null,lastPt:null,me,you:opp,myTop:R()<.5,inn:1,top:true,outs:0,b:0,s:0,bases:[null,null,null],sc:{me:0,you:0},line:{me:[],you:[]},idx:{me:0,you:0},maxInn:S.inn,over:false,steal:false,heroOut:S.hero.inj>0,heroPC:0,rec0:Object.assign({},S.hero.rec)};
 uiOff();hudOn();V.mode='bat';V.pit=null;V.bat=null;updHUD();setBtns('');tel1(`${label}　${me.name} 対 ${opp.name}`);tel2(G.myTop?'我が校は先攻です':'我が校は後攻です');await sleep(2200);tel1('プレイボール！');sndBell();await sleep(1000);
 while(!G.over)await half();tel1(G.called?'コールドゲーム！':'試合終了！');flash('ゲームセット');sndBell();await sleep(2200);hudOff();V.mode='yard';
 return{win:G.sc.me>G.sc.you,me:G.sc.me,you:G.sc.you,opp:opp.name,label,called:G.called}}
@@ -314,6 +340,7 @@ function help(){ui(`<div class="pn" style="left:60px;top:30px;width:840px;height
 球が来たらタイミングよくボタンを押す！ボタンが打法です：通常打ち／長打狙い(強振・当たりにくい)／流し打ち(逆方向)／バント(送りに)。早いと引っ張り、遅いと流れます。ストライクゾーンの枠は出ません。球をよく見よう。<br>
 球種ボタンを押して投げます。<b>ボタンの中のタップ位置がコース指定</b>（上=高め・左右=内外。画面には出ません）。制球が低いとバラけます。<br>
 自動。<b>盗塁</b>ボタンをONにして打席へ（ランナーがいる時だけ表示）。<br>
+必殺ゲージが満タンになると「必殺」ボタンで必殺技（投球＝魔球系／打撃＝特殊打法）が使えます。主人公は作成時に種族を選べて、種族で能力が変わります。<br>
 大会の合間に練習で能力アップ。ただし<b>疲労</b>がたまると試合で能力が下がり、ケガもします。休養で回復。<br>
 地方予選3勝→甲子園3勝で優勝！ 3年の夏が終わると卒業し、新しい主人公で世代交代します。セーブは自動です。<br>PCキー：Z/X/C/V=打法、1〜5=球種</div>
 <button class="mb" style="width:200px;margin:10px auto" onclick="title()">もどる</button></div>`)}
@@ -322,15 +349,16 @@ const op=PN.map((n,i)=>i?`<option value="${i}">${n}</option>`:'').join('');
 ui(`<div class="pn" style="left:30px;top:18px;width:900px;height:504px;display:flex;gap:18px"><div style="width:330px"><h2>主人公をつくる</h2>
 <label>名前<input id="nm" maxlength="6" value="青野 翔"></label><label>守備位置<select id="ps">${op}</select></label>
 <label>投げ<select id="th"><option value="R">右投げ</option><option value="L">左投げ</option></select></label><label>打ち<select id="bt"><option value="R">右打ち</option><option value="L">左打ち</option></select></label>
+<label>種族<select id="sp"><option value="human">人間（バランス）</option><option value="beetle">カブトムシ（長打特化・鈍足）</option><option value="dog">イヌ（俊足・守備）</option><option value="panda">パンダ（変化・制球）</option></select></label>
 ${gen?'':'<label>試合のイニング数<select id="inn"><option>3</option><option selected>5</option><option>7</option><option>9</option></select></label>'}</div>
 <div style="flex:1"><h2>${gen?SCH().n+'（世代交代）':'学校をえらぶ'}</h2>${gen?'':SCHOOLS.map((s,i)=>`<div class="sch" id="sc${i}" onclick="selSch(${i})"><b style="color:${s.c==='#e8e8f0'?'#fff':s.c}">■</b> <b>${s.n}</b>（チーム力${s.st}）<br>${s.d}</div>`).join('')}
 <button class="mb go" onclick="ngGo()">この内容で始める！</button></div></div>`);if(!gen)selSch(0)}
 function selSch(i){NG.sc=i;SCHOOLS.forEach((_,j)=>{const e=$('#sc'+j);if(e)e.classList.toggle('on',j===i)})}
-function ngGo(){const nm=($('#nm').value||'球児').trim().slice(0,6),ps=+$('#ps').value,th=$('#th').value,bt=$('#bt').value;
-if(NG.gen){S.gen++;S.hero=newHero(nm,ps,th,bt);S.grade=1;S.tS=SCH().st+ri(-2,5)+Math.min(S.titles,3)*2;genMates();S.ph='spring';S.slots=4;S.round=0;S.res=[]}
-else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0};genMates()}
+function ngGo(){const nm=($('#nm').value||'球児').trim().slice(0,6),ps=+$('#ps').value,th=$('#th').value,bt=$('#bt').value,sp=$('#sp').value;
+if(NG.gen){S.gen++;S.hero=newHero(nm,ps,th,bt,sp);S.grade=1;S.tS=SCH().st+ri(-2,5)+Math.min(S.titles,3)*2;genMates();S.ph='spring';S.slots=4;S.round=0;S.res=[]}
+else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0};genMates()}
 MSG='';HM='main';save();hub()}
-function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));HM='main';MSG='';hub()}catch(e){newGame()}}
+function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));if(S.hero&&!S.hero.sp)S.hero.sp='human';HM='main';MSG='';hub()}catch(e){newGame()}}
 const STN=[['meet','ミート','#f55'],['power','パワー','#f90'],['speed','走力','#4c4'],['field','守備','#4ad'],['arm','肩','#aaf'],['velo','球速','#f5a'],['ctrl','制球','#5df'],['brk','変化球','#da5'],['stam','スタミナ','#ee5']];
 const PR={meet:'打撃練習',power:'筋力トレ',speed:'ダッシュ',field:'守備練習',arm:'遠投',velo:'投げ込み',ctrl:'制球練習',brk:'変化球',stam:'走り込み'};
 function hub(){V.mode='yard';hudOff();const h=S.hero,sc=SCH();
@@ -341,7 +369,7 @@ else m=`<h2>${ph}</h2><div class="tx" style="min-height:62px;white-space:pre-lin
 <button class="mb" ${S.slots<=0||h.inj>0?'disabled':''} onclick="HM='practice';hub()">練習する</button><button class="mb" ${S.slots<=0?'disabled':''} onclick="doRest()">休養する</button>
 <button class="mb go" onclick="${S.ph==='spring'?'goTour()':'startMatch()'}">${S.ph==='spring'?'夏の大会へ進む':RL[S.round]+'へ！'}</button>
 <div style="display:flex;gap:8px"><button class="mb" onclick="records()">記録</button><button class="mb" onclick="help2()">ヘルプ</button><button class="mb" onclick="title()">タイトル</button></div>`;
-ui(`<div class="pn" style="left:20px;top:20px;width:470px;height:500px"><div class="tx" style="color:#9df">${sc.n}　${S.gen}代目</div><div style="font-size:28px;font-weight:bold;margin:2px 0 6px">${h.name}<small style="font-size:15px"> ${S.grade}年 ${PN[h.pos]} ${h.thr==='R'?'右':'左'}投${h.bat==='R'?'右':'左'}打</small></div>
+ui(`<div class="pn" style="left:20px;top:20px;width:470px;height:500px"><div class="tx" style="color:#9df">${sc.n}　${S.gen}代目</div><div style="font-size:28px;font-weight:bold;margin:2px 0 6px">${h.name}<small style="font-size:15px"> ${S.grade}年 ${PN[h.pos]}・${SPEC[h.sp||'human'].n} ${h.thr==='R'?'右':'左'}投${h.bat==='R'?'右':'左'}打</small></div>
 <div class="st"><span>疲労</span><div class="bar"><i style="width:${h.fat}%;background:${h.fat>70?'#e33':h.fat>40?'#ea3':'#3c3'}"></i></div><b>${h.fat}</b></div>${h.inj>0?`<div class="warn">ケガ：あと${h.inj}試合 離脱</div>`:''}${bars}<div class="tx">チーム力 ${Math.round(S.tS)}　${S.res.slice(-2).join('<br>')}</div></div><div class="pn" style="left:510px;top:20px;width:430px;height:500px">${m}</div>`)}
 function help2(){ui(`<div class="pn" style="left:60px;top:30px;width:840px;height:480px"><div class="tx" style="font-size:17px">疲労が高いと試合で能力が下がり、ケガの原因になります。練習の合間に「休養」を挟みましょう。ケガ中は練習できず、試合にも出られません。<br>打撃は「球が近づいてきたらボタン」。球種・コースを見て打法を使い分けよう。<br>投球はボタンの<b>タップ位置</b>がコース指定です。</div><button class="mb" style="width:200px" onclick="hub()">もどる</button></div>`)}
 function doPractice(k){const h=S.hero;if(S.slots<=0||h.inj>0)return;S.slots--;
