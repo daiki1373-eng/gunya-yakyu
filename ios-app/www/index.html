@@ -2654,6 +2654,17 @@ const MatchEngine = (() => {
   let tactic = null; // 作戦：'bunt' のみ
   const coreFactor = (coreDiff) => clamp(1.08 - Math.abs(coreDiff) / 46, 0.08, 1);
   let cursorY = 0; // ミートカーソルの縦位置 -44..44
+  const PROJ = {
+    bat: { sx: 622, sy: 230, kx: 1.1, ky: 1.05, cx: 360, cy: 330, r0: 2.5, r1: 12 },
+    pit: { sx: 252, sy: 322, kx: 0.45, ky: 0.4, cx: 622, cy: 262, r0: 10, r1: 3 }
+  };
+  function projPoint(batting, bx, by, t) {
+    const P = batting ? PROJ.bat : PROJ.pit;
+    const tx = P.cx + clamp(bx, -60, 60) * P.kx;
+    const ty = P.cy + clamp(by, -40, 60) * P.ky;
+    const e = t * 0.65 + t * t * 0.35;
+    return { x: P.sx + (tx - P.sx) * e, y: P.sy + (ty - P.sy) * t, r: P.r0 + (P.r1 - P.r0) * Math.pow(t, 1.4) };
+  }
   const coreFactor2 = (ax, ay, cx, cy) => clamp(1.08 - Math.hypot(ax - cx, ay - cy) / 52, 0.06, 1);
   const stealChance = (mash, speedMult) => clamp(0.42 + (speedMult - 1) * 0.5 + mash * 0.018, 0.05, 0.92);
 
@@ -2961,13 +2972,10 @@ const MatchEngine = (() => {
       if (trail.length > 11) trail.shift();
       ball.t += dt / ball.flight;
       const t = clamp(ball.t, 0, 1);
-      const axp = clamp(ball.bx, -60, 60);
-      const ayp = clamp(ball.by, -40, 60);
-      const txp = 480 + axp * 2.2;
-      const typ = 333 + ayp * 2.0;
-      ball.x = 472 + (txp - 472) * (t * 0.65 + t * t * 0.35);
-      ball.y = 205 + (ball.releaseY || 0) * 2 + (typ - 205 - (ball.releaseY || 0) * 2) * t + Math.sin(t * Math.PI) * ball.by * 0.35;
-      ball.r = 3 + 13 * Math.pow(t, 1.6);
+      const bp = projPoint(userBatting(), ball.bx, ball.by, t);
+      ball.x = bp.x;
+      ball.y = bp.y + (ball.releaseY || 0) * 1.5 * (1 - t) + Math.sin(t * Math.PI) * ball.by * 0.3;
+      ball.r = bp.r;
       if (t >= 1) resolveContact();
     } else if (game.phase === 'flight') {
       ball.t += dt / 1.25;
@@ -2989,57 +2997,64 @@ const MatchEngine = (() => {
   }
   function drawFieldScene(g) {
     const W = 960, H = 540;
-    g.clearRect(0, 0, W, H); g.fillStyle = '#07152B'; g.fillRect(0, 0, W, H);
-    g.fillStyle = '#132A48'; g.fillRect(0, 74, W, 150);
-    g.fillStyle = '#F8D77B'; for (let i = 0; i < 8; i += 1) { g.globalAlpha = 0.16 + (i % 2) * 0.08; g.fillRect(55 + i * 122, 34, 58, 7); } g.globalAlpha = 1;
-    for (let i = 0; i < 150; i += 1) { const cx = (i * 67) % 960; const cy = 86 + ((i * 41) % 118); g.fillStyle = ['#3E5F8A', '#8A3E4E', '#C8A24A', '#4E7A5A', '#D8D3C3'][(i * 7) % 5]; g.globalAlpha = 0.5 + ((i * 13) % 10) / 22; g.fillRect(cx, cy, 4, 4); }
-    g.globalAlpha = 1;
-    ['ぐにゃ銀行', 'やきゅうドリンク', '全国高校野球', 'タマゴヤ電機'].forEach((bt, i) => { const bx = 30 + i * 232; g.fillStyle = '#0B2138'; g.fillRect(bx, 196, 210, 26); g.strokeStyle = '#33507A'; g.lineWidth = 2; g.strokeRect(bx, 196, 210, 26); g.fillStyle = '#F8D77B'; g.font = '700 17px sans-serif'; g.textAlign = 'center'; g.fillText(bt, bx + 105, 215); g.textAlign = 'left'; });
-    g.fillStyle = '#173C2B'; g.beginPath(); g.moveTo(0, H); g.lineTo(410, 245); g.lineTo(960, H); g.closePath(); g.fill();
-    g.strokeStyle = '#D7C59B'; g.lineWidth = 3; g.beginPath(); g.moveTo(720, 350); g.lineTo(450, 244); g.lineTo(897, 325); g.stroke();
+    g.clearRect(0, 0, W, H); g.fillStyle = '#9FD3EE'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#7E93A8'; g.fillRect(0, 74, W, 150);
+    g.fillStyle = '#E8EEF4'; for (let i = 0; i < 8; i += 1) { for (let j = 0; j < 3; j += 1) { g.globalAlpha = 0.85; g.fillRect(55 + i * 122, 96 + j * 42, 58, 22); } } g.globalAlpha = 1;
+    g.fillStyle = '#2F7A4E'; g.fillRect(0, 224, W, 10); g.fillStyle = '#5A4632'; for (let i = 0; i < 12; i += 1) g.fillRect(20 + i * 82, 218, 6, 22);
+    ['がんばれ！', '高校野球', '地方大会', 'ぐにゃ学園'].forEach((bt, i) => { const bx = 30 + i * 232; g.fillStyle = '#F2EFE6'; g.fillRect(bx, 196, 210, 26); g.strokeStyle = '#8A93A0'; g.lineWidth = 2; g.strokeRect(bx, 196, 210, 26); g.fillStyle = '#274B73'; g.font = '700 17px sans-serif'; g.textAlign = 'center'; g.fillText(bt, bx + 105, 215); g.textAlign = 'left'; });
+    g.fillStyle = '#C9A26B'; g.beginPath(); g.moveTo(0, H); g.lineTo(410, 245); g.lineTo(960, H); g.closePath(); g.fill();
+    g.strokeStyle = '#FFFFFF'; g.lineWidth = 3; g.beginPath(); g.moveTo(720, 350); g.lineTo(450, 244); g.lineTo(897, 325); g.stroke();
     FIELD_HOME.forEach((f, i) => { const q = fielders[i] || f; player(g, q.x, q.y + 55, '#2F8F4E', Math.sin(clock * 4 + i) * 0.08); });
     if (ball) { g.fillStyle = '#FFF'; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 7 : 9, 0, 7); g.fill(); g.strokeStyle = '#D74437'; g.lineWidth = 2; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 5 : 7, 0.4, 2.4); g.stroke(); }
   }
-  function drawProScene(g) {
+  function drawMatchScene(g) {
     const W = 960, H = 540;
-    g.clearRect(0, 0, W, H); g.fillStyle = '#07152B'; g.fillRect(0, 0, W, H);
-    g.fillStyle = '#132A48'; g.fillRect(0, 60, W, 165);
-    g.fillStyle = '#F8D77B'; for (let i = 0; i < 8; i += 1) { g.globalAlpha = 0.16 + (i % 2) * 0.08; g.fillRect(55 + i * 122, 30, 58, 7); } g.globalAlpha = 1;
-    for (let i = 0; i < 150; i += 1) { const cx = (i * 67) % 960; const cy = 76 + ((i * 41) % 112); g.fillStyle = ['#3E5F8A', '#8A3E4E', '#C8A24A', '#4E7A5A', '#D8D3C3'][(i * 7) % 5]; g.globalAlpha = 0.5 + ((i * 13) % 10) / 22; g.fillRect(cx, cy, 4, 4); }
+    g.clearRect(0, 0, W, H); g.fillStyle = '#9FD3EE'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#FFFFFF';
+    [[140, 62, 66], [300, 42, 48], [700, 56, 74], [858, 40, 44]].forEach(([cx, cy, cw]) => { g.globalAlpha = 0.85; g.beginPath(); g.ellipse(cx, cy, cw, 15, 0, 0, 7); g.fill(); });
     g.globalAlpha = 1;
-    ['ぐにゃ銀行', 'やきゅうドリンク', '全国高校野球', 'タマゴヤ電機'].forEach((bt, i) => { const bx = 30 + i * 232; g.fillStyle = '#0B2138'; g.fillRect(bx, 196, 210, 26); g.strokeStyle = '#33507A'; g.lineWidth = 2; g.strokeRect(bx, 196, 210, 26); g.fillStyle = '#F8D77B'; g.font = '700 17px sans-serif'; g.textAlign = 'center'; g.fillText(bt, bx + 105, 215); g.textAlign = 'left'; });
-    g.fillStyle = '#173C2B'; g.beginPath(); g.moveTo(0, H); g.lineTo(330, 225); g.lineTo(630, 225); g.lineTo(960, H); g.closePath(); g.fill();
-    g.fillStyle = '#8A6B48';
-    g.beginPath(); g.ellipse(480, 238, 95, 15, 0, 0, 7); g.fill();
-    g.beginPath(); g.ellipse(480, 520, 215, 62, 0, 0, 7); g.fill();
-    g.strokeStyle = '#D7C59B'; g.lineWidth = 3; g.beginPath(); g.moveTo(480, 452); g.lineTo(140, 228); g.moveTo(480, 452); g.lineTo(820, 228); g.stroke();
-    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2; g.strokeRect(385, 223, 190, 220);
-    g.strokeStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.moveTo(448, 223); g.lineTo(448, 443); g.moveTo(512, 223); g.lineTo(512, 443); g.moveTo(385, 296); g.lineTo(575, 296); g.moveTo(385, 369); g.lineTo(575, 369); g.stroke();
+    for (let i = 0; i < 9; i += 1) { const bw = 74 + ((i * 37) % 46); const bh = 52 + ((i * 53) % 40); const bx = 6 + i * 108; const by = 238 - bh; g.fillStyle = ['#8FA3B8', '#A8B4BE', '#7E93A8', '#B9C2C9'][i % 4]; g.fillRect(bx, by, bw, bh); g.fillStyle = '#E8EEF4'; for (let wy = by + 10; wy < 230; wy += 16) for (let wx = bx + 8; wx < bx + bw - 10; wx += 16) g.fillRect(wx, wy, 8, 9); }
+    g.fillStyle = '#2F7A4E'; g.fillRect(0, 232, W, 10);
+    g.fillStyle = '#5A4632'; for (let i = 0; i < 12; i += 1) g.fillRect(20 + i * 82, 226, 6, 22);
+    g.fillStyle = '#C9A26B'; g.fillRect(0, 242, W, H - 242);
+    g.fillStyle = '#D8B57E'; g.beginPath(); g.ellipse(215, 505, 175, 44, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(622, 292, 66, 11, 0, 0, 7); g.fill();
+    g.strokeStyle = '#FFFFFF'; g.lineWidth = 3; g.beginPath(); g.moveTo(268, 462); g.lineTo(596, 266); g.moveTo(268, 462); g.lineTo(668, 266); g.stroke();
     const pitchPlay = pitchingSide() === 'user' ? cfg.play : null;
     const pitchMotion = pitchPlay && pitchPlay.motion || { armSwing: 50, release: 50, swingSpeed: 50 };
     const pitchForm = pitchPlay && pitchPlay.pitchingForm || 'overhand';
     const formPose = pitchForm === 'under' ? -0.58 : pitchForm === 'side' ? -0.32 : pitchForm === 'threeQuarter' ? 0.18 : pitchForm === 'tornado' ? 0.72 : pitchForm === 'spread' ? 0.95 : pitchForm === 'spin' ? (game.phase === 'windup' ? Math.sin(clock * 9) * 0.85 : 0.5) : pitchForm === 'dogeza' ? -0.9 : 0.38;
     const pPose = formPose + (game.phase === 'windup' && ball ? Math.sin(clamp(ball.t / ball.wind, 0, 1) * Math.PI) * (0.7 + pitchMotion.armSwing / 180) : 0);
-    g.save(); g.translate(480, 292 + (pitchForm === 'dogeza' ? 30 : 0)); g.scale(1.5, 1.5); player(g, 0, 0, pitchingSide() === 'user' ? '#255FA8' : '#2E7D4F', pPose); g.restore();
     const batPlay = userBatting() ? cfg.play : null;
     const batMotion = batPlay && batPlay.motion || { armSwing: 50, release: 50, swingSpeed: 50 };
     const bForm = batPlay && batPlay.battingForm || 'standard';
     const batPose = bForm === 'open' ? -0.28 : bForm === 'closed' ? 0.25 : bForm === 'oneLeg' ? 0.48 : bForm === 'sway' ? Math.sin(clock * 5) * 0.22 : 0;
     const sw = swingAt !== null && game.phase === 'pitch' && ball ? clamp((ball.t - swingAt) * (5 + batMotion.swingSpeed / 18), 0, 1) : 0;
-    g.save(); g.translate(296, 478); g.scale(1.9, 1.9); player(g, 0, 0, userBatting() ? '#C23B32' : '#2E7D4F', batPose + sw * 1.2);
-    g.save(); g.translate(4, -79); g.rotate(-1.7 + sw * 2.4); g.strokeStyle = '#B98242'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(78, 0); g.stroke(); g.restore();
-    g.restore();
-    g.save(); g.translate(480, 548); g.scale(2.0, 2.0); player(g, 0, 0, '#3A4A5A', 0); g.restore();
-    if (!userBatting() && game.phase === 'ready') { const gx = 480 + aim.ax * 44; const gy = 333 + aim.ay * 40; g.strokeStyle = '#FFF'; g.lineWidth = 2; g.beginPath(); g.arc(gx, gy, 13, 0, 7); g.stroke(); g.fillStyle = '#FFF'; g.beginPath(); g.arc(gx, gy, 3, 0, 7); g.fill(); }
-    if (userBatting()) { const cxp = 480 + batterShift * 2.2; const cyp = 333 + cursorY * 2.0; g.strokeStyle = '#FFB020'; g.lineWidth = 3; g.beginPath(); g.arc(cxp, cyp, 17, 0, 7); g.stroke(); g.fillStyle = '#FFB020'; g.beginPath(); g.arc(cxp, cyp, 3.5, 0, 7); g.fill(); }
-    trail.forEach((tp, i) => { g.globalAlpha = (i + 1) / trail.length * 0.28; g.fillStyle = '#FFF'; g.beginPath(); g.arc(tp.x, tp.y, 3 + (i + 1) / trail.length * 4, 0, 7); g.fill(); });
+    const drawBat = (pose) => { g.save(); g.translate(4, -79); g.rotate(-1.7 + pose * 2.4); g.strokeStyle = '#C8A24A'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(78, 0); g.stroke(); g.restore(); };
+    if (userBatting()) {
+      player(g, 320, 306, '#2E7D4F', Math.sin(clock * 4) * 0.08);
+      player(g, 884, 306, '#2E7D4F', Math.sin(clock * 4 + 2) * 0.08);
+      g.save(); g.translate(622, 240); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', pPose); g.restore();
+      g.strokeStyle = 'rgba(255,255,255,.65)'; g.lineWidth = 2; g.strokeRect(290, 255, 140, 150);
+      g.strokeStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.moveTo(337, 255); g.lineTo(337, 405); g.moveTo(383, 255); g.lineTo(383, 405); g.moveTo(290, 305); g.lineTo(430, 305); g.moveTo(290, 355); g.lineTo(430, 355); g.stroke();
+      const cxp = 360 + batterShift * 1.1; const cyp = 330 + cursorY * 1.05;
+      g.strokeStyle = '#FFB020'; g.lineWidth = 3; g.beginPath(); g.arc(cxp, cyp, 16, 0, 7); g.stroke(); g.fillStyle = '#FFB020'; g.beginPath(); g.arc(cxp, cyp, 3.5, 0, 7); g.fill();
+      g.save(); g.translate(215, 400); g.scale(2.2, 2.2); player(g, 0, 0, '#C23B32', batPose + sw * 1.2); drawBat(sw); g.restore();
+    } else {
+      g.save(); g.translate(648, 242); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', batPose); drawBat(0); g.restore();
+      g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2; g.strokeRect(590, 232, 64, 60);
+      if (game.phase === 'ready') { const gx = 622 + aim.ax * 9; const gy = 262 + aim.ay * 5.6; g.strokeStyle = '#FFF'; g.beginPath(); g.arc(gx, gy, 6, 0, 7); g.stroke(); g.fillStyle = '#FFF'; g.beginPath(); g.arc(gx, gy, 2, 0, 7); g.fill(); }
+      g.save(); g.translate(215, 400 + (pitchForm === 'dogeza' ? 55 : 0)); g.scale(2.2, 2.2); player(g, 0, 0, '#255FA8', pPose); g.restore();
+    }
+    trail.forEach((tp, i) => { g.globalAlpha = (i + 1) / trail.length * 0.28; g.fillStyle = '#FFF'; g.beginPath(); g.arc(tp.x, tp.y, 2 + (i + 1) / trail.length * 3.5, 0, 7); g.fill(); });
     g.globalAlpha = 1;
     if (ball && (game.phase === 'windup' || game.phase === 'pitch')) {
-      const bx2 = game.phase === 'windup' ? 472 : ball.x;
-      const by2 = game.phase === 'windup' ? 205 + (ball.releaseY || 0) * 2 : ball.y;
-      const br = game.phase === 'windup' ? 3 : (ball.r || 9);
+      const P0 = userBatting() ? PROJ.bat : PROJ.pit;
+      const bx2 = game.phase === 'windup' ? P0.sx : ball.x;
+      const by2 = game.phase === 'windup' ? P0.sy + (ball.releaseY || 0) * 1.5 : ball.y;
+      const br = game.phase === 'windup' ? P0.r0 : (ball.r || 9);
       g.fillStyle = '#FFF'; g.beginPath(); g.arc(bx2, by2, br, 0, 7); g.fill();
-      g.strokeStyle = '#D74437'; g.lineWidth = 2; g.beginPath(); g.arc(bx2, by2, br * 0.75, 0.4, 2.4); g.stroke();
+      g.strokeStyle = '#D74437'; g.lineWidth = 2; g.beginPath(); g.arc(bx2, by2, Math.max(1.5, br * 0.75), 0.4, 2.4); g.stroke();
     }
   }
   function drawHeader(g) {
@@ -3059,7 +3074,7 @@ const MatchEngine = (() => {
     g.save();
     g.scale(0.5, 0.5);
     if (shakeT > 0) { g.save(); g.translate((rng() - 0.5) * 9 * shakeT * 4, (rng() - 0.5) * 7 * shakeT * 4); }
-    if (game.phase === 'flight') drawFieldScene(g); else drawProScene(g);
+    if (game.phase === 'flight') drawFieldScene(g); else drawMatchScene(g);
     sparks.forEach((sp) => { const ox = game.phase === 'flight' ? 240 : 0; const oy = game.phase === 'flight' ? -3 : 0; g.globalAlpha = Math.max(0, sp.life / 0.45); g.fillStyle = '#FFB020'; g.beginPath(); g.arc(sp.x + ox, sp.y + oy, 3.2, 0, 7); g.fill(); });
     g.globalAlpha = 1;
     drawHeader(g);
@@ -3067,10 +3082,7 @@ const MatchEngine = (() => {
     g.restore();
     g0.imageSmoothingEnabled = false;
     g0.clearRect(0, 0, 960, 540);
-    const zoom = game.phase === 'windup' || game.phase === 'pitch' ? 1.07 : 1;
-    const swd = 480 / zoom;
-    const shg = 270 / zoom;
-    g0.drawImage(bufC, (480 - swd) / 2 + 30, (270 - shg) / 2 + 8, swd, shg, 0, 0, 960, 540);
+    g0.drawImage(bufC, 0, 0, 480, 270, 0, 0, 960, 540);
   }
   function frame(now) {
     if (state === 'idle') return;
@@ -3100,7 +3112,7 @@ const MatchEngine = (() => {
     else if (kind === 'out') recordOut(side, false, 'アウト');
     else if (kind === 'end') finish(forced);
   }
-  return { mount, start, startPitch, swing, choosePitch, finish, pause, resume, abort, isRunning: () => state !== 'idle', debugAct, HOOKS, beginSteal, resolveSteal, substitute, setTactic, setShift, setShiftTo, setCursor, setAim, testHooks: { coreFactor, coreFactor2, stealChance, clampShift, getCursor: () => ({ x: batterShift, y: cursorY }), staminaFactor: (p, count) => stamina(p, count) } };
+  return { mount, start, startPitch, swing, choosePitch, finish, pause, resume, abort, isRunning: () => state !== 'idle', debugAct, HOOKS, beginSteal, resolveSteal, substitute, setTactic, setShift, setShiftTo, setCursor, setAim, testHooks: { coreFactor, coreFactor2, projPoint, stealChance, clampShift, getCursor: () => ({ x: batterShift, y: cursorY }), staminaFactor: (p, count) => stamina(p, count) } };
 })();
 
 /* =====================================================================
@@ -3227,8 +3239,20 @@ const Sfx = (() => {
     src.connect(fl); fl.connect(g); g.connect(c.destination);
     src.start(t); src.stop(t + dur + 0.05);
   }
+  function ping() {
+    const c = ac(); if (!c) return;
+    const t = c.currentTime;
+    [2350, 3200].forEach((f, i) => {
+      const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const g = c.createGain();
+      g.gain.setValueAtTime(i ? 0.08 : 0.16, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + (i ? 0.05 : 0.09));
+      o.connect(g); g.connect(c.destination);
+      o.start(t); o.stop(t + 0.12);
+    });
+  }
   return {
-    crack: () => burst(0.09, 'highpass', 900, 500, 0.5),
+    crack: () => { burst(0.09, 'highpass', 900, 500, 0.5); ping(); },
     whoosh: () => burst(0.16, 'bandpass', 1400, 300, 0.22),
     crowd: (big) => burst(big ? 1.5 : 0.7, 'lowpass', 500, 240, big ? 0.34 : 0.18),
   };
@@ -4570,6 +4594,16 @@ const MatchFlow = (() => {
     const tunes = Object.values(Anthem.TUNES);
     if (tunes.length !== 3) return '曲数が3でない';
     if (tunes.some((x) => !Array.isArray(x.notes) || x.notes.length < 5)) return '音符が不足';
+    return true;
+  });
+  t("段階F 甲子園V風の投影が手前と奥で切り替わる", () => {
+    const h = MatchEngine.testHooks;
+    const b1 = h.projPoint(true, 0, 0, 1);
+    if (Math.round(b1.x) !== 360 || Math.round(b1.y) !== 330) return `打撃の到達点が違う: ${JSON.stringify(b1)}`;
+    const p1 = h.projPoint(false, 0, 0, 1);
+    if (Math.round(p1.x) !== 622 || Math.round(p1.y) !== 262) return `投球の到達点が違う: ${JSON.stringify(p1)}`;
+    if (!(h.projPoint(true, 0, 0, 0).r < b1.r)) return '打撃で球が大きくならない';
+    if (!(h.projPoint(false, 0, 0, 0).r > p1.r)) return '投球で球が小さくならない';
     return true;
   });
   t("段階E ミートカーソルは2Dで芯を判定する", () => {
