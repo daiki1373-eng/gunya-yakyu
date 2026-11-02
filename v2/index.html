@@ -342,6 +342,7 @@ button{ touch-action:manipulation }
 .eng-action.swing{min-height:54px;background:var(--red);border-color:var(--red);color:#fff;font-size:19px;letter-spacing:.08em}
 .eng-action.swing.pulse{transform:scale(.97)}
 .eng-action:disabled,.eng-select:disabled{opacity:.38}
+.eng-gauge{display:flex;align-items:center;gap:6px;min-width:0}.eng-gauge-label{font-size:11px;white-space:nowrap}.eng-gauge-bar{flex:1;min-width:16px;height:6px;border-radius:4px;background:var(--panel);overflow:hidden}.eng-gauge-bar i{display:block;width:0;height:100%;background:linear-gradient(90deg,#D88B13,#FFD76A)}.eng-action.special{background:linear-gradient(135deg,#B52C25,#B57D18);color:#FFF4CD;border-color:#FFCA55;min-width:0;overflow-wrap:anywhere}.eng-action.special:disabled{background:var(--panel);color:var(--text-2);border-color:var(--line)}
 .eng-meter{height:6px;border-radius:3px;background:var(--panel);overflow:hidden}.eng-meter i{display:block;width:50%;height:100%;background:var(--turf-text)}
 @media (max-height:700px){.eng-controls{gap:5px;padding:6px}.eng-action.swing{min-height:46px}.game-strip{height:58px}}
 
@@ -388,7 +389,7 @@ button{ touch-action:manipulation }
   .eng-commentary{margin-top:20px}
   .eng-stage{grid-area:1/2;min-width:0;min-height:0;display:grid;place-items:center}
   .eng-canvas{position:absolute;inset:0;width:100%;height:100%;min-width:0;min-height:0;object-fit:contain}
-  .eng-diamond{grid-area:1/3/-1/4;align-self:center;max-width:none;margin:0;grid-template-columns:repeat(3,minmax(52px,1fr));grid-template-rows:repeat(3,minmax(52px,auto))}
+  .eng-diamond{grid-area:1/3/-1/4;align-self:center;max-width:none;margin:0 0 72px;grid-template-columns:repeat(3,minmax(52px,1fr));grid-template-rows:repeat(3,minmax(52px,auto))}
   .eng-diamond .eng-action{min-width:52px;min-height:52px}
   [data-eng-dpad]{grid-area:1/1/-1/2;align-self:center;display:grid;max-width:none;margin:0 0 56px;gap:4px;grid-template-columns:repeat(3,minmax(52px,1fr));grid-template-rows:64px 52px 64px}
   [data-eng-dpad] .eng-action{min-width:52px;min-height:52px;padding:0;font-size:22px}
@@ -400,6 +401,7 @@ button{ touch-action:manipulation }
   [data-eng-throw]{gap:4px;flex-wrap:nowrap}
   [data-eng-subs]{grid-area:1/1;align-self:end;z-index:2;gap:4px;flex-wrap:nowrap}
   [data-eng-subs] .eng-select{flex:1;min-width:0;width:100%;height:48px;min-height:48px;padding:0 4px}
+  .eng-gauge{grid-area:1/3;align-self:end;z-index:2;flex-wrap:wrap;gap:4px}.eng-gauge .eng-action{flex-basis:100%;min-height:48px;font-size:11px;padding:4px}
   .eng-meter{grid-area:1/2;align-self:end;z-index:1;margin:0;height:6px}
   [data-engine-act="finish"]{grid-area:1/2;align-self:end;z-index:2;margin:0 0 70px;min-height:48px}
   [data-eng-startrow] .eng-action,[data-eng-throw] .eng-action{height:48px;min-height:48px;min-width:0;padding:0 4px}
@@ -517,6 +519,13 @@ const CONFIG = Object.freeze({
     duplicateCoins: Object.freeze({ 1: 100, 2: 200, 3: 500, 4: 1000 }),
   }),
   LEAGUE: Object.freeze({ rounds: 10, innings: 3, dayBoundaryHour: 4 }),
+  // 段階I：種族は選手の見た目と特性。将来のガチャ排出プールはこのテーブルのキーから作る（UI未実装）
+  SPECIES: Object.freeze({
+    human:  { label: '人間', trait: 'バランス型', mods: {} },
+    beetle: { label: 'カブトムシ', trait: '長打力特化・足は遅い', mods: { power: 16, meet: 4, speed: -14 } },
+    dog:    { label: 'イヌ', trait: '俊足で守備範囲が広い', mods: { speed: 16, defense: 6, power: -8, meet: 2 } },
+    panda:  { label: 'パンダ', trait: '球は遅いが変化と制球が抜群', mods: { kmh: -10, control: 14, movement: 16, stamina: 4 } },
+  }),
   LABELS: Object.freeze({
     pos: Object.freeze({ C: '捕', '1B': '一', '2B': '二', '3B': '三', SS: '遊', LF: '左', CF: '中', RF: '右', DH: '指', P: '投' }),
     posName: Object.freeze({ C: '捕手', '1B': '一塁手', '2B': '二塁手', '3B': '三塁手', SS: '遊撃手', LF: '左翼手', CF: '中堅手', RF: '右翼手', DH: '指名打者', P: '投手' }),
@@ -1291,8 +1300,8 @@ const Growth = (() => {
   const G = CONFIG.GROWTH;
   const LB = CONFIG.LABELS;
   const up = (o, n, kmhUp) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, k === 'kmh' ? v + kmhUp : v + n]));
-  const B = (id, name, number, pos, rarity, lv1, grow) => ({ id, name, number, type: 'B', pos, rarity, lv1, max: up(lv1, grow, 0) });
-  const P = (id, name, number, rarity, lv1, grow, special) => ({ id, name, number, type: 'P', pos: 'P', rarity, lv1, max: up(lv1, grow, 6), special });
+  const B = (id, name, number, pos, rarity, lv1, grow, species = 'human') => ({ id, name, number, species, type: 'B', pos, rarity, lv1, max: up(lv1, grow, 0) });
+  const P = (id, name, number, rarity, lv1, grow, special, species = 'human') => ({ id, name, number, species, type: 'P', pos: 'P', rarity, lv1, max: up(lv1, grow, 6), special });
   // 架空の母校リスト12校（都道府県・チーム特性つき。実在校名は使わない）
   const SCHOOLS = Object.freeze([
     { id: 'SCH01', name: '北星学園', pref: '北海道', trait: 'batting', traitLabel: '打撃型', desc: '長打力重視の強打線（パワー＋・ミート微＋）' },
@@ -1336,6 +1345,9 @@ const Growth = (() => {
     P('N11', '篠原 律', 13, 1, { kmh: 135, control: 49, stamina: 47, movement: 47 }, 10, ['curve']),
     P('N12', '片桐 蓮', 17, 1, { kmh: 136, control: 45, stamina: 49, movement: 48 }, 10, ['fork']),
     // スカウトプール（同じレア度内は均等）
+    B('X01', 'カブト丸', 99, 'DH', 3, { meet: 52, power: 74, speed: 30, defense: 40 }, 18, 'beetle'),
+    B('X02', 'ワンタ', 7, 'CF', 3, { meet: 55, power: 38, speed: 72, defense: 62 }, 18, 'dog'),
+    P('X03', 'パン太', 88, 3, { kmh: 128, control: 58, stamina: 55, movement: 62 }, 18, ['curve', 'sinker'], 'panda'),
     B('B101', '神宮寺 亮', 1, 'CF', 3, { meet: 64, power: 58, speed: 70, defense: 66 }, 18),
     B('B102', '真田 春樹', 3, 'SS', 3, { meet: 68, power: 55, speed: 66, defense: 70 }, 18),
     B('B103', '大河 竜司', 25, '3B', 3, { meet: 57, power: 72, speed: 52, defense: 61 }, 18),
@@ -1356,7 +1368,7 @@ const Growth = (() => {
   const SCHOOL_DEFAULT = Object.freeze({ id: 'SCH04', name: '蒼海学園', pref: '神奈川', trait: 'batting', traitLabel: '打撃型', selected: false });
   const PROTAG_DEFAULT = Object.freeze({
     created: false, pendingNextGen: false, generation: 1, cardId: 'PROTAG',
-    name: '熱血 球児', pos: 'P', type: 'P', throws: 'R', bats: 'R', number: 1, grade: 1,
+    species: 'human', name: '熱血 球児', pos: 'P', type: 'P', throws: 'R', bats: 'R', number: 1, grade: 1,
     stats: { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 },
   });
   const s = {
@@ -1381,8 +1393,8 @@ const Growth = (() => {
     const p = s.protagonist || PROTAG_DEFAULT;
     const isP = p.pos === 'P';
     return isP
-      ? P('PROTAG', p.name || '熱血 球児', p.number || 1, 3, { kmh: 140, control: 48, stamina: 52, movement: 48 }, 18, ['slider', 'fork'])
-      : B('PROTAG', p.name || '熱血 球児', p.number || 1, p.pos || 'CF', 3, { meet: 48, power: 48, speed: 48, defense: 48 }, 18);
+      ? P('PROTAG', p.name || '熱血 球児', p.number || 1, 3, { kmh: 140, control: 48, stamina: 52, movement: 48 }, 18, ['slider', 'fork'], p.species || 'human')
+      : B('PROTAG', p.name || '熱血 球児', p.number || 1, p.pos || 'CF', 3, { meet: 48, power: 48, speed: 48, defense: 48 }, 18, p.species || 'human');
   }
   const master = (id) => (id === 'PROTAG' ? protagMaster() : MASTER.find((c) => c.id === id) || null);
   let matchParticipants = [];
@@ -1398,7 +1410,8 @@ const Growth = (() => {
     const out = {};
     Object.keys(c.lv1).forEach((k) => {
       const v = c.lv1[k] + Math.floor((c.max[k] - c.lv1[k]) * (lv - 1) / (base - 1));
-      out[k] = Math.min(k === 'kmh' ? 165 : 99, v);
+      const mods = (CONFIG.SPECIES[c.species] || CONFIG.SPECIES.human).mods;
+      out[k] = Util.clamp(v + (mods[k] || 0), k === 'kmh' ? 60 : 1, k === 'kmh' ? 165 : 99);
     });
     return out;
   }
@@ -1416,6 +1429,7 @@ const Growth = (() => {
     const isProtagonist = id === 'PROTAG';
     const abilities = abilityAtCard(c, lv);
     return {
+      species: c.species || 'human', speciesLabel: (CONFIG.SPECIES[c.species] || CONFIG.SPECIES.human).label, speciesTrait: (CONFIG.SPECIES[c.species] || CONFIG.SPECIES.human).trait,
       id: c.id, name: c.name, number: c.number, type: c.type, pos: c.pos, posLabel: LB.pos[c.pos], posName: LB.posName[c.pos],
       rarity: c.rarity, rarityName: LB.rarity[c.rarity], lv, maxLv: maxLvOf(c, lb), exp: own ? own.exp : 0, expNext: expToNext(lv), lb,
       grade, gradeLabel: `${grade}年`, isProtagonist, protagonistBadge: isProtagonist ? '主人公' : null,
@@ -1445,6 +1459,7 @@ const Growth = (() => {
       const fit = fits(c, slot.pos);
       return {
         order: i + 1, cardId: c.id, name: c.name, number: c.number, type: 'B', pos: slot.pos, posLabel: LB.pos[slot.pos], fit,
+        species: c.species || 'human',
         grade: c.grade, gradeLabel: c.gradeLabel, isProtagonist: c.isProtagonist, roleLabel: c.roleLabel,
         abilities: { ...c.abilities }, defenseFactor: fit ? 1 : G.misfitDefense,
         effectiveDefense: Math.floor(c.abilities.defense * (fit ? 1 : G.misfitDefense)), overall: c.overall,
@@ -1456,6 +1471,7 @@ const Growth = (() => {
       const c = getCard(id);
       return {
         slot: i + 1, cardId: id, name: c.name, number: c.number, type: 'P',
+        species: c.species || 'human',
         grade: c.grade, gradeLabel: c.gradeLabel, isProtagonist: c.isProtagonist, roleLabel: c.roleLabel,
         abilities: c.abilities, special: c.special, specialNames: c.specialNames, fatigued: c.fatigued, isNext: i === s.nextStarter, overall: c.overall,
       };
@@ -1485,6 +1501,9 @@ const Growth = (() => {
     const g = s.owned.PROTAG ? gradeOf('PROTAG') : (s.protagonist.grade || 1);
     return {
       ...Util.copy(s.protagonist),
+      species: s.protagonist.species || 'human',
+      speciesLabel: (CONFIG.SPECIES[s.protagonist.species] || CONFIG.SPECIES.human).label,
+      speciesTrait: (CONFIG.SPECIES[s.protagonist.species] || CONFIG.SPECIES.human).trait,
       grade: g, gradeLabel: `${g}年`, roleLabel: LB.role[g],
       throwsBats: throwsBatsLabel(s.protagonist.throws, s.protagonist.bats),
       enrolled: !!s.owned.PROTAG,
@@ -1539,12 +1558,13 @@ const Growth = (() => {
       if (input.throwsBats.includes('左投')) throws = 'L'; else if (input.throwsBats.includes('右投')) throws = 'R';
       if (input.throwsBats.includes('左打')) bats = 'L'; else if (input.throwsBats.includes('両打')) bats = 'S'; else if (input.throwsBats.includes('右打')) bats = 'R';
     }
+    const species = Object.hasOwn(CONFIG.SPECIES, input.species) ? input.species : (s.protagonist.species || 'human');
     const number = Util.clamp(Math.floor(Number.isFinite(Number(input.number)) ? Number(input.number) : (pos === 'P' ? 1 : 8)), 1, 99);
     const generation = s.protagonist.pendingNextGen ? (s.protagonist.generation || 1) + 1 : Math.max(1, Math.floor(Number(input.generation) || s.protagonist.generation || 1));
     if (input.schoolId || !s.school.selected) selectSchool(input.schoolId || s.school.id, { commit: false });
     s.protagonist = {
       created: true, pendingNextGen: false, generation, cardId: 'PROTAG',
-      name, pos, type: pos === 'P' ? 'P' : 'B', throws, bats, number, grade: 1,
+      name, pos, species, type: pos === 'P' ? 'P' : 'B', throws, bats, number, grade: 1,
       stats: { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 },
     };
     s.owned.PROTAG = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
@@ -1879,6 +1899,7 @@ const Growth = (() => {
           generation: Math.max(1, Math.floor(p.generation || 1)),
           cardId: 'PROTAG',
           name: typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 16) : PROTAG_DEFAULT.name,
+          species: Object.hasOwn(CONFIG.SPECIES, p.species) ? p.species : 'human',
           pos, type: pos === 'P' ? 'P' : 'B',
           throws: ['R', 'L'].includes(p.throws) ? p.throws : 'R',
           bats: ['R', 'L', 'S'].includes(p.bats) ? p.bats : 'R',
@@ -2399,7 +2420,7 @@ const { League, Correction } = (() => {
     const uBonus = (stat) => Correction.traitBonus(uTrait, stat);
     const snap = Growth.getTeamSnapshot();
     const lineup = snap.lineup.map((b) => ({
-      order: b.order, cardId: b.cardId, name: b.name, number: b.number, pos: b.pos,
+      species: b.species || 'human', order: b.order, cardId: b.cardId, name: b.name, number: b.number, pos: b.pos,
       abilities: { meet: b.abilities.meet, power: b.abilities.power, speed: b.abilities.speed, defense: b.abilities.defense },
       // 適性外の-30%と学校特性補正は能力値を書き換えず、この倍率から MatchEngine.HOOKS へ通す。
       mult: {
@@ -2412,7 +2433,7 @@ const { League, Correction } = (() => {
     const st = snap.starter;
     const a = st.abilities;
     const pitcher = {
-      cardId: st.cardId, name: st.name, number: st.number, kmh: a.kmh,
+      species: st.species || 'human', cardId: st.cardId, name: st.name, number: st.number, kmh: a.kmh,
       abilities: { control: a.control, stamina: a.stamina, movement: a.movement },
       mult: {
         velocity: m3(Correction.kmhScore(a.kmh), uBonus('velocity')),
@@ -2424,12 +2445,12 @@ const { League, Correction } = (() => {
     const inLineup = new Set(lineup.map((b) => b.cardId));
     const ownedAll = Growth.getOwnedCards('overall');
     const bench = ownedAll.filter((c) => c.type === 'F' && !inLineup.has(c.id)).slice(0, 5).map((c) => ({
-      cardId: c.id, name: c.name, number: c.number,
+      species: c.species || 'human', cardId: c.id, name: c.name, number: c.number,
       abilities: { meet: c.abilities.meet, power: c.abilities.power, speed: c.abilities.speed, defense: c.abilities.defense },
       mult: { contact: m3(c.abilities.meet, uBonus('meet')), power: m3(c.abilities.power, uBonus('power')), speed: m3(c.abilities.speed, uBonus('speed')), defense: m3(c.abilities.defense, uBonus('defense')) * (c.defenseFactor || 1) },
     }));
     const benchPitchers = ownedAll.filter((c) => c.type === 'P' && c.id !== st.cardId).slice(0, 3).map((c) => ({
-      cardId: c.id, name: c.name, number: c.number, kmh: c.abilities.kmh,
+      species: c.species || 'human', cardId: c.id, name: c.name, number: c.number, kmh: c.abilities.kmh,
       abilities: { control: c.abilities.control, stamina: c.abilities.stamina, movement: c.abilities.movement },
       mult: { velocity: m3(Correction.kmhScore(c.abilities.kmh), uBonus('velocity')), control: m3(c.abilities.control, uBonus('control')), movement: m3(c.abilities.movement, uBonus('movement')) },
       staminaThreshold: Math.floor(c.abilities.stamina / 2), special: (c.special || []).slice(), fatigued: !!c.fatigued, overall: c.overall,
@@ -2682,6 +2703,13 @@ const MatchEngine = (() => {
     slowball: { name: 'スロー', speed: 0.80, bx: 0, by: 8 },
     mypitch: { name: 'マイ変化球', speed: 0.87, bx: 0, by: 0 },
   });
+  const SPECIALS = Object.freeze({
+    vanish: { kind: 'pitch', name: '消える魔球バニッシュ' },
+    boomerang: { kind: 'pitch', name: '二重変化ブーメラン' },
+    spin: { kind: 'bat', name: 'ぐるぐるトルネード打法' },
+    giant: { kind: 'bat', name: 'デカバットブレイカー' },
+  });
+  const GAUGE_GAIN = Object.freeze({ hit: 30, homerun: 55, strikeout: 40, strike: 10, out: 15 });
   const DEFAULT_BATTER = Object.freeze({ cardId: null, name: '打者', mult: { contact: 1, power: 1, speed: 1, defense: 1 }, abilities: { meet: 50, power: 50, speed: 50, defense: 50 } });
   const DEFAULT_PITCHER = Object.freeze({ cardId: null, name: '投手', kmh: 142, mult: { velocity: 1, control: 1, movement: 1 }, staminaThreshold: 25, special: [], fatigued: false });
   const FIELD_HOME = Object.freeze([{ x: 490, y: 252 }, { x: 610, y: 222 }, { x: 725, y: 254 }, { x: 555, y: 165 }, { x: 690, y: 153 }, { x: 820, y: 178 }]);
@@ -2701,6 +2729,9 @@ const MatchEngine = (() => {
   let bufC = null;
   let sparks = [];
   let shakeT = 0;
+  let slowmoT = 0;
+  let currentSwingSpecial = null;
+  let fxState = { batCore: 0, batWhiff: 0, pitFollow: 0 };
   let aim = { ax: 0, ay: 0 };
   let currentSwingStyle = null;
   let buntStance = false;
@@ -2760,6 +2791,21 @@ const MatchEngine = (() => {
   function emit(type, data = {}) {
     Events.emit(type, { mode: cfg.mode, inning: game.inning, half: game.half, outs: game.outs, score: { ...game.score }, ...data });
   }
+  function addGauge(side, n) { game.gauge[side] = Math.min(100, game.gauge[side] + n); }
+  function activateSpecial(side, kind) {
+    const ids = kind === 'bat' ? ['spin', 'giant'] : ['vanish', 'boomerang'];
+    const id = ids[Math.floor(rng() * ids.length)];
+    game.armed[side] = id; game.gauge[side] = 0;
+    if (port) port.banner('必殺！', SPECIALS[id].name);
+    shakeT = Math.max(shakeT, 0.3);
+  }
+  const specialPhaseReady = () => userBatting() ? ['ready', 'windup', 'pitch'].includes(game.phase) : game.phase === 'ready';
+  function armSpecial() {
+    if (state !== 'running' || game.gauge.user < 100 || game.armed.user || !specialPhaseReady()) return false;
+    activateSpecial('user', userBatting() ? 'bat' : 'pitch');
+    setUi('必殺技を構えました');
+    return true;
+  }
   function setUi(status) {
     if (!port) return;
     const pNow = pitcher(pitchingSide());
@@ -2772,6 +2818,8 @@ const MatchEngine = (() => {
       canPitchButtons: state === 'running' && game.phase === 'ready' && !userBatting(),
       canStartPitch: state === 'running' && game.phase === 'ready' && userBatting(),
       canStyle: state === 'running' && userBatting() && ['windup', 'pitch'].includes(game.phase),
+      gauge: Math.round(game.gauge.user), specialReady: state === 'running' && game.gauge.user >= 100 && !game.armed.user && specialPhaseReady(),
+      armedName: game.armed.user ? SPECIALS[game.armed.user].name : null,
       buntStance, count: { ...game.count }, throwSelect: pendingThrow ? { bases: [1, 2, 3, 4] } : null,
       canPitch: state === 'running' && game.phase === 'ready', canSwing: state === 'running' && game.phase === 'pitch' && userBatting() && swingAt === null,
       canFinish: cfg.mode !== 'league' && cfg.mode !== 'tournament' && game.phase === 'ready', attempts: game.attempts,
@@ -2821,7 +2869,7 @@ const MatchEngine = (() => {
       if (bi < 0) return;
       const old = u.lineup[idx];
       u.lineup[idx] = u.bench[bi];
-      u.bench[bi] = { cardId: old.cardId, name: old.name, number: old.number, abilities: old.abilities, mult: old.mult };
+      u.bench[bi] = { cardId: old.cardId, name: old.name, number: old.number, species: old.species || 'human', abilities: old.abilities, mult: old.mult };
       setUi(`代打：${u.lineup[idx].name}`);
     } else if (kind === 'pitch' && !userBatting() && u.benchPitchers) {
       const bi = u.benchPitchers.findIndex((b) => b.cardId === cardId);
@@ -2844,11 +2892,12 @@ const MatchEngine = (() => {
     if (buntStance && ['up', 'down'].includes(name)) buntAdjust = clamp(buntAdjust + (name === 'down' ? 1 : -1), -1, 1);
   }
   function readyPitch() {
-    game.phase = 'ready'; ball = null; trail = []; swingAt = null; currentSwingStyle = null; swingDir = null;
+    game.phase = 'ready'; ball = null; trail = []; swingAt = null; currentSwingStyle = null; currentSwingSpecial = null; swingDir = null;
     buntStance = false; buntAdjust = 0; aim = { ax: 0, ay: 0 }; pendingThrow = null;
   }
   function atBat() {
     if (state === 'idle') return;
+    if (activeSide() === 'opponent' && game.gauge.opponent >= 100 && !game.armed.opponent) activateSpecial('opponent', 'bat');
     game.count = { s: 0, b: 0 };
     readyPitch();
     const side = activeSide(), b = batter(side);
@@ -2856,8 +2905,10 @@ const MatchEngine = (() => {
     setUi(userBatting() ? '投球開始を押し、球を引きつけてスイング' : '球種を選んで投球開始');
   }
   function addStrike(side, kind) {
+    if (kind === 'swing') fxState.batWhiff = 0.5;
     game.count.s += 1;
     if (game.count.s >= 3) { recordOut(side, true, kind === 'swing' ? '空振り三振' : '見逃し三振'); return; }
+    addGauge(side === 'user' ? 'opponent' : 'user', GAUGE_GAIN.strike);
     readyPitch(); setUi(`${kind === 'swing' ? '空振り' : '見逃し'} ${game.count.s}ストライク`);
   }
   function addBall(side) {
@@ -2898,6 +2949,7 @@ const MatchEngine = (() => {
   function startPitch() {
     if (state !== 'running' || game.phase !== 'ready') return;
     const ps = pitchingSide();
+    if (ps === 'opponent' && game.gauge.opponent >= 100 && !game.armed.opponent) activateSpecial('opponent', 'pitch');
     const p = pitcher(ps);
     const slots = ps === 'user' ? null : pitchButtonsFor(p, null);
     const pick = ps === 'user' ? null : rng();
@@ -2918,6 +2970,7 @@ const MatchEngine = (() => {
     const formY = form === 'under' ? 30 : form === 'side' ? 18 : form === 'threeQuarter' ? 8 : form === 'tornado' ? -8 : form === 'dogeza' ? 34 : form === 'spread' ? 6 : form === 'spin' ? -4 : 0;
     const formX = form === 'side' ? 13 : form === 'under' ? 8 : form === 'tornado' ? -7 : form === 'spread' ? 4 : 0;
     ball = { x: 222, y: 300 + formY + (motion.release - 50) * 0.16, t: 0, id, name: d.name, kmh, bx: d.bx * breakM + formX + aimPt.ax * 20 + (rng() - 0.5) * scatter, by: d.by * breakM + aimPt.ay * 15 + (rng() - 0.5) * scatter, aimX: aimPt.ax, aimY: aimPt.ay, releaseY: formY + (motion.release - 50) * 0.16, wind: 0.22 + (100 - motion.armSwing) * 0.002, flight: flightSeconds(kmh), hit: false };
+    if (game.armed[ps] && SPECIALS[game.armed[ps]].kind === 'pitch') { ball.special = game.armed[ps]; game.armed[ps] = null; slowmoT = 0.9; }
     game.phase = 'windup';
     emit('match:pitch', { side: ps, pitch: id, kmh: Math.round(kmh), count: game.pitches[ps] });
     setUi(`${d.name}　${Math.round(kmh)} km/h`);
@@ -2931,6 +2984,7 @@ const MatchEngine = (() => {
     }
     if (game.phase !== 'pitch' || swingAt !== null) return;
     swingAt = ball.t; currentSwingStyle = style;
+    if (style !== 'bunt' && game.armed.user && SPECIALS[game.armed.user].kind === 'bat') { currentSwingSpecial = game.armed.user; game.armed.user = null; slowmoT = 0.7; }
     if (style !== 'bunt') buntStance = false;
     swingDir = style === 'bunt' ? null : dirHeld.down ? 'down' : dirHeld.up ? 'up' : null;
     if (port) port.swing();
@@ -2960,11 +3014,13 @@ const MatchEngine = (() => {
   }
   function hitBall(side, quality, mods = {}) {
     const b = batter(side);
-    if (ball) { for (let i = 0; i < 12; i += 1) { const a = rng() * Math.PI * 2; const sp = 40 + rng() * 130; sparks.push({ x: ball.x, y: ball.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, life: 0.45 }); } }
-    if (quality > 0.8) shakeT = 0.28;
+    const specialHit = !!(mods.giant || mods.spin || mods.cpuSpecial);
+    const coreHit = quality > 0.8 || specialHit;
+    if (ball) { for (let i = 0; i < (coreHit ? 24 : 12); i += 1) { const a = rng() * Math.PI * 2; const sp = 40 + rng() * 130; sparks.push({ x: ball.x, y: ball.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, life: 0.45 }); } }
+    if (coreHit) { shakeT = Math.max(shakeT, specialHit ? 0.35 : 0.28); fxState.batCore = 0.55; }
     const exit = clamp(HOOKS.exitVelocity(72 + quality * 88, b, cfg), 55, 182);
     const angle = -0.92 + (rng() - 0.5) * 0.42;
-    const dm = (mods.style === 'power' && mods.core ? 1.25 : 1) * (mods.style === 'hnr' ? 0.85 : 1) * orderMult(side) * (mods.dir === 'down' ? 0.94 : mods.dir === 'up' ? 1.08 : 1);
+    const dm = (mods.spin ? 1.15 : 1) * (mods.cpuSpecial ? 1.12 : 1) * (mods.style === 'power' && mods.core ? 1.25 : 1) * (mods.style === 'hnr' ? 0.85 : 1) * orderMult(side) * (mods.dir === 'down' ? 0.94 : mods.dir === 'up' ? 1.08 : 1);
     const dist = clamp((exit * (0.62 + quality * 0.42) + (rng() - 0.5) * 18) * dm, 8, 145);
     const targetX = clamp(500 + Math.cos(angle) * dist * 3.0, 425, 900);
     const targetY = clamp(360 + Math.sin(angle) * dist * 1.45, 115, 390);
@@ -2975,11 +3031,13 @@ const MatchEngine = (() => {
     if (kind !== 'HR' && quality < 0.82 && rng() < clamp(0.60 - quality * 0.34 + (range - 54) / 100 + (mods.dir === 'down' ? 0.12 : 0), 0.12, 0.8)) kind = 'OUT';
     else if (kind === '1B' && rng() < clamp(0.08 + (HOOKS.runSpeed(1, b, cfg) - 1) * 0.35, 0, 0.18)) kind = '2B';
     ball = { ...ball, hit: true, t: 0, sx: 720, sy: 330, tx: targetX, ty: targetY, peak: 70 + quality * 115, dist, kind, mods, rangeF: range };
+    ball.diveIdx = FIELD_HOME.reduce((best, f, i) => Math.hypot(f.x - targetX, f.y - targetY) < Math.hypot(FIELD_HOME[best].x - targetX, FIELD_HOME[best].y - targetY) ? i : best, 0);
     fielders = FIELD_HOME.map((f0) => ({ ...f0, sx: f0.x, sy: f0.y }));
     game.phase = 'flight';
     setUi(kind === 'HR' ? '大きな当たり！' : '打球を追っています');
   }
   function recordHit(side, kind) {
+    addGauge(side, kind === 'HR' ? GAUGE_GAIN.homerun : GAUGE_GAIN.hit);
     const b = batter(side);
     const st = side === 'user' ? stat(b.cardId) : null;
     const bases = kind === 'HR' ? 4 : kind === '2B' ? 2 : 1;
@@ -2997,6 +3055,7 @@ const MatchEngine = (() => {
     setUi(before !== game.score[sideKey(side)] ? `${runs}点入りました` : kind === 'HR' ? 'ホームラン！' : kind === '2B' ? 'ツーベース！' : 'ヒット！');
   }
   function recordOut(side, strikeout = false, label = 'アウト') {
+    addGauge(side === 'user' ? 'opponent' : 'user', strikeout ? GAUGE_GAIN.strikeout : GAUGE_GAIN.out);
     const b = batter(side);
     const st = side === 'user' ? stat(b.cardId) : null;
     if (st) st.ab += 1;
@@ -3012,6 +3071,7 @@ const MatchEngine = (() => {
     game.phase = 'between'; game.nextAt = clock + 0.75; setUi(label);
   }
   function changeHalf() {
+    game.armed = { user: null, opponent: null };
     game.outs = 0;
     game.count = { s: 0, b: 0 };
     game.bases.user.fill(0);
@@ -3027,6 +3087,7 @@ const MatchEngine = (() => {
   }
   function finish(forced) {
     if (state === 'idle') return;
+    game.armed = { user: null, opponent: null };
     const uk = sideKey('user');
     const ok = uk === 'home' ? 'away' : 'home';
     if (forced === 'W' && game.score[uk] <= game.score[ok]) game.score[uk] = game.score[ok] + 1;
@@ -3050,16 +3111,18 @@ const MatchEngine = (() => {
   function resolveContact() {
     const side = activeSide();
     if (!userBatting()) {
+      const cpuSpecial = game.armed.opponent && SPECIALS[game.armed.opponent].kind === 'bat' ? game.armed.opponent : null;
       if (!isStrikeZone(ball) && rng() < 0.55) { addBall(side); return; }
+      if (cpuSpecial) game.armed.opponent = null;
       const b = batter(side), p = pitcher('user');
       const x = { pitch: ball.id, count: game.pitches.user };
       const contact = HOOKS.sweetSpot(1, b, cfg), scatter = HOOKS.pitchScatter(1, p, cfg, x);
       const edge = Math.abs(ball.bx) > 26 || Math.abs(ball.by) > 24 ? -0.05 : 0;
-      const q = clamp(0.46 + (contact - 1) * 0.8 + (scatter - 1) * 0.8 + edge + (rng() - 0.5) * 0.45, 0.05, 0.96);
+      const q = clamp(0.46 + (cpuSpecial ? 0.10 : 0) - (ball.special === 'vanish' ? 0.16 : ball.special === 'boomerang' ? 0.08 : 0) + (contact - 1) * 0.8 + (scatter - 1) * 0.8 + edge + (rng() - 0.5) * 0.45, 0.05, 0.96);
       if (q < 0.30) { addStrike(side, 'swing'); return; }
       if (q < 0.40) { foulBall(side); return; }
       if (q < 0.58) { recordOut(side, false, '守備でアウト'); return; }
-      hitBall(side, clamp(q * orderMult(side), 0.05, 0.97), {}); return;
+      hitBall(side, clamp(q * orderMult(side), 0.05, 0.97), { cpuSpecial: !!cpuSpecial }); return;
     }
     if (swingAt === null) { if (isStrikeZone(ball)) addStrike(side, 'called'); else addBall(side); return; }
     const errMs = Math.abs(swingAt - IDEAL_T) * ball.flight * 1000;
@@ -3075,8 +3138,13 @@ const MatchEngine = (() => {
     const height = ball.by <= -8 ? 1 : ball.by >= 14 ? -1 : 0;
     const heightMatch = swingDir === 'up' ? height : swingDir === 'down' ? -height : 0;
     const style = currentSwingStyle || 'west', j = judgeTiming(errMs, style, heightMatch);
-    const mods = { style, core: j.zone === 'core', dir: swingDir };
+    if (currentSwingSpecial === 'spin') {
+      j.coreW *= 1.35; j.contactW *= 1.35;
+      j.zone = errMs <= j.coreW ? 'core' : errMs <= j.contactW ? 'contact' : 'miss';
+    }
+    const mods = { style, core: j.zone === 'core', dir: swingDir, spin: currentSwingSpecial === 'spin', giant: currentSwingSpecial === 'giant' };
     if (j.zone === 'miss') { addStrike(side, 'swing'); return; }
+    if (j.zone === 'contact' && mods.giant) { hitBall(side, 0.5 + rng() * 0.2, mods); return; }
     if (j.zone === 'contact') { if (rng() < 0.5) foulBall(side); else hitBall(side, 0.15 + rng() * 0.2, mods); return; }
     const quality = clamp((0.55 + 0.45 * (1 - errMs / j.coreW)) * HOOKS.sweetSpot(1, batter(side), cfg) * (heightMatch > 0 ? 1.06 : 1), 0.08, 1);
     hitBall(side, quality, mods);
@@ -3121,6 +3189,7 @@ const MatchEngine = (() => {
     if (state === 'running') setUi('送球完了');
   }
   function update(dt) {
+    Object.keys(fxState).forEach((key) => { fxState[key] = Math.max(0, fxState[key] - dt); });
     clock += dt;
     if (shakeT > 0) shakeT = Math.max(0, shakeT - dt);
     sparks = sparks.filter((sp) => { sp.life -= dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 260 * dt; return sp.life > 0; });
@@ -3129,16 +3198,23 @@ const MatchEngine = (() => {
     if (!ball) return;
     if (game.phase === 'windup') {
       ball.t += dt;
-      if (ball.t >= ball.wind) { ball.t = 0; game.phase = 'pitch'; setUi(userBatting() ? 'いまだ！ スイング' : `${ball.name}を投げました`); }
+      if (ball.t >= ball.wind) { ball.t = 0; game.phase = 'pitch'; fxState.pitFollow = 0.45; setUi(userBatting() ? 'いまだ！ スイング' : `${ball.name}を投げました`); }
     } else if (game.phase === 'pitch') {
-      trail.push({ x: ball.x, y: ball.y });
+      if (!(ball.special === 'vanish' && ball.t > 0.30 && ball.t < 0.72)) trail.push({ x: ball.x, y: ball.y });
+      else trail = [];
       if (trail.length > 11) trail.shift();
+      const prevT = ball.t;
       ball.t += dt / ball.flight;
+      if (ball.special === 'boomerang' && !ball.boomeranged && ball.t >= 0.5) { ball.bx = -ball.bx * 0.85; ball.boomeranged = true; }
       const t = clamp(ball.t, 0, 1);
       const bp = projPoint(userBatting(), ball.bx, ball.by, t);
       ball.x = bp.x;
       ball.y = bp.y + (ball.releaseY || 0) * 1.5 * (1 - t) + Math.sin(t * Math.PI) * ball.by * 0.3;
       ball.r = bp.r;
+      if (ball.special === 'vanish' && [0.30, 0.72].some((edge) => prevT <= edge && ball.t > edge)) {
+        for (let i = 0; i < 6; i += 1) { const a = i * Math.PI / 3; sparks.push({ x: ball.x, y: ball.y, vx: Math.cos(a) * 65, vy: Math.sin(a) * 65, life: 0.3 }); }
+        trail = [];
+      }
       if (t >= 1) resolveContact();
     } else if (game.phase === 'flight') {
       ball.t += dt / 1.25;
@@ -3152,14 +3228,24 @@ const MatchEngine = (() => {
       }
     }
   }
-  function player(g, x, y, color, pose = 0) {
-    g.save(); g.translate(x, y); g.strokeStyle = color; g.fillStyle = '#EBC29B'; g.lineCap = 'round';
-    g.lineWidth = 16; g.beginPath(); g.moveTo(0, -56); g.lineTo(Math.sin(pose) * 14, -16); g.stroke();
+  function player(g, x, y, color, pose = 0, fx = {}) {
+    g.save(); g.translate(x, y); g.rotate(fx.rot || 0); g.scale(1, fx.stretch === undefined ? 1 : fx.stretch); g.strokeStyle = color; g.fillStyle = '#EBC29B'; g.lineCap = 'round';
+    g.lineWidth = 16; g.beginPath(); g.moveTo(0, -56); g.lineTo(Math.sin(pose + (fx.bend || 0)) * 14, -16); g.stroke();
+    g.save(); g.translate(0, -44); g.rotate(fx.bend || 0); g.translate(0, 44);
     g.lineWidth = 9; g.beginPath(); g.moveTo(-2, -44); g.lineTo(-24, -24 + pose * 8); g.moveTo(4, -43); g.lineTo(25, -30 - pose * 8); g.stroke();
+    g.restore();
     g.strokeStyle = '#E8EDF2'; g.lineWidth = 11; g.beginPath(); g.moveTo(0, -16); g.lineTo(-15, 18); g.moveTo(0, -16); g.lineTo(17, 18); g.stroke();
     g.fillStyle = '#EDF1F4'; g.fillRect(-12, -58, 24, 38);
     g.strokeStyle = color; g.lineWidth = 2; g.beginPath(); g.moveTo(-5, -58); g.lineTo(-5, -20); g.moveTo(5, -58); g.lineTo(5, -20); g.stroke();
-    g.beginPath(); g.arc(0, -72, 11, 0, 7); g.fill(); g.fillStyle = color; g.fillRect(-12, -82, 24, 7); g.restore();
+    g.beginPath(); g.arc(0, -72, 11, 0, 7); g.fill(); g.fillStyle = color; g.fillRect(-12, -82, 24, 7);
+    if (fx.species === 'beetle') {
+      g.strokeStyle = color; g.lineWidth = 3; g.beginPath(); g.moveTo(-5, -81); g.quadraticCurveTo(-16, -102, -3, -105); g.moveTo(5, -81); g.quadraticCurveTo(16, -102, 3, -105); g.stroke();
+    } else if (fx.species === 'dog') {
+      g.fillStyle = color; [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * 12, -73, 6, 12, d * 0.25, 0, 7); g.fill(); });
+    } else if (fx.species === 'panda') {
+      g.fillStyle = '#18212A'; [-1, 1].forEach((d) => { g.beginPath(); g.arc(d * 9, -83, 6, 0, 7); g.fill(); g.beginPath(); g.ellipse(d * 5, -72, 4, 5, d * 0.3, 0, 7); g.fill(); });
+    }
+    g.restore();
   }
   function drawFieldScene(g) {
     const W = 960, H = 540;
@@ -3170,7 +3256,23 @@ const MatchEngine = (() => {
     ['がんばれ！', '高校野球', '地方大会', 'ぐにゃ学園'].forEach((bt, i) => { const bx = 30 + i * 232; g.fillStyle = '#F2EFE6'; g.fillRect(bx, 196, 210, 26); g.strokeStyle = '#8A93A0'; g.lineWidth = 2; g.strokeRect(bx, 196, 210, 26); g.fillStyle = '#274B73'; g.font = '700 17px sans-serif'; g.textAlign = 'center'; g.fillText(bt, bx + 105, 215); g.textAlign = 'left'; });
     g.fillStyle = '#C9A26B'; g.beginPath(); g.moveTo(0, H); g.lineTo(410, 245); g.lineTo(960, H); g.closePath(); g.fill();
     g.strokeStyle = '#FFFFFF'; g.lineWidth = 3; g.beginPath(); g.moveTo(720, 350); g.lineTo(450, 244); g.lineTo(897, 325); g.stroke();
-    FIELD_HOME.forEach((f, i) => { const q = fielders[i] || f; player(g, q.x, q.y + 55, '#2F8F4E', Math.sin(clock * 4 + i) * 0.08); });
+    FIELD_HOME.forEach((f, i) => {
+      const q = fielders[i] || f, dive = game.phase === 'flight' && ball.kind === 'OUT' && ball.diveIdx === i ? clamp((ball.t - 0.55) / 0.45, 0, 1) : 0;
+      const defense = team(pitchingSide()), entry = defense && defense.lineup && defense.lineup[i];
+      player(g, q.x, q.y + 55, '#2F8F4E', Math.sin(clock * 4 + i) * 0.08, { rot: -1.15 * dive, stretch: 1 + 0.12 * dive, species: entry && entry.species || 'human' });
+    });
+    if (game.phase === 'flight') {
+      const bases = [[700,352], [806,302], [700,256], [594,302], [700,352]], side = activeSide(), t = clamp(ball.t, 0, 1);
+      const run = (progress, entry, offset) => {
+        const n = Math.min(3, Math.floor(progress)), f = progress - n, a = bases[n], b = bases[n + 1];
+        const bounce = Math.sin(t * 34 + offset);
+        g.save(); g.translate(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f + bounce * 3); g.scale(0.36, 0.36);
+        player(g, 0, 0, side === 'user' ? '#C23B32' : '#255FA8', bounce * 0.3, { rot: 0.35, stretch: 1 + bounce * 0.06, species: entry && entry.species || 'human' }); g.restore();
+      };
+      run(t * (ball.kind === 'HR' ? 4 : ball.kind === '2B' ? 2 : 1), batter(side), 0);
+      const offense = team(side);
+      game.bases[side].forEach((occupied, i) => { if (occupied) { const lineup = offense && offense.lineup; const entry = lineup && lineup[(game.order[side] - i - 1 + lineup.length * 2) % lineup.length]; run(i + 1 + t * 0.5, entry, i + 1); } });
+    }
     if (ball) { g.fillStyle = '#FFF'; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 7 : 9, 0, 7); g.fill(); g.strokeStyle = '#D74437'; g.lineWidth = 2; g.beginPath(); g.arc(ball.x, ball.y, ball.hit ? 5 : 7, 0.4, 2.4); g.stroke(); }
   }
   function drawMatchScene(g) {
@@ -3196,19 +3298,22 @@ const MatchEngine = (() => {
     const bForm = batPlay && batPlay.battingForm || 'standard';
     const batPose = bForm === 'open' ? -0.28 : bForm === 'closed' ? 0.25 : bForm === 'oneLeg' ? 0.48 : bForm === 'sway' ? Math.sin(clock * 5) * 0.22 : 0;
     const sw = swingAt !== null && game.phase === 'pitch' && ball ? clamp((ball.t - swingAt) * (5 + batMotion.swingSpeed / 18), 0, 1) : 0;
-    const drawBat = (pose) => { g.save(); g.translate(4, -79); g.rotate(userBatting() && buntStance ? -0.2 : -1.7 + pose * 2.4); g.strokeStyle = '#C8A24A'; g.lineWidth = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(78, 0); g.stroke(); g.restore(); };
+    const bFx = { species: batter().species || 'human', bend: -0.85 * Math.sin(fxState.batCore / 0.55 * Math.PI) + (fxState.batWhiff > 0 ? 0.6 : 0), rot: (fxState.batWhiff > 0 ? Math.sin((0.5 - fxState.batWhiff) * 30) * 0.45 : 0) + (currentSwingSpecial === 'spin' && sw > 0 ? sw * Math.PI * 2 : 0) };
+    const pFx = { species: pitcher().species || 'human', bend: 0.55 * Math.sin(fxState.pitFollow / 0.45 * Math.PI) };
+    const giantBat = currentSwingSpecial === 'giant';
+    const drawBat = (pose, length = 1, width = 1) => { g.save(); g.translate(4, -79); g.rotate(userBatting() && buntStance ? -0.2 : -1.7 + pose * 2.4); g.strokeStyle = '#C8A24A'; g.lineWidth = 10 * width; g.beginPath(); g.moveTo(0, 0); g.lineTo(78 * length, 0); g.stroke(); g.restore(); };
     if (userBatting()) {
-      player(g, 320, 306, '#2E7D4F', Math.sin(clock * 4) * 0.08);
-      player(g, 884, 306, '#2E7D4F', Math.sin(clock * 4 + 2) * 0.08);
-      g.save(); g.translate(622, 240); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', pPose); g.restore();
-      g.save(); g.translate(215, 400); g.scale(2.2, 2.2); player(g, 0, 0, '#C23B32', batPose + sw * 1.2); drawBat(sw); g.restore();
+      player(g, 320, 306, '#2E7D4F', Math.sin(clock * 4) * 0.08, { species: (team(pitchingSide())?.lineup?.[0]?.species) || 'human' });
+      player(g, 884, 306, '#2E7D4F', Math.sin(clock * 4 + 2) * 0.08, { species: (team(pitchingSide())?.lineup?.[1]?.species) || 'human' });
+      g.save(); g.translate(622, 240); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', pPose, pFx); g.restore();
+      g.save(); g.translate(215, 400); g.scale(2.2, 2.2); player(g, 0, 0, '#C23B32', batPose + sw * 1.2, bFx); g.rotate(bFx.rot); drawBat(sw, giantBat ? 2.3 : 1, giantBat ? 1.6 : 1); g.restore();
     } else {
-      g.save(); g.translate(648, 242); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', batPose); drawBat(0); g.restore();
-      g.save(); g.translate(215, 400 + (pitchForm === 'dogeza' ? 55 : 0)); g.scale(2.2, 2.2); player(g, 0, 0, '#255FA8', pPose); g.restore();
+      g.save(); g.translate(648, 242); g.scale(0.62, 0.62); player(g, 0, 0, '#2E7D4F', batPose, bFx); g.rotate(bFx.rot); drawBat(0, giantBat ? 2.3 : 1, giantBat ? 1.6 : 1); g.restore();
+      g.save(); g.translate(215, 400 + (pitchForm === 'dogeza' ? 55 : 0)); g.scale(2.2, 2.2); player(g, 0, 0, '#255FA8', pPose, pFx); g.restore();
     }
     trail.forEach((tp, i) => { g.globalAlpha = (i + 1) / trail.length * 0.28; g.fillStyle = '#FFF'; g.beginPath(); g.arc(tp.x, tp.y, 2 + (i + 1) / trail.length * 3.5, 0, 7); g.fill(); });
     g.globalAlpha = 1;
-    if (ball && (game.phase === 'windup' || game.phase === 'pitch')) {
+    if (ball && (game.phase === 'windup' || game.phase === 'pitch') && !(game.phase === 'pitch' && ball.special === 'vanish' && ball.t > 0.30 && ball.t < 0.72)) {
       const P0 = userBatting() ? PROJ.bat : PROJ.pit;
       const bx2 = game.phase === 'windup' ? P0.sx : ball.x;
       const by2 = game.phase === 'windup' ? P0.sy + (ball.releaseY || 0) * 1.5 : ball.y;
@@ -3237,9 +3342,12 @@ const MatchEngine = (() => {
     g.save();
     g.scale(0.5, 0.5);
     if (shakeT > 0) { g.save(); g.translate((rng() - 0.5) * 9 * shakeT * 4, (rng() - 0.5) * 7 * shakeT * 4); }
+    g.save();
+    if (slowmoT > 0 && ['windup', 'pitch'].includes(game.phase)) { const cx = userBatting() ? 420 : 430; g.translate(cx, 320); g.scale(1.22, 1.22); g.translate(-cx, -320); }
     if (game.phase === 'flight' || game.phase === 'throw') drawFieldScene(g); else drawMatchScene(g);
     sparks.forEach((sp) => { const ox = game.phase === 'flight' ? 240 : 0; const oy = game.phase === 'flight' ? -3 : 0; g.globalAlpha = Math.max(0, sp.life / 0.45); g.fillStyle = '#FFB020'; g.beginPath(); g.arc(sp.x + ox, sp.y + oy, 3.2, 0, 7); g.fill(); });
     g.globalAlpha = 1;
+    g.restore();
     drawHeader(g);
     if (shakeT > 0) g.restore();
     g.restore();
@@ -3249,7 +3357,9 @@ const MatchEngine = (() => {
   }
   function frame(now) {
     if (state === 'idle') return;
-    const dt = Math.min(0.034, last ? (now - last) / 1000 : 0); last = now;
+    const dtReal = last ? Math.max(0, (now - last) / 1000) : 0; last = now;
+    let dt = Math.min(0.034, dtReal);
+    if (slowmoT > 0 && state !== 'paused') { slowmoT = Math.max(0, slowmoT - dtReal); dt *= 0.35; }
     update(state === 'paused' ? 0 : dt); draw(); raf = requestAnimationFrame(frame);
   }
   function mount(drawingPort) { port = drawingPort; }
@@ -3257,8 +3367,9 @@ const MatchEngine = (() => {
     cfg = matchConfig; state = 'running'; rng = (() => { let s = (cfg.seed || 1) >>> 0; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
     selectedPitch = (cfg.unlockedPitches || []).includes(cfg.play && cfg.play.selectedPitch) ? cfg.play.selectedPitch : (cfg.unlockedPitches && cfg.unlockedPitches[0]) || 'fastball';
     currentSwingStyle = null; buntStance = false; buntAdjust = 0; dirHeld = { up: false, down: false, left: false, right: false }; swingDir = null; pendingThrow = null;
+    currentSwingSpecial = null; slowmoT = 0; fxState = { batCore: 0, batWhiff: 0, pitFollow: 0 };
     trail = []; sparks = []; shakeT = 0; aim = { ax: 0, ay: 0 };
-    game = { inning: 1, half: 'top', outs: 0, count: { s: 0, b: 0 }, score: { home: 0, away: 0 }, order: { user: 0, opponent: 0 }, pitches: { user: 0, opponent: 0 }, bases: { user: [0, 0, 0], opponent: [0, 0, 0] }, batting: {}, k: 0, attempts: 0, phase: 'ready', nextAt: 0, pitchCounts: {} };
+    game = { gauge: { user: 0, opponent: 0 }, armed: { user: null, opponent: null }, inning: 1, half: 'top', outs: 0, count: { s: 0, b: 0 }, score: { home: 0, away: 0 }, order: { user: 0, opponent: 0 }, pitches: { user: 0, opponent: 0 }, bases: { user: [0, 0, 0], opponent: [0, 0, 0] }, batting: {}, k: 0, attempts: 0, phase: 'ready', nextAt: 0, pitchCounts: {} };
     const participants = cfg.teams ? [...cfg.teams.user.lineup.map((b) => b.cardId), cfg.teams.user.pitcher.cardId] : [];
     fielders = FIELD_HOME.map((f) => ({ ...f })); clock = 0; last = 0; emit('match:start', { userSide: cfg.userSide, participants }); atBat();
     if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
@@ -3276,7 +3387,7 @@ const MatchEngine = (() => {
     else if (kind === 'out') recordOut(side, false, 'アウト');
     else if (kind === 'end') finish(forced);
   }
-  return { mount, start, startPitch, swing, choosePitch, finish, pause, resume, abort, isRunning: () => state !== 'idle', debugAct, HOOKS, beginSteal, resolveSteal, substitute, swingStyle, setDir, choosePitchButton, chooseThrow, testHooks: { ORDER_MULT, orderMultAt, flightSeconds, judgeTiming, pitchButtonsFor, isStrikeZone, throwSelectEnabled, coreFactor, projPoint, stealChance, staminaFactor: (p, count) => stamina(p, count) } };
+  return { mount, start, armSpecial, startPitch, swing, choosePitch, finish, pause, resume, abort, isRunning: () => state !== 'idle', debugAct, HOOKS, beginSteal, resolveSteal, substitute, swingStyle, setDir, choosePitchButton, chooseThrow, testHooks: { atBat, SPECIALS, GAUGE_GAIN, gaugeSnapshot: () => (game ? { gauge: { ...game.gauge }, armed: { ...game.armed } } : null), ORDER_MULT, orderMultAt, flightSeconds, judgeTiming, pitchButtonsFor, isStrikeZone, throwSelectEnabled, coreFactor, projPoint, stealChance, staminaFactor: (p, count) => stamina(p, count) } };
 })();
 
 /* =====================================================================
@@ -3290,7 +3401,12 @@ const View = (() => {
   const draft = (text = '仮データ') => `<span class="draft">${text}</span>`;
   const lockNote = (text) => `<p class="lock-note">${icon('lock')}<span>${text}</span></p>`;
   const pageHead = (title) => `<div class="page-h"><button class="icon-btn" type="button" data-act="back" aria-label="戻る">${icon('back')}</button><h1>${title}</h1></div>`;
-  const figure = (c) => `<svg viewBox="0 0 80 96" aria-hidden="true"><path class="fig-body" d="M12 96V77c0-12 9-21 21-21h14c12 0 21 9 21 21v19z"/><circle class="fig-body" cx="40" cy="37" r="12.5"/><path class="fig-cap" d="M26.5 34a13.5 13 0 0 1 27 0z"/><rect class="fig-cap" x="26.5" y="32" width="34" height="4" rx="2"/><text class="fig-num" x="40" y="89" text-anchor="middle">${c.number}</text></svg>`;
+  const figure = (c) => {
+    const panda = c.species === 'panda';
+    const ears = c.species === 'dog' ? '<ellipse cx="25" cy="40" rx="6" ry="13" fill="#805636"/><ellipse cx="55" cy="40" rx="6" ry="13" fill="#805636"/>' : panda ? '<circle cx="28" cy="25" r="7" fill="#171b24"/><circle cx="52" cy="25" r="7" fill="#171b24"/>' : '';
+    const decoration = c.species === 'beetle' ? '<path d="M37 27V16L27 9V2L40 12L53 2V9L43 16V27Z" fill="#65402a" stroke="#32271f" stroke-width="1.5"/>' : panda ? '<ellipse cx="35" cy="39" rx="4" ry="5" fill="#171b24"/><ellipse cx="45" cy="39" rx="4" ry="5" fill="#171b24"/>' : '';
+    return `<svg viewBox="0 0 80 96" aria-hidden="true"><path class="fig-body" d="M12 96V77c0-12 9-21 21-21h14c12 0 21 9 21 21v19z"/>${ears}<circle ${panda ? 'fill="#fff"' : 'class="fig-body"'} cx="40" cy="37" r="12.5"/><path class="fig-cap" d="M26.5 34a13.5 13 0 0 1 27 0z"/><rect class="fig-cap" x="26.5" y="32" width="34" height="4" rx="2"/>${decoration}<text class="fig-num" x="40" y="89" text-anchor="middle">${c.number}</text></svg>`;
+  };
   // [表示名, 略称, 表示する値, ランクと棒に使う0〜100の値]
   function triples(c) {
     const a = c.abilities;
@@ -3309,10 +3425,11 @@ const View = (() => {
     const tag = opts.go ? 'button' : opts.tag || 'div';
     const attrs = opts.go ? ` type="button" data-go="player" data-id="${c.id}" aria-label="${esc(c.name)}の詳細"` : '';
     const body = opts.size === 'is-mini' ? `<span class="pc-ranks">${miniRanks(c)}</span>` : `<span class="pc-abs">${abilityList(c)}</span>`;
+    const speciesTag = c.species && c.species !== 'human' ? `<span class="tag-grade">[${esc(c.speciesLabel)}]</span>` : '';
     const gradeTag = c.grade ? `<span class="tag-grade">${c.grade}年</span>` : '';
     const protagTag = c.isProtagonist ? `<span class="tag-protag">${esc(c.protagonistBadge || '主人公')}</span>` : '';
     const sub = `${'★'.repeat(c.rarity)} ${c.rarityName}　Lv${c.lv}${opts.caption ? `　${esc(opts.caption)}` : ''}`;
-    return `<${tag} class="pcard r${c.rarity}${opts.size ? ` ${opts.size}` : ''}"${attrs}><span class="pc-top"><span class="pc-pos">${c.posLabel}</span><span class="pc-ovr"><small>総合</small><b>${c.overall}</b></span></span><span class="pc-fig">${figure(c)}</span><span class="pc-name">${esc(c.name)}${protagTag}${gradeTag}</span><span class="pc-sub">${sub}</span>${body}</${tag}>`;
+    return `<${tag} class="pcard r${c.rarity}${opts.size ? ` ${opts.size}` : ''}"${attrs}><span class="pc-top"><span class="pc-pos">${c.posLabel}</span><span class="pc-ovr"><small>総合</small><b>${c.overall}</b></span></span><span class="pc-fig">${figure(c)}</span><span class="pc-name">${esc(c.name)}${speciesTag}${protagTag}${gradeTag}</span><span class="pc-sub">${sub}</span>${body}</${tag}>`;
   }
   // 相手の先発（カードマスタにいない選手）をカードの形で見せる
   function oppPitcherCard(p) {
@@ -3450,6 +3567,28 @@ const NativeFeel = (() => {
     } catch (e) { /* 触覚なしで続行 */ }
   }
   return { tap: () => fire('LIGHT'), hit: () => fire('MEDIUM'), big: () => fire('HEAVY') };
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：試合キャンバスのDOMアダプター ---- */
@@ -3479,6 +3618,7 @@ const GameSurface = (() => {
         <div class="eng-row" data-eng-dpad hidden aria-label="方向">${[['up', '↑'], ['down', '↓'], ['left', '←'], ['right', '→']].map(([dir, label]) => `<button class="eng-action" type="button" data-dir="${dir}">${label}</button>`).join('')}</div>
         <div class="eng-row" data-eng-throw hidden>${['一塁', '二塁', '三塁', '本塁'].map((name, i) => `<button class="eng-action" type="button" data-throw="${i + 1}">${name}</button>`).join('')}</div>
         <div class="eng-row" data-eng-subs hidden><select class="eng-select" data-engine-sub="bat" aria-label="代打"><option value="">代打を選ぶ</option></select><select class="eng-select" data-engine-sub="pitch" aria-label="投手交代"><option value="">投手交代</option></select></div>
+        <div class="eng-gauge" data-eng-gauge hidden><span class="eng-gauge-label">必殺ゲージ</span><div class="eng-gauge-bar"><i></i></div><button class="eng-action special" type="button" data-engine-act="special" disabled>必殺</button></div>
         <div class="eng-meter" aria-hidden="true"><i></i></div>
         <button class="eng-action" type="button" data-engine-act="finish" hidden>このモードを終了</button>
       </div>
@@ -3491,6 +3631,11 @@ const GameSurface = (() => {
   function update(v) {
     if (!root) return;
     lastView = v;
+    const gauge = one('[data-eng-gauge]'), specialButton = one('[data-engine-act="special"]');
+    gauge.hidden = typeof v.gauge !== 'number';
+    if (!gauge.hidden) gauge.querySelector('i').style.width = `${v.gauge}%`;
+    specialButton.disabled = !v.specialReady || !!v.armedName;
+    specialButton.textContent = v.armedName ? `必殺：${v.armedName}` : '必殺';
     const status = one('.eng-status');
     const pitch = one('[data-engine-act="pitch"]');
     const finish = one('[data-engine-act="finish"]');
@@ -3581,6 +3726,7 @@ const GameSurface = (() => {
     if (b.dataset.style) playStyle(b.dataset.style);
     else if (b.dataset.pitchbtn) MatchEngine.choosePitchButton(b.dataset.pitchbtn);
     else if (b.dataset.throw) MatchEngine.chooseThrow(Number(b.dataset.throw));
+    else if (b.dataset.engineAct === 'special') MatchEngine.armSpecial();
     else if (b.dataset.engineAct === 'pitch') MatchEngine.startPitch();
     else if (b.dataset.engineAct === 'finish') MatchEngine.finish();
     else if (b.dataset.eng === 'end') MatchEngine.debugAct('end', b.dataset.r);
@@ -3638,6 +3784,28 @@ const GameSurface = (() => {
     return port;
   }
   return { mount };
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：画面シェル（ヘッダー・タブ・モーダル・デモ広告・トースト） ---- */
@@ -3730,6 +3898,28 @@ const Shell = (() => {
     });
   }
   return { mount, renderTabs, refreshHeader, toast, openModal, closeModal, confirm, confirmOk, showDemoAd, hasModal: () => !!modal, hasOverlay: () => overlay, currentModal: () => modal };
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：モーダルの中身（下から出るシート） ---- */
@@ -3746,6 +3936,28 @@ const Modals = (() => {
     confirm: (p) => sheet(`<h2>${Util.esc(p.title)}</h2><p>${Util.esc(p.body)}</p><div class="btn-row"><button class="btn btn-line" type="button" data-act="closeModal">${Util.esc(p.cancelLabel || 'やめておく')}</button><button class="btn ${p.danger ? 'btn-danger' : 'btn-amber'}" type="button" data-act="confirmOk">${Util.esc(p.okLabel)}</button></div>`, 'closeModal'),
     debug: () => sheet(`<h2>デバッグ</h2><p>${CONFIG.VERSION}。URL に ?debug=1 があるときだけ出ます。</p><div class="dbg-list"><button class="btn btn-line" type="button" data-act="debugCoins">コイン＋1,000</button><button class="btn btn-line" type="button" data-act="debugTickets">チケット＋10</button><button class="btn btn-line" type="button" data-act="debugFps">FPS表示の切り替え</button><button class="btn btn-amber" type="button" data-act="debugTest">自己テスト</button><button class="btn btn-line" type="button" data-act="debugSave">保存データの枠</button><button class="btn btn-line" type="button" data-act="debugSeason">シーズン終了画面</button><button class="btn btn-line" type="button" data-act="debugLogin">ログボを表示</button><button class="btn btn-line" type="button" data-act="closeModal">閉じる</button></div><pre class="dbg-out" id="dbg-out">結果はここに出ます</pre>`, 'closeModal'),
   };
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：試合画面のスコアボードと選手の帯（試合の通知を受けて描く） ---- */
@@ -3808,6 +4020,28 @@ const GameHud = (() => {
     return b ? `${e.order}番 ${b.name} ${CONFIG.LABELS.pos[b.pos]} ミ${b.abilities.meet} パ${b.abilities.power} 走${b.abilities.speed}` : '';
   }
   return { bind, unbind, describeBatter };
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：15画面（主人公作成／卒業式／ホーム／大会／編成／スカウト／ショップ／ミッション／設定／試合前／試合／試合結果／年度終了／選手詳細／スカウト演出） ---- */
@@ -3826,6 +4060,7 @@ const Screens = (() => {
     const gen = curProtag.created ? curProtag.generation + 1 : (curProtag.generation || 1);
     const schoolOpts = schools.map((sc) => `<option value="${esc(sc.id)}"${sc.id === curSchool.id ? ' selected' : ''}>${esc(sc.name)}（${esc(sc.pref)}・${esc(sc.traitLabel)}：${esc(sc.desc)}）</option>`).join('');
     const posOpts = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'].map((pos) => `<option value="${pos}"${pos === (curProtag.pos || 'P') ? ' selected' : ''}>${LB.pos[pos]}（${LB.posName[pos]}）</option>`).join('');
+    const speciesOpts = Object.entries(CONFIG.SPECIES).map(([key, sp]) => `<option value="${key}"${key === curProtag.species ? ' selected' : ''}>${esc(sp.label)}（${esc(sp.trait)}）</option>`).join('');
     const throwsOpts = [['R', '右投'], ['L', '左投']].map(([k, t]) => `<option value="${k}"${k === (curProtag.throws || 'R') ? ' selected' : ''}>${t}</option>`).join('');
     const batsOpts = [['R', '右打'], ['L', '左打'], ['S', '両打']].map(([k, t]) => `<option value="${k}"${k === (curProtag.bats || 'R') ? ' selected' : ''}>${t}</option>`).join('');
     return `<section class="screen">
@@ -3835,6 +4070,7 @@ const Screens = (() => {
         <div class="field"><label for="c-school">母校（架空12校・都道府県・チーム特性）</label><select id="c-school">${schoolOpts}</select></div>
         <div class="field"><label for="c-name">主人公の名前（10文字まで）</label><input id="c-name" type="text" maxlength="10" value="${esc(curProtag.name || '蒼井 翔')}"></div>
         <div class="field"><label for="c-pos">守備位置</label><select id="c-pos">${posOpts}</select></div>
+        <div class="field"><label for="c-species">種族</label><select id="c-species">${speciesOpts}</select></div>
         <div class="field"><label for="c-throws">利き腕（投）</label><select id="c-throws">${throwsOpts}</select></div>
         <div class="field"><label for="c-bats">打席（打）</label><select id="c-bats">${batsOpts}</select></div>
         <div class="field"><label for="c-num">背番号（1〜99）</label><input id="c-num" type="number" min="1" max="99" step="1" value="${curProtag.number || 1}"></div>
@@ -4026,6 +4262,7 @@ const Screens = (() => {
     return `<section class="screen">${View.pageHead('選手詳細')}
       ${View.card(c, { size: 'is-big' })}
       <div class="panel detail">
+        ${c.species !== 'human' ? `<div class="kv"><span>種族：</span><b>${esc(c.speciesLabel)}（${esc(c.speciesTrait)}）</b></div>` : ''}
         <div class="kv"><span>学年・立場</span><b>${esc(c.roleLabel || c.gradeLabel || '2年生')}${c.isProtagonist ? '（卒業まで在籍保証）' : ''}</b></div>
         <div class="kv"><span>投打</span><b>${esc(c.throwsBatsLabel || '右投右打')}</b></div>
         <div class="kv"><span>レベル</span><b class="num">Lv${c.lv}<small> / ${c.maxLv}</small></b></div><div class="kv"><span>経験値</span><b class="num">${c.exp}<small> / ${c.expNext}</small></b></div><span class="prog"><i style="width:${pct}%"></i></span>
@@ -4155,6 +4392,28 @@ const Screens = (() => {
     render: (n, p) => S[n](p || {}),
     after: (n, p) => { if (AFTER[n]) AFTER[n](p || {}); },
   };
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：ルーター（自前の履歴を正とし、ブラウザの履歴にも写す） ---- */
@@ -4210,6 +4469,28 @@ const Router = (() => {
   }
   function back() { if (historyOk && stack.length > 1) window.history.back(); else handleBack(false); }
   return { go, replace, refresh, start, back, current: () => ({ ...top() }), depth: () => stack.length, onPopState: () => handleBack(true) };
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：操作（data-act）。各モジュールの公開関数を呼ぶだけ ---- */
@@ -4223,6 +4504,7 @@ const Actions = {
       schoolId: v('c-school'),
       name: v('c-name'),
       pos: v('c-pos'),
+      species: v('c-species'),
       throws: v('c-throws'),
       bats: v('c-bats'),
       number: Number(v('c-num')) || 1,
@@ -4880,6 +5162,78 @@ const MatchFlow = (() => {
       && gradsAfter.some((g) => g.isProtagonist && g.name === '初代 主将');
     return ok || JSON.stringify({ calAtGrad, gen1Grad, p2, calAfter, walletAfter, unlocksAfter, careerAfter });
   }));
+
+  t('段階I 種族カードの特性', () => {
+    const expected = [
+      ['X01', 'beetle', { meet: 56, power: 90, speed: 16, defense: 40 }],
+      ['X02', 'dog', { speed: 88, power: 30, defense: 68, meet: 57 }],
+      ['X03', 'panda', { kmh: 118, control: 72, movement: 78, stamina: 59 }],
+      ['S01', 'human', { meet: 43, power: 47, speed: 37, defense: 50 }],
+    ];
+    for (const [id, species, abilities] of expected) {
+      const card = Growth.getCard(id);
+      const lv1 = Growth.abilityAt(id, 1);
+      if (!card || card.species !== species || !Object.entries(abilities).every(([k, v]) => lv1[k] === v && card.abilities[k] === Growth.abilityAt(id, card.lv)[k])) return JSON.stringify({ id, card, lv1, expected: abilities });
+    }
+    return true;
+  });
+  t('段階I 主人公の種族選択', () => League.testScope(() => {
+    // 既存セーブの種族によらず、人間からのフォールバックを確認する。
+    Growth.createProtagonist({ name: '種族 テスト', pos: 'SS', species: 'human', schoolId: 'SCH01' });
+    Growth.createProtagonist({ name: '種族 テスト', pos: 'SS', species: 'alien', schoolId: 'SCH01' });
+    const fallback = Growth.getCard('PROTAG');
+    if (fallback.species !== 'human') return JSON.stringify({ fallback });
+    Growth.createProtagonist({ name: '種族 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const dog = Growth.getCard('PROTAG');
+    if (dog.species !== 'dog' || dog.abilities.speed !== 64 || dog.abilities.power !== 40) return JSON.stringify({ dog });
+    Growth.createProtagonist({ name: '種族 テスト', pos: 'SS', schoolId: 'SCH01' });
+    const inherited = Growth.getCard('PROTAG');
+    return inherited.species === 'dog' || JSON.stringify({ inherited });
+  }));
+  t('段階I 必殺技テーブル', () => {
+    const { SPECIALS, GAUGE_GAIN } = MatchEngine.testHooks;
+    const specials = Object.values(SPECIALS);
+    const expected = { hit: 30, homerun: 55, strikeout: 40, strike: 10, out: 15 };
+    return (specials.length === 4 && specials.every((s) => typeof s.name === 'string' && s.name.trim().length > 0)
+      && specials.filter((s) => s.kind === 'pitch').length === 2 && specials.filter((s) => s.kind === 'bat').length === 2
+      && Object.keys(GAUGE_GAIN).length === 5 && Object.entries(expected).every(([k, v]) => GAUGE_GAIN[k] === v)) || JSON.stringify({ SPECIALS, GAUGE_GAIN });
+  });
+  t('段階I 必殺ゲージの加算と発動', () => Economy.testScope(() => {
+    try {
+      const cfg = engineConfig();
+      MatchEngine.start(cfg);
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      const before = MatchEngine.testHooks.gaugeSnapshot();
+      if (!before || before.gauge.user !== 100) return JSON.stringify({ before });
+      MatchEngine.testHooks.atBat();
+      const armed = MatchEngine.armSpecial();
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return (armed === true && after.gauge.user === 0 && ['spin', 'giant'].includes(after.armed.user)) || JSON.stringify({ armed, after });
+    } finally { MatchEngine.abort(); }
+  }));
+
+
+  t('段階I 主人公の種族は保存往復で保持', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '保存 テスト', pos: 'SS', species: 'dog', schoolId: 'SCH01' });
+    const data = new Map();
+    const store = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, String(value)), removeItem: (key) => data.delete(key) };
+    const imported = Save.importText(Save.exportText(), store);
+    if (!imported.ok) return JSON.stringify(imported);
+    Save.load(store);
+    return Growth.getCard('PROTAG').species === 'dog' || '保存往復で種族が消失';
+  }));
+  t('段階I 必殺予約は攻守交代で消える', () => Economy.testScope(() => {
+    try {
+      MatchEngine.start(engineConfig());
+      for (let i = 0; i < 4; i += 1) MatchEngine.debugAct('hit');
+      MatchEngine.testHooks.atBat();
+      if (!MatchEngine.armSpecial()) return '必殺予約に失敗';
+      for (let i = 0; i < 3; i += 1) MatchEngine.debugAct('out');
+      const after = MatchEngine.testHooks.gaugeSnapshot();
+      return after.armed.user === null || JSON.stringify(after);
+    } finally { MatchEngine.abort(); }
+  }));
+
 })();
 
 /* ---- 1 画面遷移：起動と組み立て ---- */
