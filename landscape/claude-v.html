@@ -49,7 +49,12 @@ label{display:block;margin:7px 0;font-size:16px}input,select{font-size:18px;font
 table{border-collapse:collapse;width:100%;font-size:16px}td,th{border:1px solid #89a;padding:3px 6px;text-align:center}
 #lyr{position:absolute;left:0;right:0;bottom:30px;text-align:center;font-size:34px;font-weight:bold;text-shadow:3px 3px 0 #000;letter-spacing:4px}
 #mute{position:absolute;right:6px;top:140px;z-index:70;width:38px;height:38px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.5);color:#fff;font-size:18px}
-#form-ui{z-index:45;left:250px;top:70px;width:460px;height:400px;pointer-events:auto;background:linear-gradient(#194956,#102e3b)}#form-ui h2{font-size:22px}#form-ui .form-controls{width:245px}#form-ui label{font-size:14px;margin:6px 0}#form-ui input{padding:0;margin:4px 0}#form-ui select{font-size:16px;padding:4px}#form-preview{position:absolute;right:10px;top:98px;width:150px;height:190px;border-radius:10px;background:#b9d5c4}#form-ui .form-close{position:absolute;bottom:10px;left:14px;width:426px;font-size:18px}#form-ui .form-stage{display:flex;gap:4px;margin:8px 0}#form-ui .form-stage button{flex:1;padding:6px 0;font-size:13px;color:white;background:#315c6e;border:1px solid #8ca9a8;border-radius:5px}#form-ui .form-stage button.on{background:#d5ad48;color:#17333c}
+#form-ui{z-index:45;left:175px;top:30px;width:610px;height:480px;pointer-events:auto;background:linear-gradient(#194956,#102e3b)}
+#form-ui h2{font-size:22px;margin:0 0 7px}#form-ui .form-controls{width:292px}#form-ui label{font-size:14px;margin:9px 0}#form-ui output{float:right;color:#ffe39a;font-variant-numeric:tabular-nums}#form-ui input{padding:0;margin:3px 0;height:17px;accent-color:#f1c662}#form-ui select{font-size:16px;padding:5px;margin:0}
+#form-ui button{cursor:pointer;font-family:inherit}#form-ui .form-tabs,#form-ui .form-stage,#form-ui .form-tools{display:flex;gap:5px;margin:8px 0}#form-ui .form-tabs button,#form-ui .form-stage button,#form-ui .form-tools button,#form-play{flex:1;padding:6px 0;font-size:13px;font-weight:bold;color:white;background:#315c6e;border:1px solid #8ca9a8;border-radius:5px}#form-ui .form-tabs button.on,#form-ui .form-stage button.on{background:#d5ad48;color:#17333c}
+#form-ui .form-sliders{height:240px;overflow:auto;padding:0 3px}#form-ui .form-sliders:has(.form-stage) label{margin:15px 0}#form-ui .form-tools{position:absolute;left:14px;bottom:57px;width:292px;height:29px;margin:0}#form-preview{position:absolute;right:12px;top:64px;width:250px;height:300px;border-radius:10px;background:#bdd4bf}#form-play{position:absolute;right:12px;top:372px;width:250px}#form-ui .form-close{position:absolute;bottom:8px;left:14px;width:576px;font-size:18px;margin:0;padding:7px}
+#form-ui .form-sliders:not(:has(.form-stage)) label{margin:3px 0;font-size:13px;line-height:16px}#form-ui .form-sliders:not(:has(.form-stage)) input{display:block;height:14px;margin:1px 0}
+
 </style></head><body>
 <div id="stage"><canvas id="cv" width="960" height="540"></canvas>
 <div id="hud"><div id="sb" class="hb"></div><div id="cnt" class="hb"></div><div id="tel1" class="tel"></div><div id="tel2" class="tel"></div><div id="flash"></div><div id="info"></div><div id="bl"></div><div id="br"></div></div>
@@ -193,7 +198,7 @@ const V={mode:'yard',pit:null,bat:null,f:null,k:null,spark:0,dcol:'#c33'};
 const clouds=[{x:20,y:8,w:34,s:.6},{x:110,y:20,w:44,s:.4},{x:210,y:6,w:38,s:.7},{x:280,y:24,w:30,s:.5}];
 const OUTLINE='#203944';
 function mitt(x,y,s=1){X.save();X.translate(x,y);X.scale(s,s);oval(0,0,4,5,'#b47a40',OUTLINE,.8);stroke([[-2,-2],[1,2],[2,-3]],'#754f31',.6);X.restore()}
-function toonHead(sp,col,helmet=false,profile=false){
+function toonHead(sp,col,helmet=false,profile=false,back=false){
  if(sp==='dog'){oval(-10,-29,3.5,7,'#a66e40',OUTLINE,.8);oval(10,-29,3.5,7,'#a66e40',OUTLINE,.8)}
  if(sp==='panda'){oval(-8,-38,3.6,3.8,OUTLINE);oval(8,-38,3.6,3.8,OUTLINE)}
  oval(0,-29,11.5,10,sp==='panda'?'#fff5dd':'#f6c795',OUTLINE,1);
@@ -204,38 +209,43 @@ function toonHead(sp,col,helmet=false,profile=false){
  stroke([[-8,-37],[-6,-40],[-3,-41]],'#ffffff60',1);lettering('K',0,-38,4.5,'#fff1cb','center');
  if(helmet)box(-11,-33,3.5,8,col,1.5,OUTLINE,.7);
  if(sp==='beetle')shape([[-1.2,-42],[-1.5,-48],[-4.2,-51],[-3.3,-52],[0,-49],[3.3,-52],[4.2,-51],[1.5,-48],[1.2,-42]],'#b17d45',OUTLINE,.8);
- const eye=sp==='panda'?'#fff9e4':OUTLINE;
+ if(back){stroke([[-7,-31],[7,-31]],'#ffffff55',.6);return}const eye=sp==='panda'?'#fff9e4':OUTLINE;
  for(const a of profile?[5]:[-4.4,4.4]){oval(a,-29,1.1,2,eye);if(sp==='panda')oval(a,-29,.5,1,OUTLINE);else oval(a+.3,-29.7,.35,.6,'#fff')}
  stroke([[-6,-32],[-3,-33]],OUTLINE,.7);stroke([[3,-33],[6,-32]],OUTLINE,.7);
  X.beginPath();X.arc(1,-25,2.1,.1,Math.PI-.1);X.lineWidth=.6;X.strokeStyle=OUTLINE;X.stroke();
 }
 function drawToon(x,y,s,col,col2,sp='human',pose='field'){
- X.save();X.translate(x,y);X.scale(s,s);
- oval(0,1,12,2.5,'#183e3638');
- box(-8,-10,6,9,'#fff3da',1,OUTLINE,.8);box(2,-10,6,9,'#fff3da',1,OUTLINE,.8);
- oval(-5,-1,5,2.5,'#fff4dd',OUTLINE,.8);oval(6,-1,5.5,2.5,'#fff4dd',OUTLINE,.8);
- shape([[-7,-22],[-10,-17],[-7,-9],[7,-9],[10,-17],[7,-22]],'#fff5df',OUTLINE,.9);
- shape([[-7,-22],[-10,-17],[-7,-14],[-4,-20]],col,OUTLINE,.6);shape([[7,-22],[10,-17],[7,-14],[4,-20]],col,OUTLINE,.6);
- stroke([[-7,-10],[7,-10]],OUTLINE,1.2);stroke([[0,-20],[0,-11]],'#d5cbb1',.4);lettering('K',3,-15,4,col,'center');
- mitt(-11,-15,.8);oval(10,-14,3,3,'#f8cb9c',OUTLINE,.7);toonHead(sp,col);X.restore();
+ const running=pose==='run',time=nw()/1000,cycle=time*15,step=running?Math.sin(cycle)*7:0,bob=running?Math.abs(Math.sin(cycle))*2:0;
+ X.save();X.translate(x,y);X.scale(s,s);oval(0,1,13,2.6,'#183e3638');X.translate(0,-bob);
+ stroke([[-4,-18],[-6+step,-2]],OUTLINE,6.2);stroke([[-4,-18],[-6+step,-2]],'#fff2d9',4.3);
+ stroke([[4,-18],[6-step,-2]],OUTLINE,6.2);stroke([[4,-18],[6-step,-2]],'#fff2d9',4.3);
+ oval(-6+step,-1,5.8,2.5,'#fff5df',OUTLINE,.8);oval(6-step,-1,5.8,2.5,'#fff5df',OUTLINE,.8);
+ X.save();X.translate(0,-18);X.rotate(running?Math.sin(cycle)*.08:0);
+ shape([[-8,-27],[-11,-21],[-8,2],[8,2],[11,-21],[8,-27]],'#fff5df',OUTLINE,.9);
+ shape([[-8,-27],[-11,-21],[-7,-16],[-4,-25]],col,OUTLINE,.6);shape([[8,-27],[11,-21],[7,-16],[4,-25]],col,OUTLINE,.6);
+ stroke([[-8,1],[8,1]],OUTLINE,1.3);stroke([[0,-24],[0,0]],'#d5cbb1',.4);lettering('K',3,-14,6,col,'center');
+ const arm=running?Math.sin(cycle)*8:0;stroke([[-9,-22],[-13,-13+arm]],col,4);stroke([[9,-22],[13,-13-arm]],col,4);
+ mitt(-13,-13+arm,.9);oval(13,-13-arm,3,3,'#f8cb9c',OUTLINE,.7);
+ box(-3,-31,6,6,sp==='panda'?'#fff5df':'#f6c695');X.save();X.translate(0,-8);toonHead(sp,col);X.restore();X.restore();X.restore();
 }
+
 function defenseTeam(){if(!G)return null;const off=G.top===G.myTop?'me':'you';return G[off==='me'?'you':'me']}
 function drawDefense(t){
  const def=defenseTeam();if(!def)return;
- const entities=def.lineup.filter(p=>p.pos>=3&&p.pos<=9).map(p=>{const q=FP[p.pos],screen=batProject(...q);if(p.pos===8)screen[0]+=14;return{p,q:screen,s:cl(21/(q[1]+30),.19,.46)}}).sort((a,b)=>a.q[1]-b.q[1]);
+ const entities=def.lineup.filter(p=>p.pos>=3&&p.pos<=9).map(p=>{const q=FP[p.pos],screen=batProject(...q);if(p.pos===8)screen[0]+=14;if(p.pos===7)screen[0]-=12;if(p.pos===9)screen[0]+=12;return{p,q:screen,s:cl(16/(q[1]+36),.14,.31)}}).sort((a,b)=>a.q[1]-b.q[1]);
  for(const e of entities)drawToon(...e.q,e.s,def.color,def.color2,e.p.sp||'human');
  // Catcher stays on the open side of the foreground so all nine defenders remain visible.
  const cp=def.lineup.find(p=>p.pos===2),right=!V.bat||V.bat.side==='R';
- X.save();X.translate(right?202:118,175);X.scale(.92,.92);oval(0,1,15,3,'#183e3638');
+ X.save();X.translate(right?202:118,175);X.scale(.8,.8);oval(0,1,15,3,'#183e3638');
  oval(-8,-2,7,4,'#fff1d6',OUTLINE,.9);oval(8,-2,7,4,'#fff1d6',OUTLINE,.9);
- shape([[-7,-20],[-12,-10],[-9,-2],[9,-2],[12,-10],[7,-20]],'#fff0d5',OUTLINE,.9);
- box(-7,-18,14,14,def.color,3,OUTLINE,.8);stroke([[-5,-17],[5,-5]],'#263e4a',1.6);stroke([[5,-17],[-5,-5]],'#263e4a',1.6);
- if(cp&&cp.sp==='dog'){oval(-9,-29,3,6,'#a66e40',OUTLINE,.7);oval(9,-29,3,6,'#a66e40',OUTLINE,.7)}
+ shape([[-7,-32],[-12,-19],[-9,-2],[9,-2],[12,-19],[7,-32]],'#fff0d5',OUTLINE,.9);
+ box(-7,-30,14,25,def.color,3,OUTLINE,.8);stroke([[-5,-29],[5,-5]],'#263e4a',1.6);stroke([[5,-29],[-5,-5]],'#263e4a',1.6);
+ X.save();X.translate(0,-13);if(cp&&cp.sp==='dog'){oval(-9,-29,3,6,'#a66e40',OUTLINE,.7);oval(9,-29,3,6,'#a66e40',OUTLINE,.7)}
  if(cp&&cp.sp==='panda'){oval(-8,-39,3,3,OUTLINE);oval(8,-39,3,3,OUTLINE)}
  oval(0,-28,11,10,def.color,OUTLINE,1);box(-9,-36,18,14,'#2d4854',4,OUTLINE,.8);
  for(const y of [-33,-29,-25])stroke([[-8,y],[8,y]],'#b4c7c3',.7);stroke([[-4,-35],[-4,-23]],'#b4c7c3',.6);stroke([[4,-35],[4,-23]],'#b4c7c3',.6);
  if(cp&&cp.sp==='beetle')shape([[-1,-38],[-1,-44],[-4,-47],[0,-45],[4,-47],[1,-44],[1,-38]],'#b17d45',OUTLINE,.7);
- mitt(-16,-19,1);X.restore();
+ X.restore();mitt(-18,-31,1);X.restore();
 }
 function drawBatter(t){
  const s=V.bat;if(!s)return;const dir=s.side==='R'?1:-1,fx=dir>0?108:212,fy=167,nowT=nw();let bend=0;
@@ -245,15 +255,15 @@ function drawBatter(t){
  const e=t*1000-s.t0,u=s.pose==='swing'?cl(e/150,0,1):0,spin=G&&G.fx==='spin',giant=G&&(G.arm[s.mine?'me':'you']==='giant'||G.fx==='giant');
  X.save();X.translate(fx,fy);X.scale(dir,1);oval(3,1,24,4,'#173a3538');
  // These transforms consume the existing hit/miss timestamps only; collision timing is untouched.
- X.transform(1,0,bend*.28,1,0,0);X.rotate(bend*.12);
+ if(spin&&s.pose==='swing'){X.translate(0,-44-Math.abs(Math.sin(e/90))*10);X.rotate(e/230*Math.PI*2);X.translate(0,44)}if(s.twistT&&nowT-s.twistT<420){const q=(nowT-s.twistT)/420;X.translate(0,-44);X.rotate(Math.sin(q*Math.PI)*Math.PI*2);X.translate(0,44)}X.transform(1,0,bend*.65,1,0,0);X.rotate(bend*.22);
  shape([[-13,-24],[-16,-5],[-7,-4],[-2,-23]],'#fff3d9',OUTLINE,1);shape([[1,-23],[4,-5],[13,-4],[10,-24]],'#ece4ce',OUTLINE,1);
  box(-16,-10,10,5,s.col,1,OUTLINE,.8);box(4,-9,10,5,s.col,1,OUTLINE,.8);
  oval(-12,-2,8,3.5,'#fff4dc',OUTLINE,1);oval(11,-1,8,3.5,'#fff4dc',OUTLINE,1);
- shape([[-12,-48],[-19,-38],[-13,-22],[10,-22],[16,-38],[8,-48]],'#fff4dd',OUTLINE,1.1);
- shape([[-12,-48],[-19,-38],[-11,-34],[-5,-44]],s.col,OUTLINE,.8);shape([[8,-48],[16,-38],[10,-34],[3,-44]],s.col,OUTLINE,.8);
+ shape([[-12,-66],[-19,-56],[-13,-22],[10,-22],[16,-56],[8,-66]],'#fff4dd',OUTLINE,1.1);
+ shape([[-12,-66],[-19,-56],[-11,-51],[-5,-62]],s.col,OUTLINE,.8);shape([[8,-66],[16,-56],[10,-51],[3,-62]],s.col,OUTLINE,.8);
  stroke([[-12,-22],[10,-22]],OUTLINE,1.6);
- const off=G?G[G.top===G.myTop?'me':'you']:null,num=off?off.lineup[G.idx[off===G.me?'me':'you']].num:7;lettering(String(num),-2,-34,12,s.col,'center');
- if(s.sp==='dog')oval(-14,-64,5.2,11,'#a97143',OUTLINE,1);
+ const off=G?G[G.top===G.myTop?'me':'you']:null,num=off?off.lineup[G.idx[off===G.me?'me':'you']].num:7;lettering(String(num),-2,-44,14,s.col,'center');
+ box(-4,-73,8,9,s.sp==='panda'?'#fff4df':'#f6c695',1,OUTLINE,.7);X.save();X.translate(0,-83);X.scale(.82,.82);X.translate(0,64);if(s.sp==='dog')oval(-14,-64,5.2,11,'#a97143',OUTLINE,1);
  if(s.sp==='panda'){oval(-11,-79,4,4,OUTLINE);oval(10,-79,4,4,OUTLINE)}
  oval(1,-64,19,16,s.sp==='panda'?'#fff7e4':'#f7c895',OUTLINE,1.2);oval(13,-60,8,6,s.sp==='dog'?'#ffe4b2':s.sp==='panda'?'#fff7e4':'#f7c895');
  if(s.sp==='panda')oval(11,-62,4,5,OUTLINE);oval(12,-61,1.5,2.5,s.sp==='panda'?'#fff7e4':OUTLINE);if(s.sp==='dog')oval(20,-61,1.8,1.3,OUTLINE);
@@ -262,43 +272,72 @@ function drawBatter(t){
  shape([[-17,-70],[18,-71],[28,-68],[26,-65],[0,-67]],s.col,OUTLINE,1.1);box(-17,-69,7,12,s.col,3,OUTLINE,1);
  stroke([[-13,-75],[-11,-81],[-5,-84]],'#ffffff66',1.5);
  if(s.sp==='beetle')shape([[-2,-87],[-2,-96],[-7,-101],[-5,-103],[0,-98],[5,-103],[7,-101],[2,-96],[2,-87]],'#af7b43',OUTLINE,1);
- let hx=19,hy=-42,ang=-66+u*245,len=49;if(s.pose==='bunt'){ang=7;hx=23;hy=-34;len=35}if(spin)ang+=u*360;if(giant)len*=2.3;
+ X.restore();let hx=19,hy=-58,ang=-66+u*245,len=49;if(s.pose==='bunt'){ang=7;hx=23;hy=-46;len=35}if(spin)ang+=u*360;if(giant)len*=2.3;
  if(spin&&s.pose==='swing')for(const d of [-28,-56])stroke([[hx,hy],[hx+Math.cos((ang+d)*rad)*len,hy+Math.sin((ang+d)*rad)*len]],'#ffe29d77',1.5);
  const tx=hx+Math.cos(ang*rad)*len,ty=hy+Math.sin(ang*rad)*len;
  stroke([[hx,hy],[tx,ty]],OUTLINE,giant?8:4);stroke([[hx,hy],[tx,ty]],'#edbb69',giant?5.7:2.6);stroke([[hx,hy],[hx+(tx-hx)*.18,hy+(ty-hy)*.18]],'#735438',giant?3:2);
- stroke([[11,-38],[20,-39],[hx,hy]],OUTLINE,7);stroke([[11,-38],[20,-39],[hx,hy]],'#fff0d7',5);
+ stroke([[11,-56],[20,-55],[hx,hy]],OUTLINE,7);stroke([[11,-56],[20,-55],[hx,hy]],'#fff0d7',5);
  oval(hx,hy,4.3,4,'#fff8e4',OUTLINE,.8);oval(hx+3,hy-5,4,3.7,'#fff8e4',OUTLINE,.8);X.restore();
 }
-function drawPitcherPose(x,y,s,col,col2,sp,sd,u,form=null){
- // Three editable key poses interpolate through the existing windup clock.
- const fallback=[{body:-7,arm:-105,leg:30},{body:-18,arm:-145,leg:65},{body:25,arm:-15,leg:9}],poses=form||fallback;
- let a=poses[0],z=poses[1],v=cl(u*2,0,1);if(u>.5){a=poses[1];z=poses[2];v=cl((u-.5)*2,0,1)}
- const mix=k=>a[k]+(z[k]-a[k])*v,body=mix('body'),arm=mix('arm'),leg=mix('leg');
- X.save();X.translate(x,y);X.scale(s*sd,s);oval(0,1,13,3,'#163e3638');
- const knee=[6+Math.sin(leg*rad)*8,-6-Math.sin(leg*rad)*10];
- stroke([[-4,-13],[-6,-2]],OUTLINE,6);stroke([[-4,-13],[-6,-2]],'#fff0d8',4);
- stroke([[4,-13],knee,[knee[0]+4,knee[1]+5]],OUTLINE,6);stroke([[4,-13],knee,[knee[0]+4,knee[1]+5]],'#fff0d8',4);
- oval(-6,-1,5,2.2,'#fff3da',OUTLINE,.8);oval(knee[0]+5,knee[1]+5,5,2.2,'#fff3da',OUTLINE,.8);
- X.save();X.translate(0,-13);X.rotate(body*rad*.7);shape([[-7,-10],[-9,-5],[-7,3],[7,3],[9,-5],[7,-10]],'#fff4de',OUTLINE,.9);
- stroke([[-7,3],[7,3]],OUTLINE,1);lettering('K',3,-3,4,col,'center');
- const hand=[8+Math.cos(arm*rad)*14,-7+Math.sin(arm*rad)*14];
- stroke([[7,-7],hand],OUTLINE,4.5);stroke([[7,-7],hand],col,3.1);oval(...hand,2.3,2.3,'#f6c595',OUTLINE,.7);
- if(u<1)oval(hand[0]+.3,hand[1]-.3,1.1,1.1,'#fff6df');
- stroke([[-7,-7],[-11,-3]],col,3);mitt(-11,-3,.8);
- X.save();X.translate(0,19);toonHead(sp,col);X.restore();X.restore();X.restore();
+// All motion is presentation-only; the pitch clock and collision endpoint stay in the engine.
+function pitchRig(u,form){
+ const poses=form.poses,w=cl(u,0,1),smooth=w*w*(3-2*w),segment=w<.5?0:1,v=w<.5?w*2:(w-.5)*2;
+ const mix=k=>poses[segment][k]+(poses[segment+1][k]-poses[segment][k])*v;
+ const loose=(form.loose||0)/100,body=mix('body')+Math.sin(w*Math.PI*2)*loose*48;
+ const arm=mix('arm')+(form.windmill||0)*360*smooth,leg=mix('leg'),h=28*cl((form.stretch||1)*(1+Math.sin(w*Math.PI)*loose*.28),.4,3.2);
+ const yaw=Math.cos((form.twist||0)*Math.PI*2*smooth),legA=(leg-10)*rad;
+ return{w,body:body*rad,arm:arm*rad,leg:legA,h,spin:(form.spin||0)*Math.PI*2*smooth,yaw:(yaw<0?-1:1)*Math.max(.13,Math.abs(yaw)),shear:Math.sin(w*Math.PI*4)*loose*.3,jump:Math.sin(w*Math.PI)*(form.jump||0),
+  hand:[8+Math.cos(arm*rad)*23,-h+5+Math.sin(arm*rad)*23],knee:[4+Math.sin(legA)*14,-18+Math.cos(legA)*12],foot:[4+Math.sin(legA)*14+Math.sin(legA*.6)*9,-18+Math.cos(legA)*12+Math.cos(legA*.6)*10]};
+}
+function pitchRigPoint(r,p,upper=false){
+ let [x,y]=p;if(upper){const a=x*Math.cos(r.body)-y*Math.sin(r.body);y=-18+x*Math.sin(r.body)+y*Math.cos(r.body);x=a}
+ const a=x*r.yaw+y*r.shear;return[a*Math.cos(r.spin)-y*Math.sin(r.spin),a*Math.sin(r.spin)+y*Math.cos(r.spin)-r.jump];
+}
+function pitchBounds(form){
+ const points=[];
+ for(let i=0;i<=128;i++){
+  const r=pitchRig(i/128,form);
+  for(const p of [[-13,5],[-1,-5],[r.foot[0]-6,r.foot[1]-3],[r.foot[0]+6,r.foot[1]+3]])points.push(pitchRigPoint(r,p));
+  for(const p of [[-16,-r.h-29],[16,-r.h-29],[-16,-r.h+3],[16,-r.h+3],[-18,-r.h+4],[-8,3],[8,3],[r.hand[0]-5,r.hand[1]-5],[r.hand[0]+5,r.hand[1]+5]])points.push(pitchRigPoint(r,p,true));
+ }
+ const x0=Math.min(...points.map(p=>p[0])),x1=Math.max(...points.map(p=>p[0])),y0=Math.min(...points.map(p=>p[1])),y1=Math.max(...points.map(p=>p[1])),px=5+(x1-x0)*.07,py=5+(y1-y0)*.07;
+ return{x0:x0-px,x1:x1+px,y0:y0-py,y1:y1+py};
+}
+function pitchAppearance(){
+ const def=defenseTeam(),pt=def?pit(def):null,mine=def&&def===G.me;
+ const fallback={poses:[{body:-7,arm:-105,leg:30},{body:-18,arm:-145,leg:65},{body:25,arm:-15,leg:9}],spin:0,windmill:0,twist:0,stretch:1,jump:0,loose:15};
+ const form=typeof pitchForm!=='undefined'&&mine?pitchForm:typeof PITCH_FORMS!=='undefined'?PITCH_FORMS[pt&&pt.sp==='beetle'?4:pt&&pt.sp==='dog'?1:pt&&pt.sp==='panda'?2:0]:fallback;
+ return{def,pt,form,scale:.62/Math.max(1,(form.stretch||1)*.4+(form.jump||0)*.012+.4)};
+}
+function drawPitcherPose(x,y,s,col,col2,sp,sd,u,poses=null,effects=null){
+ const form=effects||{poses:poses||[{body:-7,arm:-105,leg:30},{body:-18,arm:-145,leg:65},{body:25,arm:-15,leg:9}],stretch:1},r=pitchRig(u,form);
+ X.save();X.translate(x,y);X.scale(s*sd,s);oval(0,2,15,3,'#163e362e');X.translate(0,-r.jump);X.rotate(r.spin);X.transform(r.yaw,0,r.shear,1,0,0);
+ stroke([[-4,-18],[-7,-1]],OUTLINE,6);stroke([[-4,-18],[-7,-1]],'#fff1d8',4);
+ stroke([[4,-18],r.knee,r.foot],OUTLINE,6);stroke([[4,-18],r.knee,r.foot],'#fff1d8',4);
+ oval(-7,-1,5.5,2.5,'#fff4dd',OUTLINE,.8);X.save();X.translate(...r.foot);X.rotate(-r.leg*.35);oval(0,0,5.5,2.5,'#fff4dd',OUTLINE,.8);X.restore();
+ X.save();X.translate(0,-18);X.rotate(r.body);
+ shape([[-8,-r.h],[-11,-r.h+6],[-8,3],[8,3],[11,-r.h+6],[8,-r.h]],'#fff5df',OUTLINE,.9);
+ shape([[-8,-r.h],[-11,-r.h+6],[-7,-r.h+11],[-4,-r.h+2]],col,OUTLINE,.6);
+ shape([[8,-r.h],[11,-r.h+6],[7,-r.h+11],[4,-r.h+2]],col,OUTLINE,.6);
+ stroke([[-8,2],[8,2]],OUTLINE,1.3);stroke([[0,-r.h+5],[0,1]],'#d5cbb1',.5);lettering(r.yaw<0?'1':'K',3,-r.h*.55,6,col,'center');
+ if((form.windmill||0)&&r.w>0&&r.w<1){X.save();X.globalAlpha*=.17;for(let i=1;i<=3;i++){const a=r.arm-i*.45;stroke([[8,-r.h+5],[8+Math.cos(a)*23,-r.h+5+Math.sin(a)*23]],'#f1d795',2.5)}X.restore()}
+ const elbow=[8+(r.hand[0]-8)*.54,-r.h+5+(r.hand[1]+r.h-5)*.54+Math.sin(r.arm)*3];
+ stroke([[8,-r.h+5],elbow,r.hand],OUTLINE,4.8);stroke([[8,-r.h+5],elbow,r.hand],col,3.2);oval(...r.hand,2.5,2.5,'#f6c695',OUTLINE,.7);
+ if(u<1)oval(r.hand[0]+.4,r.hand[1]-.4,1.2,1.2,'#fff7e4');
+ stroke([[-8,-r.h+5],[-13,-r.h+12]],col,3.5);mitt(-13,-r.h+12,.95);
+ box(-3,-r.h-5,6,6,sp==='panda'?'#fff4dc':'#f6c695');X.save();X.translate(0,-r.h+19);toonHead(sp,col,false,false,r.yaw<0);X.restore();X.restore();X.restore();
 }
 function drawPitcher(t){
- const pi=V.pit,def=defenseTeam(),pt=def?pit(def):null,col=pi?pi.col:def?def.color:V.dcol,sp=pi?pi.sp:pt?pt.sp||'human':'human',sd=pi?pi.sd:pt&&pt.thr==='L'?-1:1;
- const u=pi?cl((t*1000-pi.t0)/pi.wind,0,1.25):0;
- const mine=def&&def===G.me,form=typeof pitchForm!=='undefined'&&mine?pitchForm.poses:null;
- if(pi&&mine&&typeof pitchForm!=='undefined'&&pitchForm.preset===3&&u<1){X.save();X.translate(160,100);X.rotate(u*Math.PI*2);drawPitcherPose(0,0,.8,col,def.color2,sp,sd,u,form);X.restore();return}
- drawPitcherPose(160,100,.8,col,def?def.color2:'#fff',sp,sd,u,form);
+ const pi=V.pit,a=pitchAppearance(),col=pi?pi.col:a.def?a.def.color:V.dcol,sp=pi?pi.sp:a.pt?a.pt.sp||'human':'human',sd=pi?pi.sd:a.pt&&a.pt.thr==='L'?-1:1,u=pi?cl((t*1000-pi.t0)/pi.wind,0,1.25):0;
+ if(pi&&u>0&&u<1&&((a.form.spin||0)||(a.form.windmill||0)||(a.form.twist||0))){
+  X.save();X.globalAlpha=.1;for(let i=3;i>0;i--)drawPitcherPose(160,100,a.scale,col,a.def?a.def.color2:'#fff',sp,sd,Math.max(0,u-i*.045),a.form.poses,a.form);X.restore();
+  oval(160,100,21,3,'#ffffff00','#f0dca266',.6);
+ }
+ drawPitcherPose(160,100,a.scale,col,a.def?a.def.color2:'#fff',sp,sd,u,a.form.poses,a.form);
 }
 function pitchReleasePoint(pi){
- const def=defenseTeam(),mine=def&&def===G.me;
- const pose=typeof pitchForm!=='undefined'&&mine?pitchForm.poses[2]:{body:25,arm:-15};
- const a=pose.body*rad*.7,hx=8+Math.cos(pose.arm*rad)*14,hy=-7+Math.sin(pose.arm*rad)*14;
- return[160+pi.sd*(Math.cos(a)*hx-Math.sin(a)*hy)*.8,100+(-13+Math.sin(a)*hx+Math.cos(a)*hy)*.8];
+ const a=pitchAppearance(),r=pitchRig(1,a.form),hand=pitchRigPoint(r,r.hand,true);
+ return[160+pi.sd*hand[0]*a.scale,100+hand[1]*a.scale];
 }
 
 function drawBall(t){const pi=V.pit;if(!pi||pi.hit)return;const p=pi.p,e=t*1000-pi.t0-pi.wind;if(e<0)return;const pr=e/(p.T*1000);if(pr>1.2)return;
@@ -306,56 +345,73 @@ function drawBall(t){const pi=V.pit;if(!pi||pi.hit)return;const p=pi.p,e=t*1000-
  const bx=p.sp==='boomerang'&&pr>=.5?-p.bx*.85:p.bx;let x=sx+(nx-sx)*u+bx*11*g,y=sy+(ny-sy)*u-p.by*12*g;if(pr>1){x=ex;y=ey;if(pr<1.15){P(ex-5,ey,11,1,'#ff0');P(ex,ey-5,1,11,'#ff0')}}
  if(p.sp==='vanish'&&pr>=.3&&pr<=.72){P(x-3,y,1,1,'#ffe14a');P(x+2,y-2,1,1,'#ffe14a');P(x+1,y+3,1,1,'#ffe14a');return}
  const d=3+5*Math.min(1,u);oval(x,y,d/2,d/2,'#fff9e8',OUTLINE,.3);if(d>4){stroke([[x-1,y-1.5],[x-1.5,y],[x-1,y+1.5]],'#d16d56',.35)}}
-const guy=(x,y,c,sp)=>drawToon(x,y,.34,c,'#fff2d5',sp);
-function guyDive(x,y,c,sp){X.save();X.translate(x,y-2);X.rotate(-1.2);drawToon(0,0,.34,c,'#fff2d5',sp,'dive');X.restore()}
+const guy=(x,y,c,sp,pose='field')=>drawToon(x,y,.28,c,'#fff2d5',sp,pose);
+function guyDive(x,y,c,sp){X.save();X.translate(x,y-2);X.rotate(-1.2);drawToon(0,0,.28,c,'#fff2d5',sp,'dive');X.restore()}
 function pathPos(a,b2,u){const f=a+(b2-a)*u,i=Math.min(3,Math.floor(f)),fr=f-i,p=BP[i],q=BP[i+1];return[p[0]+(q[0]-p[0])*fr,p[1]+(q[1]-p[1])*fr]}
 function drawField(t){b.drawImage(fsC,0,0,320,180);drawClouds(t,6);b.drawImage(ffC,0,0,320,180);drawScoreboard();const f=V.f,E=[];
  for(let p=1;p<=9;p++)E.push({x:f.fl[p][0],y:f.fl[p][1],c:f.dcol,p,sp:f.sp[p]});
  f.runners.forEach(r=>{if(!r.vis)return;const q=pathPos(r.a,r.b,r.u);E.push({x:q[0],y:q[1],c:f.ocol,sp:r.id.sp})});
- E.sort((a,c)=>c.y-a.y).forEach(e=>(f.dive===e.p?guyDive:guy)(SXf(e.x,e.y),SY(e.y),e.c,e.sp));
+ E.sort((a,c)=>c.y-a.y).forEach(e=>(f.dive===e.p?guyDive:guy)(SXf(e.x,e.y),SY(e.y),e.c,e.sp,e.p?'field':'run'));
  const bl=f.ball;if(bl.vis){const sx=SXf(bl.x,bl.y),sy=SY(bl.y);P(sx-1,sy,3,1,'rgba(0,0,0,.4)');disc(sx,sy-bl.z*1.7-1,3,'#fff')}}
 function drawBat(t){b.drawImage(skyC,0,0,320,180);drawClouds(t);b.drawImage(frC,0,0,320,180);drawScoreboard();drawDefense(t);drawPitcher(t);drawBatter(t);drawBall(t);
  if(V.spark&&nw()-V.spark<140){P(150,128,21,2,'#ff8');P(160,118,2,22,'#ff8');P(154,122,13,13,'rgba(255,255,200,.7)')}}
 function drawKouka(t){b.drawImage(skyC,0,0,320,180);drawClouds(t);b.drawImage(frC,0,0,320,180);const k=V.k;P(158,66,2,80,'#bbb');
  for(let i=0;i<44;i++){const yy=Math.round(Math.sin(t*5+i*.3)*2);P(160+i,68+yy,1,24,i%14<2?k.c2:k.c)}
- for(let i=0;i<9;i++){const x=32+i*32,y=169+(i&1)*3-(Math.sin(t*2+i)>.92?1:0),p=G&&G.me?G.me.lineup[i]:null;drawToon(x,y,.7,k.c,k.c2,p?p.sp||'human':'human')}
+ for(let i=0;i<9;i++){const x=32+i*32,y=169+(i&1)*3-(Math.sin(t*2+i)>.92?1:0),p=G&&G.me?G.me.lineup[i]:null;drawToon(x,y,.52,k.c,k.c2,p?p.sp||'human':'human')}
 }
 function frame(ts){X=b;const t=ts/1000;if(V.mode==='field'&&V.f)drawField(t);else if(V.mode==='bat')drawBat(t);else if(V.mode==='kouka')drawKouka(t);else{b.drawImage(skyC,0,0,320,180);drawClouds(t);b.drawImage(frC,0,0,320,180);drawScoreboard()}
  cx.imageSmoothingEnabled=true;cx.drawImage(bc,0,0,960,540);drawFormPreview(t);requestAnimationFrame(frame)}
 function fit(){const st=$('#stage');if(innerWidth<innerHeight){st.style.transform='rotate(90deg) scale('+Math.min(innerHeight/960,innerWidth/540)+')'}else{st.style.transform='scale('+Math.min(innerWidth/960,innerHeight/540)+')'}}addEventListener('resize',fit);addEventListener('orientationchange',fit);fit();
 /* ===== 投球フォーム（描画専用・セーブ互換を維持） ===== */
 const PITCH_FORMS=[
- {name:'オーバースロー',poses:[{body:-7,arm:-105,leg:30},{body:-18,arm:-145,leg:65},{body:25,arm:-45,leg:9}]},
- {name:'サイドスロー',poses:[{body:-5,arm:-85,leg:22},{body:-15,arm:-175,leg:45},{body:12,arm:0,leg:6}]},
- {name:'アンダースロー',poses:[{body:8,arm:-95,leg:20},{body:38,arm:135,leg:38},{body:40,arm:65,leg:4}]},
- {name:'トルネード',poses:[{body:-35,arm:-130,leg:54},{body:-45,arm:-175,leg:86},{body:35,arm:-20,leg:12}]}
+ {name:'オーバースロー',poses:[{body:-7,arm:-105,leg:30},{body:-18,arm:-145,leg:65},{body:25,arm:-45,leg:9}],spin:0,windmill:0,twist:0,stretch:1,jump:0,loose:15},
+ {name:'サイドスロー',poses:[{body:-5,arm:-85,leg:22},{body:-15,arm:-175,leg:45},{body:12,arm:0,leg:6}],spin:0,windmill:0,twist:0,stretch:1,jump:0,loose:15},
+ {name:'アンダースロー',poses:[{body:8,arm:-95,leg:20},{body:60,arm:135,leg:38},{body:55,arm:65,leg:4}],spin:0,windmill:0,twist:0,stretch:1.1,jump:0,loose:25},
+ {name:'ぐるぐるトルネード',poses:[{body:-35,arm:-130,leg:54},{body:-90,arm:-220,leg:125},{body:35,arm:-20,leg:12}],spin:1,windmill:1,twist:1,stretch:1.1,jump:8,loose:35},
+ {name:'風車投法',poses:[{body:-15,arm:-90,leg:25},{body:-65,arm:-270,leg:115},{body:40,arm:-35,leg:10}],spin:0,windmill:4,twist:0,stretch:1.15,jump:4,loose:40},
+ {name:'ヘリコプター',poses:[{body:0,arm:-100,leg:20},{body:45,arm:-180,leg:180},{body:25,arm:-20,leg:10}],spin:3,windmill:4,twist:2,stretch:1.2,jump:28,loose:60},
+ {name:'宙返り投法',poses:[{body:-10,arm:-100,leg:35},{body:130,arm:-270,leg:235},{body:30,arm:-45,leg:5}],spin:2,windmill:1,twist:0,stretch:1.1,jump:35,loose:45},
+ {name:'ぐにゃぐにゃゴム人間',poses:[{body:-80,arm:-140,leg:35},{body:135,arm:300,leg:-120},{body:60,arm:-35,leg:15}],spin:1,windmill:2,twist:1,stretch:2.25,jump:12,loose:100},
+ {name:'逆立ちリリース',poses:[{body:0,arm:-100,leg:25},{body:-50,arm:-200,leg:150},{body:0,arm:-90,leg:180}],spin:.5,windmill:2,twist:0,stretch:1.2,jump:14,loose:25}
 ];
-let pitchForm={preset:0,stage:0,poses:PITCH_FORMS[0].poses.map(p=>({...p}))};
+const copyPitchForm=i=>({...PITCH_FORMS[i],poses:PITCH_FORMS[i].poses.map(p=>({...p})),preset:i,stage:0,tab:'pose',playing:true,previewAt:nw(),previewBounds:null});
+let pitchForm=copyPitchForm(3),formSeed=1234567;
 const pitchAim={x:0,y:0};
+const FORM_MOTION=[['spin','全身回転',-6,6,.5,'回'],['windmill','腕回転',-8,8,1,'回'],['twist','横ひねり',-6,6,.5,'回'],['stretch','胴の長さ',.6,2.5,.05,'倍'],['jump','ジャンプ',0,45,1,''],['loose','ぐにゃぐにゃ',0,100,1,'']];
+function formValue(v){return Math.round(v*100)/100}
 function openPitchForm(){
- if(!pitchRes)return;
- const e=$('#form-ui'),p=pitchForm.poses[pitchForm.stage];
- e.innerHTML=`<h2>投球フォーム</h2><div class="form-controls"><select aria-label="投球フォームの種類" onchange="selectPitchForm(+this.value)">${PITCH_FORMS.map((f,i)=>`<option value="${i}" ${i===pitchForm.preset?'selected':''}>${f.name}</option>`).join('')}</select><div class="form-stage">${['構え','踏み込み','リリース'].map((n,i)=>`<button class="${i===pitchForm.stage?'on':''}" onclick="pitchForm.stage=${i};openPitchForm()">${n}</button>`).join('')}</div>${[['body','体',-45,45],['arm','腕',-180,180],['leg','脚',-20,90]].map(([k,n,lo,hi])=>`<label>${n} <output id="form-${k}-value">${p[k]}°</output><input aria-label="${n}の角度" type="range" min="${lo}" max="${hi}" value="${p[k]}" oninput="editPitchPose('${k}',+this.value)"></label>`).join('')}</div><canvas id="form-preview" width="450" height="570"></canvas><button class="mb form-close" onclick="closePitchForm()">決定</button>`;
+ if(!pitchRes)return;const e=$('#form-ui'),p=pitchForm.poses[pitchForm.stage];
+ if(e.style.display==='none'){pitchForm.playing=true;pitchForm.previewAt=nw()}
+ const controls=pitchForm.tab==='pose'?`<div class="form-stage">${['構え','踏み込み','リリース'].map((n,i)=>`<button class="${i===pitchForm.stage?'on':''}" onclick="setPitchStage(${i})">${n}</button>`).join('')}</div>${[['body','体',-540,540],['arm','腕',-1080,1080],['leg','脚',-360,360]].map(([k,n,lo,hi])=>`<label>${n} <output id="form-${k}-value">${p[k]}°</output><input aria-label="${n}の角度" type="range" min="${lo}" max="${hi}" value="${p[k]}" oninput="editPitchPose('${k}',+this.value)"></label>`).join('')}`:
+  FORM_MOTION.map(([k,n,lo,hi,step,unit])=>`<label>${n} <output id="form-motion-${k}-value">${formValue(pitchForm[k])}${unit}</output><input aria-label="${n}" type="range" min="${lo}" max="${hi}" step="${step}" value="${pitchForm[k]}" oninput="editPitchMotion('${k}',+this.value)"></label>`).join('');
+ e.innerHTML=`<h2>投球フォーム</h2><div class="form-controls"><select aria-label="投球フォームの種類" onchange="selectPitchForm(+this.value)">${pitchForm.preset<0?'<option value="-1">カスタム</option>':''}${PITCH_FORMS.map((f,i)=>`<option value="${i}" ${i===pitchForm.preset?'selected':''}>${f.name}</option>`).join('')}</select><div class="form-tabs"><button class="${pitchForm.tab==='pose'?'on':''}" onclick="setPitchTab('pose')">ポーズ</button><button class="${pitchForm.tab==='motion'?'on':''}" onclick="setPitchTab('motion')">回転・伸び</button></div><div class="form-sliders">${controls}</div><div class="form-tools"><button onclick="randomPitchForm()">おまかせ</button><button onclick="selectPitchForm(pitchForm.preset<0?0:pitchForm.preset)">リセット</button></div></div><canvas id="form-preview" width="750" height="900"></canvas><button id="form-play" onclick="togglePitchPreview()">${pitchForm.playing?'Ⅱ 停止':'▶ 再生'}</button><button class="mb form-close" onclick="closePitchForm()">決定</button>`;
  e.style.display='block';
 }
-function selectPitchForm(i){pitchForm={preset:i,stage:pitchForm.stage,poses:PITCH_FORMS[i].poses.map(p=>({...p}))};openPitchForm()}
-function editPitchPose(k,value){pitchForm.poses[pitchForm.stage][k]=value;$('#form-'+k+'-value').textContent=value+'°'}
+function selectPitchForm(i){if(i<0||i>=PITCH_FORMS.length)return;const tab=pitchForm.tab;pitchForm=copyPitchForm(i);pitchForm.tab=tab;openPitchForm()}
+function setPitchStage(i){pitchForm.stage=i;pitchForm.playing=false;openPitchForm()}
+function setPitchTab(tab){pitchForm.tab=tab;if(tab==='motion'){pitchForm.playing=true;pitchForm.previewAt=nw()}openPitchForm()}
+function editPitchPose(k,value){pitchForm.poses[pitchForm.stage][k]=value;pitchForm.previewBounds=null;pitchForm.playing=false;$('#form-'+k+'-value').textContent=value+'°';$('#form-play').textContent='▶ 再生'}
+function editPitchMotion(k,value){pitchForm[k]=value;pitchForm.previewBounds=null;if(!pitchForm.playing){pitchForm.playing=true;pitchForm.previewAt=nw()}const unit=FORM_MOTION.find(r=>r[0]===k)[5];$('#form-motion-'+k+'-value').textContent=formValue(value)+unit;$('#form-play').textContent='Ⅱ 停止'}
+function togglePitchPreview(){pitchForm.playing=!pitchForm.playing;pitchForm.previewAt=nw();$('#form-play').textContent=pitchForm.playing?'Ⅱ 停止':'▶ 再生'}
+function randomPitchForm(){
+ // Independent visual RNG: creating a funny form must never consume match randomness.
+ const rand=()=>{formSeed=(Math.imul(formSeed,1664525)+1013904223)>>>0;return formSeed/4294967296},integer=(a,b)=>a+Math.floor(rand()*(b-a+1)),tab=pitchForm.tab;
+ pitchForm={preset:-1,stage:0,tab,playing:true,previewAt:nw(),previewBounds:null,poses:Array.from({length:3},()=>({body:integer(-270,270),arm:integer(-720,720),leg:integer(-270,270)})),spin:integer(-4,4)*.5,windmill:integer(-6,6),twist:integer(-4,4)*.5,stretch:integer(12,44)/20,jump:integer(0,35),loose:integer(30,100)};openPitchForm();
+}
 function closePitchForm(){const e=$('#form-ui');if(e)e.style.display='none'}
 function drawFormPreview(t){
- const panel=$('#form-ui');if(!panel||panel.style.display==='none')return;
- if(!pitchRes){closePitchForm();return}
- const c=$('#form-preview');if(!c)return;const previous=X;X=c.getContext('2d');X.setTransform(3,0,0,3,0,0);X.clearRect(0,0,150,190);
- box(0,0,150,190,'#bfd7c5');oval(75,170,55,12,'#9bb79d');
- const pt=G.lastPt;drawPitcherPose(75,163,3,G.me.color,G.me.color2,pt?pt.sp||'human':'human',pt&&pt.thr==='L'?-1:1,pitchForm.stage*.5,pitchForm.poses);X=previous;
+ const panel=$('#form-ui');if(!panel||panel.style.display==='none')return;if(!pitchRes){closePitchForm();return}
+ const c=$('#form-preview');if(!c)return;const previous=X;X=c.getContext('2d');X.setTransform(3,0,0,3,0,0);X.clearRect(0,0,250,300);
+ box(0,0,250,300,'#bdd4bf');for(let i=0;i<6;i++)stroke([[0,235+i*13],[250,235+i*13]],'#a9c3ab',.5);oval(125,272,85,12,'#9bb699');
+ if(!pitchForm.previewBounds)pitchForm.previewBounds=pitchBounds(pitchForm);const b=pitchForm.previewBounds,scale=Math.min(2.8,225/(b.x1-b.x0),255/(b.y1-b.y0)),ax=125-(b.x0+b.x1)*.5*scale,ay=148-(b.y0+b.y1)*.5*scale;
+ const u=pitchForm.playing?Math.min(1.25,((nw()-pitchForm.previewAt)%1900)/1400):pitchForm.stage*.5,pt=G.lastPt;
+ drawPitcherPose(ax,ay,scale,G.me.color,G.me.color2,pt?pt.sp||'human':'human',pt&&pt.thr==='L'?-1:1,u,pitchForm.poses,pitchForm);X=previous;
 }
 addEventListener('keydown',e=>{
- if(e.target.matches('input,select,textarea'))return;
- if(e.key==='Escape'){closePitchForm();return}
- if(!pitchRes)return;
+ if(e.key==='Escape'){closePitchForm();return}if(e.target.matches('input,select,textarea'))return;if(!pitchRes)return;
  const moves={ArrowLeft:[-.25,0],ArrowRight:[.25,0],ArrowUp:[0,.25],ArrowDown:[0,-.25]};
  if(moves[e.key]){e.preventDefault();pitchAim.x=cl(pitchAim.x+moves[e.key][0],-1.4,1.4);pitchAim.y=cl(pitchAim.y+moves[e.key][1],-1.4,1.4)}
- if(e.key.toLowerCase()==='f'){e.preventDefault();openPitchForm()}
- if(e.key==='0'){pitchAim.x=0;pitchAim.y=0}
+ if(e.key.toLowerCase()==='f'){e.preventDefault();openPitchForm()}if(e.key==='0'){pitchAim.x=0;pitchAim.y=0}
 });
 
 /* ===== HUD ===== */
@@ -507,7 +563,7 @@ function title(){V.mode='yard';hudOff();const has=!!localStorage.getItem(KEY);
 ui(`<div class="ttl"><div class="logo">甲子園への道</div><div class="sub">〜 白球に夢をのせて 〜</div><div class="mn"><button class="mb" onclick="newGame()">はじめから</button>${has?'<button class="mb" onclick="loadGame()">つづきから</button>':''}<button class="mb" onclick="help()">あそびかた</button></div></div>`)}
 function help(){ui(`<div class="pn" style="left:60px;top:30px;width:840px;height:480px"><h2>あそびかた</h2><div class="tx">
 球が来たらタイミングよくボタンを押す！ボタンが打法です：通常打ち／長打狙い(強振・当たりにくい)／流し打ち(逆方向)／バント(送りに)。早いと引っ張り、遅いと流れます。ストライクゾーンの枠は出ません。球をよく見よう。<br>
-球種ボタンを押して投げます。<b>ボタンの中のタップ位置がコース指定</b>（上=高め・左右=内外。画面には出ません）。制球が低いとバラけます。「投球フォーム」で構え・踏み込み・リリースの腕／体／脚を変更できます（見た目のみ・今のプレイ中に有効）。<br>
+球種ボタンを押して投げます。<b>ボタンの中のタップ位置がコース指定</b>（上=高め・左右=内外。画面には出ません）。制球が低いとバラけます。「投球フォーム」で構え・踏み込み・リリースの腕／体／脚に加え、全身回転・腕回転・横ひねり・胴の長さ・ジャンプを変更できます（見た目のみ・今のプレイ中に有効）。<br>
 自動。<b>盗塁</b>ボタンをONにして打席へ（ランナーがいる時だけ表示）。<br>
 必殺ゲージが満タンになると「必殺」ボタンで必殺技（投球＝魔球系／打撃＝特殊打法）が使えます。主人公は作成時に種族を選べて、種族で能力が変わります。<br>
 大会の合間に練習で能力アップ。ただし<b>疲労</b>がたまると試合で能力が下がり、ケガもします。休養で回復。<br>
