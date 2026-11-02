@@ -7,7 +7,7 @@
 Node.js 22以上、CocoaPods、Xcode 26以上を用意し、Xcodeで自分のApple Developerアカウントへサインインします。
 
 ```bash
-git clone https://github.com/daiki1373-eng/gunya-yakyu.git
+git clone --branch main https://github.com/daiki1373-eng/gunya-yakyu.git
 cd gunya-yakyu/ios-app
 bash scripts/mac-release.sh --simulator
 ```
