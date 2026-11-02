@@ -243,7 +243,9 @@ button:disabled{cursor:not-allowed}
 .field label{display:flex;justify-content:space-between;font-size:13.5px;font-weight:700}
 .field output{font:600 15px/1 var(--f-num);color:var(--amber)}
 .field input[type=range]{width:100%;height:44px;accent-color:var(--amber)}
-.field select{min-height:44px;padding:0 10px;border-radius:8px;background:var(--navy);border:1px solid var(--line)}
+.field select,.field input[type=text],.field input[type=number]{width:100%;min-height:44px;padding:0 10px;border-radius:8px;background:var(--navy);border:1px solid var(--line)}
+.tag-protag{display:inline-block;padding:0 6px;border-radius:4px;background:var(--amber);color:var(--amber-ink);font-size:10.5px;font-weight:900;line-height:1.6;vertical-align:1px;margin-left:4px}
+.tag-grade{display:inline-block;padding:0 5px;border-radius:4px;background:var(--panel-2);border:1px solid var(--line);color:var(--text-2);font-size:10.5px;font-weight:700;line-height:1.5;vertical-align:1px;margin-left:4px}
 .data-import{width:100%;min-height:132px;padding:10px;border-radius:8px;background:var(--navy);border:1px solid var(--line);color:var(--text);font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
 .data-file{width:100%;min-height:44px;padding:8px;border-radius:8px;background:var(--navy);border:1px solid var(--line);color:var(--text-2)}
 
@@ -380,7 +382,7 @@ button:disabled{cursor:not-allowed}
    共通基盤：定数 CONFIG（バランス値・仮置き値・段階ごとの機能スイッチ・表示名）
    ===================================================================== */
 const CONFIG = Object.freeze({
-  VERSION: '段階4 最終実装 1.0',
+  VERSION: "'98甲子園準拠 段階A 1.0",
   /* BUILD_CONFIG_START: build-prod.js はこの範囲だけを置換する */
   BUILD: 'production',
   STORAGE: Object.freeze({
@@ -394,11 +396,13 @@ const CONFIG = Object.freeze({
   /* BUILD_CONFIG_END */
   FEATURES: Object.freeze({
     persistence: true,     // CONFIG.STORAGE で開発用／本番用キーを切り替える
-    leagueProgress: true,  // 段階2：試合結果をリーグに記録して節を進める
-    leagueRewards: true,   // 段階2：リーグ戦の報酬を試合終了時にまとめて付与
-    correction: true,      // 段階2：能力補正を MatchEngine.HOOKS 経由で有効にする
-    growth: true,          // 段階3：経験値・特訓・限界突破・スカウトの排出と消費
-    daily: true,           // 段階3：ログボ・ミッションの付与とリーグ戦以外の1日上限
+    league: false,         // 段階A：6球団リーグは主モードから外し無効化
+    tournament: true,      // 段階A：地方予選（3試合）→甲子園本大会（3試合）の大会トーナメント
+    leagueProgress: false, // 旧リーグ進行は無効化（大会カレンダー進行に置換）
+    leagueRewards: true,   // 段階2・A：公式戦の報酬を試合終了時にまとめて付与
+    correction: true,      // 段階2・A：能力補正・学校特性補正を MatchEngine.HOOKS 経由で有効にする
+    growth: true,          // 段階3・A：経験値・特訓・限界突破・スカウト1年生排出・進級と卒業
+    daily: true,           // 段階3：ログボ・ミッションの付与と公式戦以外の1日上限
   }),
   PROVISIONAL: Object.freeze({  // 仕様書 D の仮置き
     Q1_nonLeagueDailyCap: 300,  // Q1=B：リーグ戦以外のコイン獲得は1日合計300まで
@@ -432,7 +436,11 @@ const CONFIG = Object.freeze({
     posName: Object.freeze({ C: '捕手', '1B': '一塁手', '2B': '二塁手', '3B': '三塁手', SS: '遊撃手', LF: '左翼手', CF: '中堅手', RF: '右翼手', DH: '指名打者', P: '投手' }),
     pitch: Object.freeze({ fastball: 'まっすぐ', curve: 'カーブ', slider: 'スライダー', fork: 'フォーク', shoot: 'シュート', sinker: 'シンカー', mypitch: 'マイ変化球' }),
     rarity: Object.freeze({ 1: 'ルーキー', 2: 'レギュラー', 3: 'スター', 4: 'レジェンド' }),
-    mode: Object.freeze({ league: 'リーグ戦', practice: '練習', challenge10: '10球チャレンジ', exhibition: 'エキシビション' }),
+    mode: Object.freeze({ league: '大会試合', tournament: '大会試合', practice: '練習', challenge10: '10球チャレンジ', exhibition: 'エキシビション' }),
+    throws: Object.freeze({ R: '右投', L: '左投' }),
+    bats: Object.freeze({ R: '右打', L: '左打', S: '両打' }),
+    trait: Object.freeze({ batting: '打撃型', mobility: '機動型', defense: '守備型' }),
+    role: Object.freeze({ 1: '新入部員', 2: 'レギュラー', 3: 'キャプテン' }),
   }),
 });
 
@@ -525,6 +533,8 @@ const Save = (() => {
       if (typeof data.settings.pitchingForm !== 'string' || typeof data.settings.battingForm !== 'string') errors.push('settings のフォームが不正です');
       if (!plain(data.settings.myPitch) || !plain(data.settings.motion)) errors.push('settings の変化球またはモーションが不正です');
     }
+    ['school', 'protagonist', 'calendar', 'grades'].forEach((key) => { if (data[key] !== undefined && !plain(data[key])) errors.push(`${key} がオブジェクトではありません`); });
+    if (data.graduates !== undefined && !Array.isArray(data.graduates)) errors.push('graduates が配列ではありません');
     return errors.length ? { ok: false, reason: errors.slice(0, 4).join('／'), errors } : { ok: true, data };
   }
   const safeInt = (v, fallback = 0, max = Number.MAX_SAFE_INTEGER) => Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : fallback;
@@ -618,28 +628,32 @@ const Save = (() => {
     if (plain(data.meta.migration)) meta.migration = { ...meta.migration, ...data.meta.migration };
   }
   // 読み込んで各モジュールに渡す。破損本体は .broken に退避して .bak から復旧する。
-  function load() {
+  function load(store = window.localStorage) {
     if (!defaults) defaults = Util.copy(snapshot());
-    let found = CONFIG.FEATURES.persistence ? readForLoad() : { data: null, source: 'new' };
+    let found = CONFIG.FEATURES.persistence ? readForLoad(store) : { data: null, source: 'new' };
     if (!found.data && found.source !== 'storage-unavailable' && CONFIG.FEATURES.persistence && KEYS.migrationEnabled) {
-      try { found = migrateFromV1(); } catch (e) { found = { data: null, source: 'storage-unavailable', error: e.name }; }
+      try { found = migrateFromV1(store); } catch (e) { found = { data: null, source: 'storage-unavailable', error: e.name }; }
     }
     let data = found.data;
+    const needsV2Upgrade = !!(data && KEYS.migrationEnabled && !(data.meta && data.meta.migration && data.meta.migration.completed));
+    const needsGradeMigration = !!(data && !(data.grades && data.grades.migrated === true));
     // 段階3以前の有効なv2がある場合は上書き移行せず、二重移行防止フラグだけを追加する。
-    if (data && KEYS.migrationEnabled && !(data.meta && data.meta.migration && data.meta.migration.completed)) {
+    if (needsV2Upgrade) {
       const upgraded = Util.copy(data);
       upgraded.meta = plain(upgraded.meta) ? upgraded.meta : {};
       upgraded.meta.migration = { completed: true, status: 'existing-v2', sourceKey: KEYS.legacyV1, at: new Date().toISOString() };
-      try {
-        if (!parse(window.localStorage.getItem(KEYS.bak))) window.localStorage.setItem(KEYS.bak, JSON.stringify(data));
-        window.localStorage.setItem(KEYS.main, JSON.stringify(upgraded));
-      } catch (e) {}
       data = upgraded;
     }
     takeMeta(data);
     slices.forEach((api) => api.importSlice(data || {}));
     last = snapshot();
-    return { source: found.source, recovered: !!found.recovered, migrated: !!found.migrated };
+    if ((needsV2Upgrade || needsGradeMigration) && CONFIG.FEATURES.persistence) {
+      try {
+        if (!parse(store.getItem(KEYS.bak))) store.setItem(KEYS.bak, JSON.stringify(found.data));
+        store.setItem(KEYS.main, JSON.stringify(last));
+      } catch (e) {}
+    }
+    return { source: found.source, recovered: !!found.recovered, migrated: !!found.migrated, gradeMigrated: needsGradeMigration };
   }
   // 状態が変わる操作の直後に呼ぶ。保存前の世代は毎回 .bak へ退避する。
   function commit(reason) {
@@ -655,7 +669,7 @@ const Save = (() => {
       return { ok: true, persisted: true };
     } catch (e) { return { ok: false, persisted: false, error: e.name }; }
   }
-  const peek = () => last || snapshot();
+  const peek = () => snapshot();
   const exportText = () => JSON.stringify(peek(), null, 2);
   function importText(text, store = window.localStorage) {
     let data;
@@ -888,17 +902,18 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     return { ok: true, pack: p };
   }
 
-  // リーグ報酬はpendingに置いて終了時だけ確定。非リーグの試合コインは従来どおり即時付与する。
-  Events.on('match:start', (e) => { pendingMatch = e.mode === 'league' ? { mode: e.mode, hits: 0, homeruns: 0 } : null; });
+  // 公式戦（大会・旧リーグ）報酬はpendingに置いて終了時だけ確定。非公式戦の試合コインは従来どおり即時付与する。
+  const isOfficialMode = (m) => m === 'league' || m === 'tournament';
+  Events.on('match:start', (e) => { pendingMatch = isOfficialMode(e.mode) ? { mode: e.mode, hits: 0, homeruns: 0 } : null; });
   Events.on('match:hit', (e) => {
     if (e.side !== 'user') return;
     const hr = e.kind === 'HR';
-    if (e.mode !== 'league') { earn({ coins: hr ? E.homerunCoins : E.hitCoins }, hr ? 'homerun' : 'hit', 'nonLeague'); return; }
+    if (!isOfficialMode(e.mode)) { earn({ coins: hr ? E.homerunCoins : E.hitCoins }, hr ? 'homerun' : 'hit', 'nonLeague'); return; }
     if (!pendingMatch) return;
     pendingMatch[hr ? 'homeruns' : 'hits'] += 1;
   });
   function settleMatch(e) {
-    if (e.mode !== 'league' || !pendingMatch) { lastMatchRewards = null; pendingMatch = null; return null; }
+    if (!isOfficialMode(e.mode) || !pendingMatch) { lastMatchRewards = null; pendingMatch = null; return null; }
     const p = pendingMatch;
     const r = { result: e.result, hits: p.hits, hitCoins: p.hits * E.hitCoins, homeruns: p.homeruns, homerunCoins: p.homeruns * E.homerunCoins, resultCoins: E.leagueResultCoins[e.result] || 0, granted: CONFIG.FEATURES.leagueRewards };
     r.total = r.hitCoins + r.homerunCoins + r.resultCoins;
@@ -1067,7 +1082,7 @@ const { Economy, Ads, Missions, LoginBonus } = (() => {
     ensureDaily();
     s.missions.progress.hits5 = Math.min(DAILY[1].goal, (s.missions.progress.hits5 || 0) + pendingMissions.hits);
     s.missions.progress.k3 = Math.min(DAILY[2].goal, (s.missions.progress.k3 || 0) + pendingMissions.strikeouts);
-    if (e.mode === 'league') s.missions.progress.playLeague = 1;
+    if (isOfficialMode(e.mode)) s.missions.progress.playLeague = 1;
     const applied = { ...pendingMissions };
     pendingMissions = null;
     return applied;
@@ -1189,6 +1204,21 @@ const Growth = (() => {
   const up = (o, n, kmhUp) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, k === 'kmh' ? v + kmhUp : v + n]));
   const B = (id, name, number, pos, rarity, lv1, grow) => ({ id, name, number, type: 'B', pos, rarity, lv1, max: up(lv1, grow, 0) });
   const P = (id, name, number, rarity, lv1, grow, special) => ({ id, name, number, type: 'P', pos: 'P', rarity, lv1, max: up(lv1, grow, 6), special });
+  // 架空の母校リスト12校（都道府県・チーム特性つき。実在校名は使わない）
+  const SCHOOLS = Object.freeze([
+    { id: 'SCH01', name: '北星学園', pref: '北海道', trait: 'batting', traitLabel: '打撃型', desc: '長打力重視の強打線（パワー＋・ミート微＋）' },
+    { id: 'SCH02', name: '杜陵実業', pref: '宮城', trait: 'defense', traitLabel: '守備型', desc: '堅守と制球で守り勝つ（守備＋・制球微＋）' },
+    { id: 'SCH03', name: '東都第一', pref: '東京', trait: 'mobility', traitLabel: '機動型', desc: '足と巧打でかき回す（走力＋・ミート微＋）' },
+    { id: 'SCH04', name: '蒼海学園', pref: '神奈川', trait: 'batting', traitLabel: '打撃型', desc: '潮風に乗せる豪快アーチ（パワー＋・ミート微＋）' },
+    { id: 'SCH05', name: '房総中央', pref: '千葉', trait: 'mobility', traitLabel: '機動型', desc: '俊足揃いの機動力野球（走力＋・ミート微＋）' },
+    { id: 'SCH06', name: '富嶽工科', pref: '静岡', trait: 'defense', traitLabel: '守備型', desc: '鉄壁の内野陣と粘投（守備＋・制球微＋）' },
+    { id: 'SCH07', name: '尾張商業', pref: '愛知', trait: 'mobility', traitLabel: '機動型', desc: '積極走塁の伝統校（走力＋・ミート微＋）' },
+    { id: 'SCH08', name: '浪速学院', pref: '大阪', trait: 'batting', traitLabel: '打撃型', desc: '切れ目ない重量打線（パワー＋・ミート微＋）' },
+    { id: 'SCH09', name: '六甲湊', pref: '兵庫', trait: 'defense', traitLabel: '守備型', desc: '基本に忠実な守り（守備＋・制球微＋）' },
+    { id: 'SCH10', name: '瀬戸内水産', pref: '広島', trait: 'defense', traitLabel: '守備型', desc: '広い守備範囲で失点を防ぐ（守備＋・制球微＋）' },
+    { id: 'SCH11', name: '伊予橘', pref: '愛媛', trait: 'mobility', traitLabel: '機動型', desc: '機敏な走塁で次の塁を狙う（走力＋・ミート微＋）' },
+    { id: 'SCH12', name: '玄海大附', pref: '福岡', trait: 'batting', traitLabel: '打撃型', desc: 'フルスイングの猛打（パワー＋・ミート微＋）' },
+  ]);
   // カードマスタ（仮）。Lv1の値と基準最大Lvの値を持つ。IDは一度決めたら変えない・再利用しない
   const MASTER = Object.freeze([
     B('S01', '岩城 拓真', 22, 'C', 1, { meet: 43, power: 47, speed: 37, defense: 50 }, 10),
@@ -1203,6 +1233,19 @@ const Growth = (() => {
     P('S10', '千葉 悠真', 18, 1, { kmh: 138, control: 47, stamina: 50, movement: 46 }, 10, ['slider', 'fork']),
     P('S11', '杉崎 航', 11, 1, { kmh: 134, control: 50, stamina: 46, movement: 48 }, 10, ['curve', 'sinker']),
     P('S12', '間宮 陸', 21, 1, { kmh: 136, control: 44, stamina: 50, movement: 49 }, 10, ['shoot', 'slider']),
+    // 卒業後の部員補充用1年生プール（スカウト排出プールには含めない）
+    B('N01', '佐伯 航太', 12, 'C', 1, { meet: 44, power: 45, speed: 39, defense: 49 }, 10),
+    B('N02', '大塚 健吾', 3, '1B', 1, { meet: 42, power: 49, speed: 37, defense: 42 }, 10),
+    B('N03', '三宅 蒼', 14, '2B', 1, { meet: 48, power: 40, speed: 48, defense: 47 }, 10),
+    B('N04', '吉岡 颯太', 15, '3B', 1, { meet: 44, power: 49, speed: 42, defense: 45 }, 10),
+    B('N05', '成瀬 翼', 16, 'SS', 1, { meet: 47, power: 41, speed: 49, defense: 49 }, 10),
+    B('N06', '高梨 悠', 19, 'LF', 1, { meet: 45, power: 45, speed: 45, defense: 41 }, 10),
+    B('N07', '桐谷 駿', 28, 'CF', 1, { meet: 46, power: 42, speed: 49, defense: 48 }, 10),
+    B('N08', '結城 匠', 27, 'RF', 1, { meet: 43, power: 47, speed: 44, defense: 44 }, 10),
+    B('N09', '熊沢 剛', 29, 'DH', 1, { meet: 41, power: 49, speed: 37, defense: 37 }, 10),
+    P('N10', '水野 遥斗', 10, 1, { kmh: 137, control: 47, stamina: 49, movement: 46 }, 10, ['slider']),
+    P('N11', '篠原 律', 13, 1, { kmh: 135, control: 49, stamina: 47, movement: 47 }, 10, ['curve']),
+    P('N12', '片桐 蓮', 17, 1, { kmh: 136, control: 45, stamina: 49, movement: 48 }, 10, ['fork']),
     // スカウトプール（同じレア度内は均等）
     B('B101', '神宮寺 亮', 1, 'CF', 3, { meet: 64, power: 58, speed: 70, defense: 66 }, 18),
     B('B102', '真田 春樹', 3, 'SS', 3, { meet: 68, power: 55, speed: 66, defense: 70 }, 18),
@@ -1221,10 +1264,21 @@ const Growth = (() => {
     B('B403', '松田 雄大', 31, 'LF', 1, { meet: 41, power: 49, speed: 43, defense: 40 }, 10),
     P('P404', '伊東 淳', 26, 1, { kmh: 136, control: 45, stamina: 47, movement: 43 }, 10, ['shoot']),
   ]);
-  const master = (id) => MASTER.find((c) => c.id === id) || null;
+  const SCHOOL_DEFAULT = Object.freeze({ id: 'SCH04', name: '蒼海学園', pref: '神奈川', trait: 'batting', traitLabel: '打撃型', selected: false });
+  const PROTAG_DEFAULT = Object.freeze({
+    created: false, pendingNextGen: false, generation: 1, cardId: 'PROTAG',
+    name: '熱血 球児', pos: 'P', type: 'P', throws: 'R', bats: 'R', number: 1, grade: 1,
+    stats: { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 },
+  });
   const s = {
     teamName: 'ぐにゃーズ',
+    school: Util.copy(SCHOOL_DEFAULT),
+    protagonist: Util.copy(PROTAG_DEFAULT),
     owned: Object.fromEntries(MASTER.filter((c) => c.id.startsWith('S')).map((c) => [c.id, { lv: 1, exp: 0, lb: 0, fatigue: 0 }])),
+    grades: Object.fromEntries(MASTER.filter((c) => c.id.startsWith('S')).map((c) => [c.id, 2])),
+    gradesMigrated: true,
+    graduates: [],
+    cardStats: {},
     lineup: [
       { cardId: 'S07', pos: 'CF' }, { cardId: 'S03', pos: '2B' }, { cardId: 'S04', pos: '3B' },
       { cardId: 'S02', pos: '1B' }, { cardId: 'S09', pos: 'DH' }, { cardId: 'S01', pos: 'C' },
@@ -1234,6 +1288,14 @@ const Growth = (() => {
     nextStarter: 0,
     scout: { pity: 0, totalPulls: 0, adTicketDayKey: null, history: [] },
   };
+  function protagMaster() {
+    const p = s.protagonist || PROTAG_DEFAULT;
+    const isP = p.pos === 'P';
+    return isP
+      ? P('PROTAG', p.name || '熱血 球児', p.number || 1, 3, { kmh: 140, control: 48, stamina: 52, movement: 48 }, 18, ['slider', 'fork'])
+      : B('PROTAG', p.name || '熱血 球児', p.number || 1, p.pos || 'CF', 3, { meet: 48, power: 48, speed: 48, defense: 48 }, 18);
+  }
+  const master = (id) => (id === 'PROTAG' ? protagMaster() : MASTER.find((c) => c.id === id) || null);
   let matchParticipants = [];
   let lastExpGain = null;
 
@@ -1252,6 +1314,8 @@ const Growth = (() => {
     return out;
   }
   const overallOf = (c, a) => Math.round(c.type === 'P' ? (kmhScore(a.kmh) + a.control + a.stamina + a.movement) / 4 : (a.meet + a.power + a.speed + a.defense) / 4);
+  const gradeOf = (id) => Util.clamp(Math.floor(s.grades[id] || (id === 'PROTAG' ? (s.protagonist.grade || 1) : 1)), 1, 3);
+  const throwsBatsLabel = (th = 'R', bt = 'R') => `${LB.throws[th] || '右投'}${LB.bats[bt] || '右打'}`;
 
   function getCard(id) {
     const c = master(id);
@@ -1259,10 +1323,16 @@ const Growth = (() => {
     const own = s.owned[id];
     const lv = own ? own.lv : 1;
     const lb = own ? own.lb : 0;
+    const grade = gradeOf(id);
+    const isProtagonist = id === 'PROTAG';
     const abilities = abilityAtCard(c, lv);
     return {
       id: c.id, name: c.name, number: c.number, type: c.type, pos: c.pos, posLabel: LB.pos[c.pos], posName: LB.posName[c.pos],
       rarity: c.rarity, rarityName: LB.rarity[c.rarity], lv, maxLv: maxLvOf(c, lb), exp: own ? own.exp : 0, expNext: expToNext(lv), lb,
+      grade, gradeLabel: `${grade}年`, isProtagonist, protagonistBadge: isProtagonist ? '主人公' : null,
+      roleLabel: isProtagonist ? LB.role[grade] : null,
+      throws: isProtagonist ? s.protagonist.throws : 'R', bats: isProtagonist ? s.protagonist.bats : 'R',
+      throwsBats: isProtagonist ? throwsBatsLabel(s.protagonist.throws, s.protagonist.bats) : null,
       abilities, overall: overallOf(c, abilities), special: c.special || [], specialNames: (c.special || []).map((p) => LB.pitch[p]),
       owned: !!own, fatigued: !!(own && own.fatigue > 0),
     };
@@ -1273,8 +1343,9 @@ const Growth = (() => {
     rarity: (a, b) => b.rarity - a.rarity || b.overall - a.overall,
     lv: (a, b) => b.lv - a.lv || b.overall - a.overall,
     pos: (a, b) => POS_ORDER[a.pos] - POS_ORDER[b.pos],
+    grade: (a, b) => b.grade - a.grade || b.overall - a.overall,
   };
-  const getOwnedCards = (sort = 'overall') => Object.keys(s.owned).map(getCard).sort(SORTS[sort] || SORTS.overall);
+  const getOwnedCards = (sort = 'overall') => Object.keys(s.owned).map(getCard).filter(Boolean).sort(SORTS[sort] || SORTS.overall);
   const getAbilities = (id) => { const c = getCard(id); return c ? c.abilities : null; };
   const cardOverall = (id) => { const c = getCard(id); return c ? c.overall : 0; };
   const fits = (c, pos) => pos === 'DH' || c.pos === pos;
@@ -1285,6 +1356,7 @@ const Growth = (() => {
       const fit = fits(c, slot.pos);
       return {
         order: i + 1, cardId: c.id, name: c.name, number: c.number, type: 'B', pos: slot.pos, posLabel: LB.pos[slot.pos], fit,
+        grade: c.grade, gradeLabel: c.gradeLabel, isProtagonist: c.isProtagonist, roleLabel: c.roleLabel,
         abilities: { ...c.abilities }, defenseFactor: fit ? 1 : G.misfitDefense,
         effectiveDefense: Math.floor(c.abilities.defense * (fit ? 1 : G.misfitDefense)), overall: c.overall,
       };
@@ -1293,10 +1365,14 @@ const Growth = (() => {
   function getRotation() {
     return s.rotation.map((id, i) => {
       const c = getCard(id);
-      return { slot: i + 1, cardId: id, name: c.name, number: c.number, type: 'P', abilities: c.abilities, special: c.special, specialNames: c.specialNames, fatigued: c.fatigued, isNext: i === s.nextStarter, overall: c.overall };
+      return {
+        slot: i + 1, cardId: id, name: c.name, number: c.number, type: 'P',
+        grade: c.grade, gradeLabel: c.gradeLabel, isProtagonist: c.isProtagonist, roleLabel: c.roleLabel,
+        abilities: c.abilities, special: c.special, specialNames: c.specialNames, fatigued: c.fatigued, isNext: i === s.nextStarter, overall: c.overall,
+      };
     });
   }
-  const getTeamSnapshot = () => ({ name: s.teamName, lineup: getLineup(), starter: getRotation()[s.nextStarter] });
+  const getTeamSnapshot = () => ({ name: s.teamName, school: getSchool(), lineup: getLineup(), starter: getRotation()[s.nextStarter] });
   // チーム総合力＝打撃×0.4＋投手×0.4＋守備走塁×0.2（仕様書 A-5）
   function teamOverall() {
     const lu = getLineup();
@@ -1306,6 +1382,150 @@ const Growth = (() => {
     const fld = fl.reduce((t, b) => t + b.abilities.speed + b.effectiveDefense, 0) / (fl.length * 2);
     return Math.round(bat * 0.4 + pit * 0.4 + fld * 0.2);
   }
+  const getSchools = () => SCHOOLS.map((sch) => ({ ...sch }));
+  const getSchool = () => ({ ...s.school });
+  function selectSchool(schoolId, options = {}) {
+    const found = SCHOOLS.find((x) => x.id === schoolId || x.name === schoolId) || SCHOOLS[0];
+    s.school = { id: found.id, name: found.name, pref: found.pref, trait: found.trait, traitLabel: found.traitLabel, desc: found.desc, selected: true };
+    s.teamName = found.name;
+    Events.emit('school:selected', getSchool());
+    if (options.commit !== false) Save.commit('selectSchool');
+    return { ok: true, school: getSchool() };
+  }
+  function getProtagonist() {
+    const g = s.owned.PROTAG ? gradeOf('PROTAG') : (s.protagonist.grade || 1);
+    return {
+      ...Util.copy(s.protagonist),
+      grade: g, gradeLabel: `${g}年`, roleLabel: LB.role[g],
+      throwsBats: throwsBatsLabel(s.protagonist.throws, s.protagonist.bats),
+      enrolled: !!s.owned.PROTAG,
+    };
+  }
+  const hasProtagonist = () => !!(s.protagonist && s.protagonist.created && s.owned.PROTAG);
+  function ensureRosterAndLineup(excludedIds = new Set()) {
+    const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
+    const rookiePool = MASTER.filter((c) => (c.id.startsWith('N') || c.id.startsWith('S')) && !excludedIds.has(c.id));
+    let batters = getOwnedCards('overall').filter((c) => c.type === 'B');
+    for (const cand of rookiePool.filter((c) => c.type === 'B')) {
+      if (batters.length >= 9) break;
+      if (!s.owned[cand.id]) { s.owned[cand.id] = { lv: 1, exp: 0, lb: 0, fatigue: 0 }; s.grades[cand.id] = 1; batters = getOwnedCards('overall').filter((c) => c.type === 'B'); }
+    }
+    let pitchers = getOwnedCards('overall').filter((c) => c.type === 'P');
+    for (const cand of rookiePool.filter((c) => c.type === 'P')) {
+      if (pitchers.length >= 3) break;
+      if (!s.owned[cand.id]) { s.owned[cand.id] = { lv: 1, exp: 0, lb: 0, fatigue: 0 }; s.grades[cand.id] = 1; pitchers = getOwnedCards('overall').filter((c) => c.type === 'P'); }
+    }
+    const protagIsB = s.owned.PROTAG && s.protagonist.type === 'B';
+    const protagIsP = s.owned.PROTAG && s.protagonist.type === 'P';
+    const usedB = new Set();
+    const validLineup = Array.isArray(s.lineup) && s.lineup.length === 9
+      && s.lineup.every((x) => x && s.owned[x.cardId] && master(x.cardId) && master(x.cardId).type === 'B' && positions.includes(x.pos))
+      && new Set(s.lineup.map((x) => x.cardId)).size === 9 && new Set(s.lineup.map((x) => x.pos)).size === 9;
+    if (!validLineup || (protagIsB && !s.lineup.some((x) => x.cardId === 'PROTAG'))) {
+      if (protagIsB) usedB.add('PROTAG');
+      const targetPos = protagIsB ? (positions.includes(s.protagonist.pos) ? s.protagonist.pos : 'CF') : null;
+      s.lineup = positions.map((pos) => {
+        if (protagIsB && pos === targetPos) return { cardId: 'PROTAG', pos };
+        const pick = batters.find((c) => !usedB.has(c.id) && (pos === 'DH' || c.pos === pos)) || batters.find((c) => !usedB.has(c.id));
+        usedB.add(pick.id);
+        return { cardId: pick.id, pos };
+      });
+    }
+    const validRot = Array.isArray(s.rotation) && s.rotation.length === 3
+      && new Set(s.rotation).size === 3 && s.rotation.every((id) => s.owned[id] && master(id) && master(id).type === 'P');
+    if (!validRot || (protagIsP && !s.rotation.includes('PROTAG'))) {
+      const rest = pitchers.filter((p) => p.id !== 'PROTAG').slice(0, protagIsP ? 2 : 3).map((p) => p.id);
+      s.rotation = protagIsP ? ['PROTAG', ...rest] : rest;
+    }
+    s.nextStarter = Util.clamp(s.nextStarter || 0, 0, s.rotation.length - 1);
+  }
+  function createProtagonist(input = {}) {
+    const rawName = typeof input.name === 'string' ? input.name.trim() : '';
+    const name = (rawName || '熱血 球児').slice(0, 16);
+    const allPos = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
+    const pos = allPos.includes(input.pos) ? input.pos : 'P';
+    let throws = ['R', 'L'].includes(input.throws) ? input.throws : 'R';
+    let bats = ['R', 'L', 'S'].includes(input.bats) ? input.bats : 'R';
+    if (typeof input.throwsBats === 'string') {
+      if (input.throwsBats.includes('左投')) throws = 'L'; else if (input.throwsBats.includes('右投')) throws = 'R';
+      if (input.throwsBats.includes('左打')) bats = 'L'; else if (input.throwsBats.includes('両打')) bats = 'S'; else if (input.throwsBats.includes('右打')) bats = 'R';
+    }
+    const number = Util.clamp(Math.floor(Number.isFinite(Number(input.number)) ? Number(input.number) : (pos === 'P' ? 1 : 8)), 1, 99);
+    const generation = s.protagonist.pendingNextGen ? (s.protagonist.generation || 1) + 1 : Math.max(1, Math.floor(Number(input.generation) || s.protagonist.generation || 1));
+    if (input.schoolId || !s.school.selected) selectSchool(input.schoolId || s.school.id, { commit: false });
+    s.protagonist = {
+      created: true, pendingNextGen: false, generation, cardId: 'PROTAG',
+      name, pos, type: pos === 'P' ? 'P' : 'B', throws, bats, number, grade: 1,
+      stats: { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 },
+    };
+    s.owned.PROTAG = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
+    s.grades.PROTAG = 1;
+    s.cardStats.PROTAG = { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 };
+    if (pos === 'P') {
+      s.lineup = s.lineup.filter((x) => x.cardId !== 'PROTAG');
+      const otherP = getOwnedCards('overall').filter((c) => c.type === 'P' && c.id !== 'PROTAG').slice(0, 2).map((c) => c.id);
+      s.rotation = ['PROTAG', ...otherP];
+      s.nextStarter = 0;
+    } else {
+      s.rotation = s.rotation.filter((id) => id !== 'PROTAG');
+      const idx = s.lineup.findIndex((x) => x.pos === pos);
+      const existingProtagIdx = s.lineup.findIndex((x) => x.cardId === 'PROTAG');
+      if (existingProtagIdx >= 0 && existingProtagIdx !== idx) {
+        const rep = getOwnedCards('overall').find((c) => c.type === 'B' && c.id !== 'PROTAG' && !s.lineup.some((l) => l.cardId === c.id));
+        if (rep) s.lineup[existingProtagIdx].cardId = rep.id;
+      }
+      if (idx >= 0) s.lineup[idx].cardId = 'PROTAG';
+    }
+    ensureRosterAndLineup();
+    const out = getProtagonist();
+    Events.emit('protagonist:created', out);
+    if (input.commit !== false) Save.commit('createProtagonist');
+    return { ok: true, protagonist: out, card: getCard('PROTAG'), school: getSchool() };
+  }
+  function formatGraduateSummary(c, st) {
+    if (c.type === 'P') return `Lv${c.lv} 総合${c.overall}／${st.games || 0}登板 ${st.wins || 0}勝 ${st.k || 0}奪三振`;
+    return `Lv${c.lv} 総合${c.overall}／${st.games || 0}試合 ${st.hits || 0}安打 ${st.hr || 0}本 ${st.rbi || 0}打点`;
+  }
+  function processYearEnd(year = 1) {
+    const ownedIds = Object.keys(s.owned);
+    const graduatingIds = ownedIds.filter((id) => gradeOf(id) >= 3);
+    const graduated = [];
+    const promoted = [];
+    let protagGraduated = false;
+    graduatingIds.forEach((id) => {
+      const c = getCard(id);
+      const st = s.cardStats[id] || (id === 'PROTAG' ? s.protagonist.stats : null) || { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 };
+      const rec = {
+        id: `GRAD-${year}-${id}-${s.graduates.length + 1}`,
+        cardId: id, name: c.name, pos: c.pos, posLabel: c.posLabel, number: c.number, type: c.type,
+        rarity: c.rarity, lv: c.lv, overall: c.overall, isProtagonist: !!c.isProtagonist,
+        throwsBats: c.throwsBats || null, generation: s.protagonist.generation || 1,
+        graduatedYear: year, schoolId: s.school.id, schoolName: s.school.name,
+        statsSummary: formatGraduateSummary(c, st), stats: Util.copy(st),
+      };
+      s.graduates.unshift(rec);
+      graduated.push(rec);
+      if (id === 'PROTAG') protagGraduated = true;
+      delete s.owned[id];
+      delete s.grades[id];
+      delete s.cardStats[id];
+    });
+    Object.keys(s.owned).forEach((id) => {
+      const nextGrade = Math.min(3, gradeOf(id) + 1);
+      s.grades[id] = nextGrade;
+      promoted.push({ cardId: id, name: getCard(id).name, grade: nextGrade });
+    });
+    if (protagGraduated) {
+      s.protagonist.created = false;
+      s.protagonist.pendingNextGen = true;
+      s.protagonist.grade = 3;
+    } else if (s.owned.PROTAG) {
+      s.protagonist.grade = s.grades.PROTAG;
+    }
+    ensureRosterAndLineup(new Set(graduatingIds));
+    return { graduated, promoted, generationEnded: protagGraduated, protagonistGraduated: protagGraduated };
+  }
+
   const getScoutInfo = () => ({ costs: CONFIG.SCOUT.costs, rates: CONFIG.SCOUT.rates, guaranteeRates: CONFIG.SCOUT.guaranteeRates, pityRemaining: CONFIG.SCOUT.pity - s.scout.pity, totalPulls: s.scout.totalPulls, enabled: CONFIG.FEATURES.growth });
   function addExp(cardId, amount) {
     const c = master(cardId); const own = s.owned[cardId];
@@ -1339,15 +1559,22 @@ const Growth = (() => {
   function acquire(cardId, options = {}) {
     const c = master(cardId); const own = s.owned[cardId];
     if (!c) return null;
+    // 主人公は卒業まで在籍保証（重複コイン変換・通常引退の対象外）
+    if (cardId === 'PROTAG') {
+      if (!own) { s.owned.PROTAG = { lv: 1, exp: 0, lb: 0, fatigue: 0 }; s.grades.PROTAG = s.protagonist.grade || 1; }
+      return { cardId: 'PROTAG', rarity: c.rarity, grade: gradeOf('PROTAG'), status: '主人公（在籍保証）', coins: 0 };
+    }
     let status = 'NEW'; let coins = 0;
-    if (!own) s.owned[cardId] = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
-    else if (own.lb < G.limitBreakMax) { own.lb += 1; status = `限界突破 +${own.lb}`; }
+    if (!own) {
+      s.owned[cardId] = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
+      s.grades[cardId] = 1; // 新規スカウト排出は全員1年生
+    } else if (own.lb < G.limitBreakMax) { own.lb += 1; status = `限界突破 +${own.lb}`; }
     else {
       const requested = G.duplicateCoins[c.rarity];
       const granted = Economy.earn({ coins: requested }, `duplicate:${cardId}`, 'duplicate', { commit: false, date: options.date });
       coins = granted.coins || 0; status = `コイン変換 +${coins}`;
     }
-    const out = { cardId, rarity: c.rarity, status, coins };
+    const out = { cardId, rarity: c.rarity, grade: gradeOf(cardId), status, coins };
     Events.emit('growth:acquired', { ...out, isNew: !own });
     return out;
   }
@@ -1366,7 +1593,7 @@ const Growth = (() => {
       const rarity = rarityRoll(rng, kind === 'guarantee' || (kind === 'ten' && i === 9));
       s.scout.totalPulls += 1;
       s.scout.pity = rarity === 4 ? 0 : s.scout.pity + 1;
-      const pool = MASTER.filter((c) => !c.id.startsWith('S') && c.rarity === rarity);
+      const pool = MASTER.filter((c) => !c.id.startsWith('S') && !c.id.startsWith('N') && c.rarity === rarity);
       const picked = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
       const result = acquire(picked.id, options);
       results.push(result);
@@ -1376,9 +1603,27 @@ const Growth = (() => {
     Save.commit(`scout:${kind}`);
     return { ok: true, kind, cost, results, pity: s.scout.pity, totalPulls: s.scout.totalPulls };
   }
+  function recordMatchStats(e) {
+    matchParticipants.forEach((id) => {
+      s.cardStats[id] = s.cardStats[id] || { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 };
+      s.cardStats[id].games += 1;
+    });
+    if (Array.isArray(e.batting)) e.batting.forEach((b) => {
+      if (!b || !b.cardId || !s.owned[b.cardId]) return;
+      const st = s.cardStats[b.cardId] || (s.cardStats[b.cardId] = { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 });
+      st.ab += b.ab || 0; st.hits += b.h || 0; st.hr += b.hr || 0; st.rbi += b.rbi || 0;
+    });
+    if (Array.isArray(e.pitching)) e.pitching.forEach((p) => {
+      if (!p || !p.cardId || !s.owned[p.cardId]) return;
+      const st = s.cardStats[p.cardId] || (s.cardStats[p.cardId] = { games: 0, ab: 0, hits: 0, hr: 0, rbi: 0, pitches: 0, k: 0, wins: 0 });
+      st.pitches += p.pitches || 0; st.k += p.k || 0; if (e.result === 'W') st.wins += 1;
+    });
+    if (s.cardStats.PROTAG) s.protagonist.stats = Util.copy(s.cardStats.PROTAG);
+  }
   function settleMatch(e) {
-    if (e.mode === 'league' && s.rotation.length) s.nextStarter = (s.nextStarter + 1) % s.rotation.length;
+    if ((e.mode === 'league' || e.mode === 'tournament') && s.rotation.length) s.nextStarter = (s.nextStarter + 1) % s.rotation.length;
     if (!CONFIG.FEATURES.growth || !matchParticipants.length) { lastExpGain = null; matchParticipants = []; return null; }
+    recordMatchStats(e);
     const rows = matchParticipants.map((id) => {
       let amount = G.appearanceExp + (e.result === 'W' ? G.winExp : 0);
       if (e.mvp === id) amount += G.mvpExp;
@@ -1405,7 +1650,7 @@ const Growth = (() => {
   }
   function cycleLineupPlayer(index) {
     const slot = s.lineup[index];
-    if (!slot) return false;
+    if (!slot || slot.cardId === 'PROTAG') return false;
     const cards = getOwnedCards('overall').filter((c) => c.type === 'B');
     const active = new Set(s.lineup.filter((_, i) => i !== index).map((x) => x.cardId));
     const at = cards.findIndex((c) => c.id === slot.cardId);
@@ -1416,7 +1661,7 @@ const Growth = (() => {
     return true;
   }
   function cycleRotationPlayer(index) {
-    if (!Number.isInteger(index) || !s.rotation[index]) return false;
+    if (!Number.isInteger(index) || !s.rotation[index] || s.rotation[index] === 'PROTAG') return false;
     const cards = getOwnedCards('overall').filter((c) => c.type === 'P');
     const active = new Set(s.rotation.filter((_, i) => i !== index));
     const at = cards.findIndex((c) => c.id === s.rotation[index]);
@@ -1432,11 +1677,21 @@ const Growth = (() => {
     if (batters.length < 9) return { ok: false, reason: '野手が9人必要です' };
     if (pitchers.length < 3) return { ok: false, reason: '投手が3人必要です' };
     const used = new Set(); const positions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
+    const protagB = s.owned.PROTAG && s.protagonist.type === 'B';
+    const protagPos = protagB && positions.includes(s.protagonist.pos) ? s.protagonist.pos : null;
+    if (protagB) used.add('PROTAG');
     s.lineup = positions.map((pos) => {
+      if (protagB && pos === protagPos) return { cardId: 'PROTAG', pos };
       const pick = batters.find((c) => !used.has(c.id) && (pos === 'DH' || c.pos === pos)) || batters.find((c) => !used.has(c.id));
       used.add(pick.id); return { cardId: pick.id, pos };
     });
-    s.rotation = pitchers.slice(0, 3).map((p) => p.id);
+    const protagP = s.owned.PROTAG && s.protagonist.type === 'P';
+    if (protagP) {
+      const top3 = pitchers.slice(0, 3).map((p) => p.id);
+      s.rotation = top3.includes('PROTAG') ? top3 : ['PROTAG', ...pitchers.filter((p) => p.id !== 'PROTAG').slice(0, 2).map((p) => p.id)];
+    } else {
+      s.rotation = pitchers.slice(0, 3).map((p) => p.id);
+    }
     s.nextStarter = Util.clamp(s.nextStarter, 0, s.rotation.length - 1);
     Save.commit('autoLineup');
     return { ok: true };
@@ -1512,13 +1767,71 @@ const Growth = (() => {
   }
 
   Save.register('growth', {
-    exportSlice: () => ({ team: { name: s.teamName, lineup: Util.copy(s.lineup), rotation: s.rotation.slice(), nextStarter: s.nextStarter }, cards: Util.copy(s.owned), scout: { ...s.scout } }),
+    exportSlice: () => ({
+      school: getSchool(),
+      protagonist: Util.copy(s.protagonist),
+      grades: { migrated: !!s.gradesMigrated, byCard: Util.copy(s.grades) },
+      graduates: Util.copy(s.graduates),
+      team: { name: s.teamName, lineup: Util.copy(s.lineup), rotation: s.rotation.slice(), nextStarter: s.nextStarter },
+      cards: Util.copy(s.owned),
+      scout: { ...s.scout },
+    }),
     importSlice: (data) => {
-      if (data.cards && typeof data.cards === 'object') Object.keys(data.cards).forEach((id) => {
-        const c = master(id); const own = data.cards[id];
-        if (!c || !own || typeof own !== 'object') return;
-        s.owned[id] = { lv: Math.floor(Util.clamp(own.lv || 1, 1, maxLvOf(c, own.lb || 0))), exp: Math.max(0, Math.floor(own.exp || 0)), lb: Math.floor(Util.clamp(own.lb || 0, 0, G.limitBreakMax)), fatigue: Math.max(0, Math.floor(own.fatigue || 0)) };
-      });
+      if (data.school && typeof data.school === 'object') {
+        const found = SCHOOLS.find((x) => x.id === data.school.id || x.name === data.school.name) || SCHOOLS[3];
+        s.school = { id: found.id, name: found.name, pref: found.pref, trait: found.trait, traitLabel: found.traitLabel, desc: found.desc, selected: !!data.school.selected };
+      } else s.school = Util.copy(SCHOOL_DEFAULT);
+      if (data.protagonist && typeof data.protagonist === 'object') {
+        const p = data.protagonist;
+        const pos = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'].includes(p.pos) ? p.pos : 'P';
+        s.protagonist = {
+          ...Util.copy(PROTAG_DEFAULT),
+          created: !!p.created, pendingNextGen: !!p.pendingNextGen,
+          generation: Math.max(1, Math.floor(p.generation || 1)),
+          cardId: 'PROTAG',
+          name: typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 16) : PROTAG_DEFAULT.name,
+          pos, type: pos === 'P' ? 'P' : 'B',
+          throws: ['R', 'L'].includes(p.throws) ? p.throws : 'R',
+          bats: ['R', 'L', 'S'].includes(p.bats) ? p.bats : 'R',
+          number: Util.clamp(Math.floor(p.number || 1), 1, 99),
+          grade: Util.clamp(Math.floor(p.grade || 1), 1, 3),
+          stats: p.stats && typeof p.stats === 'object' ? { ...PROTAG_DEFAULT.stats, ...p.stats } : Util.copy(PROTAG_DEFAULT.stats),
+        };
+      } else s.protagonist = Util.copy(PROTAG_DEFAULT);
+      if (data.cards && typeof data.cards === 'object') {
+        s.owned = {};
+        Object.keys(data.cards).forEach((id) => {
+          const c = master(id); const own = data.cards[id];
+          if (!c || !own || typeof own !== 'object') return;
+          s.owned[id] = { lv: Math.floor(Util.clamp(own.lv || 1, 1, maxLvOf(c, own.lb || 0))), exp: Math.max(0, Math.floor(own.exp || 0)), lb: Math.floor(Util.clamp(own.lb || 0, 0, G.limitBreakMax)), fatigue: Math.max(0, Math.floor(own.fatigue || 0)) };
+        });
+        if (!Object.keys(s.owned).length) {
+          s.owned = Object.fromEntries(MASTER.filter((c) => c.id.startsWith('S')).map((c) => [c.id, { lv: 1, exp: 0, lb: 0, fatigue: 0 }]));
+        }
+      }
+      if (s.protagonist.created && !s.owned.PROTAG) s.owned.PROTAG = { lv: 1, exp: 0, lb: 0, fatigue: 0 };
+      // 学年復元：grades が無い既存セーブ読込時は所持カードへ2年生を付与する移行を1回だけ行う
+      s.grades = {};
+      if (data.grades && typeof data.grades === 'object' && data.grades.migrated === true) {
+        const byCard = data.grades.byCard && typeof data.grades.byCard === 'object' ? data.grades.byCard : data.grades;
+        Object.keys(s.owned).forEach((id) => {
+          s.grades[id] = Util.clamp(Math.floor(Number(byCard[id]) || (id === 'PROTAG' ? s.protagonist.grade : 1)), 1, 3);
+        });
+        s.gradesMigrated = true;
+      } else if (data.cards && typeof data.cards === 'object') {
+        Object.keys(s.owned).forEach((id) => {
+          s.grades[id] = id === 'PROTAG' ? (s.protagonist.grade || 1) : 2;
+        });
+        s.gradesMigrated = true;
+      } else {
+        Object.keys(s.owned).forEach((id) => {
+          s.grades[id] = id === 'PROTAG' ? 1 : 2;
+        });
+        s.gradesMigrated = true;
+      }
+      if (Array.isArray(data.graduates)) {
+        s.graduates = data.graduates.filter((g) => g && typeof g === 'object' && typeof g.name === 'string').map((g) => ({ ...g }));
+      } else s.graduates = [];
       const team = data.team;
       if (team && typeof team === 'object') {
         if (typeof team.name === 'string' && team.name.trim()) s.teamName = team.name.trim().slice(0, 20);
@@ -1529,6 +1842,7 @@ const Growth = (() => {
         if (Array.isArray(team.rotation) && team.rotation.length === 3 && new Set(team.rotation).size === 3 && team.rotation.every((id) => { const c = master(id); return c && c.type === 'P' && s.owned[id]; })) s.rotation = team.rotation.slice();
         if (Number.isInteger(team.nextStarter)) s.nextStarter = Util.clamp(team.nextStarter, 0, s.rotation.length - 1);
       }
+      if (s.school.selected && (!team || !team.name)) s.teamName = s.school.name;
       if (data.scout && typeof data.scout === 'object') s.scout = {
         ...s.scout, pity: Math.floor(Util.clamp(data.scout.pity || 0, 0, CONFIG.SCOUT.pity - 1)), totalPulls: Math.max(0, Math.floor(data.scout.totalPulls || 0)),
         adTicketDayKey: typeof data.scout.adTicketDayKey === 'string' ? data.scout.adTicketDayKey : null,
@@ -1542,7 +1856,10 @@ const Growth = (() => {
     abilityAt: (id, lv) => abilityAtCard(master(id), lv),
     getLineup, getRotation, getTeamSnapshot, teamOverall,
     getTeamName: () => s.teamName,
-    getScoutInfo, scout, train, addExp, settleMatch, getLastExpGain: () => lastExpGain && Util.copy(lastExpGain),
+    getSchools, getSchool, selectSchool, createProtagonist, getProtagonist, hasProtagonist,
+    getGrade: gradeOf, getGrades: () => ({ migrated: !!s.gradesMigrated, byCard: Util.copy(s.grades) }),
+    getGraduates: () => Util.copy(s.graduates), processYearEnd,
+    getScoutInfo, scout, acquire, train, addExp, settleMatch, getLastExpGain: () => lastExpGain && Util.copy(lastExpGain),
     setLineupPosition, cycleLineupPosition, cycleLineupPlayer, cycleRotationPlayer, autoLineup,
     testScope, testTrainingAndExp, testDuplicate, testMatchExp, testScout, testRotationAdvance, testAutoPitchers,
   };
@@ -1554,9 +1871,21 @@ const Growth = (() => {
    ===================================================================== */
 const { League, Correction } = (() => {
   const k = CONFIG.PROVISIONAL.Q2_correctionK;
-  // 補正倍率 m＝1＋k×（能力−50）÷50（仕様書 A-5）
-  const Correction = Object.freeze({ k, multiplier: (v) => 1 + k * (v - 50) / 50, kmhScore: (kmh) => Growth.kmhScore(kmh) });
-  const m3 = (v) => Math.round(Correction.multiplier(v) * 1000) / 1000;
+  // 学校特性ごとの能力補正値（控えめに補正関数1か所へ加算して反映）
+  const TRAIT_BONUSES = Object.freeze({
+    batting: Object.freeze({ power: 5, meet: 2 }),
+    mobility: Object.freeze({ speed: 5, meet: 2 }),
+    defense: Object.freeze({ defense: 5, control: 3 }),
+  });
+  const traitBonus = (trait, stat) => (trait && TRAIT_BONUSES[trait] && TRAIT_BONUSES[trait][stat]) || 0;
+  // 補正倍率 m＝1＋k×（能力＋特性補正−50）÷50（仕様書 A-5）
+  const Correction = Object.freeze({
+    k,
+    multiplier: (v, bonus = 0) => 1 + k * (v + bonus - 50) / 50,
+    traitBonus,
+    kmhScore: (kmh) => Growth.kmhScore(kmh),
+  });
+  const m3 = (v, bonus = 0) => Math.round(Correction.multiplier(v, bonus) * 1000) / 1000;
   const TEAMS = Object.freeze([
     { id: 0, name: null, short: null, style: '自チーム', overall: null },
     { id: 1, name: '千鳥足ペンギンズ', short: 'ペンギンズ', style: 'バランス型', overall: 42 },
@@ -1564,6 +1893,25 @@ const { League, Correction } = (() => {
     { id: 3, name: '湾岸ゴリラズ', short: 'ゴリラズ', style: 'パワー型', overall: 52 },
     { id: 4, name: '鋼鉄ロボッツ', short: 'ロボッツ', style: '投手力型', overall: 56 },
     { id: 5, name: '雷神サンダース', short: 'サンダース', style: '総合型', overall: 62 },
+  ]);
+  const TOURNAMENT_ROUNDS = Object.freeze([
+    { step: 1, stage: 'qualifier', round: 1, stageRound: 1, stageLabel: '地方予選', roundLabel: '1回戦', label: '地方予選 1回戦', fullLabel: '地方予選 1回戦', baseOverall: 42 },
+    { step: 2, stage: 'qualifier', round: 2, stageRound: 2, stageLabel: '地方予選', roundLabel: '準決勝', label: '地方予選 準決勝', fullLabel: '地方予選 準決勝', baseOverall: 46 },
+    { step: 3, stage: 'qualifier', round: 3, stageRound: 3, stageLabel: '地方予選', roundLabel: '決勝', label: '地方予選 決勝', fullLabel: '地方予選 決勝', baseOverall: 50 },
+    { step: 4, stage: 'koshien', round: 1, stageRound: 1, stageLabel: '甲子園本大会', roundLabel: '1回戦', label: '甲子園 1回戦', fullLabel: '甲子園 1回戦', baseOverall: 54 },
+    { step: 5, stage: 'koshien', round: 2, stageRound: 2, stageLabel: '甲子園本大会', roundLabel: '準決勝', label: '甲子園 準決勝', fullLabel: '甲子園 準決勝', baseOverall: 58 },
+    { step: 6, stage: 'koshien', round: 3, stageRound: 3, stageLabel: '甲子園本大会', roundLabel: '決勝', label: '甲子園 決勝', fullLabel: '甲子園 決勝', baseOverall: 63 },
+  ]);
+  const OPP_SCHOOL_POOL = Object.freeze([
+    { name: '青葉台学院', pref: '宮城', trait: 'mobility' }, { name: '城北工科', pref: '埼玉', trait: 'defense' },
+    { name: '桜ヶ丘学園', pref: '東京', trait: 'batting' }, { name: '明峰義塾', pref: '長野', trait: 'defense' },
+    { name: '海星商業', pref: '千葉', trait: 'mobility' }, { name: '白樺農林', pref: '北海道', trait: 'batting' },
+    { name: '黒潮水産', pref: '高知', trait: 'defense' }, { name: '緑ヶ丘総合', pref: '神奈川', trait: 'mobility' },
+    { name: '大楠工業', pref: '熊本', trait: 'batting' }, { name: '蒼穹館', pref: '愛知', trait: 'defense' },
+    { name: '鶴ヶ峰実業', pref: '福島', trait: 'mobility' }, { name: '瑞穂第一', pref: '新潟', trait: 'defense' },
+    { name: '昴学園', pref: '京都', trait: 'mobility' }, { name: '紫雲高専', pref: '香川', trait: 'defense' },
+    { name: '金剛大附', pref: '奈良', trait: 'batting' }, { name: '不知火工業', pref: '長崎', trait: 'batting' },
+    { name: '天竜実業', pref: '静岡', trait: 'mobility' }, { name: '白鷺商業', pref: '兵庫', trait: 'defense' },
   ]);
   const CPU_NAMES = Object.freeze([
     ['白瀬', '氷室', '雪村', '北野', '水谷', '風間', '青木', '月島', '浜田'],
@@ -1610,7 +1958,58 @@ const { League, Correction } = (() => {
     };
     return { lineup, pitcher };
   }
+  // 大会の対戦相手校を年度×ラウンドのシードから再生成する（CPUデータは保存しない）
+  function generateOpponentSchool(year = 1, step = 1) {
+    const rd = TOURNAMENT_ROUNDS[Util.clamp(Math.floor(step || 1), 1, 6) - 1];
+    const seed = ((year * 1000003) ^ (rd.step * 91761) ^ 0x5A17) >>> 0;
+    const rng = Util.seeded(seed);
+    const userSchoolName = Growth.getSchool().name;
+    const pool = OPP_SCHOOL_POOL.filter((x) => x.name !== userSchoolName);
+    const picked = pool[Math.floor(rng() * pool.length)] || OPP_SCHOOL_POOL[0];
+    const yearBonus = Math.min(12, Math.max(0, year - 1) * 2);
+    const overall = rd.baseOverall + yearBonus;
+    const bankIdx = (year + rd.step) % CPU_NAMES.length;
+    const jitter = (spread = 7) => (rng() * 2 - 1) * spread;
+    const tTrait = picked.trait;
+    const lineup = CPU_POS.map((pos, i) => {
+      const abilities = {
+        meet: bounded(overall + traitBonus(tTrait, 'meet') + jitter()),
+        power: bounded(overall + traitBonus(tTrait, 'power') + jitter()),
+        speed: bounded(overall + traitBonus(tTrait, 'speed') + jitter()),
+        defense: bounded(overall + traitBonus(tTrait, 'defense') + jitter()),
+      };
+      return {
+        order: i + 1, cardId: `OPP-${year}-${rd.step}-${i + 1}`,
+        name: `${CPU_NAMES[bankIdx][i]} ${CPU_GIVEN[(i + year + rd.step) % CPU_GIVEN.length]}`,
+        number: 2 + i, pos, abilities,
+        mult: { contact: m3(abilities.meet), power: m3(abilities.power), speed: m3(abilities.speed), defense: m3(abilities.defense) },
+      };
+    });
+    const kmh = bounded(130 + overall * 0.34 + jitter(4), 120, 165);
+    const abilities = {
+      control: bounded(overall + traitBonus(tTrait, 'control') + jitter()),
+      stamina: bounded(overall + 5 + jitter()),
+      movement: bounded(overall + jitter()),
+    };
+    const pitcher = {
+      cardId: `OPP-${year}-${rd.step}-P`,
+      name: `${CPU_NAMES[bankIdx][(year + rd.step) % 9]} ${CPU_GIVEN[(year * 2 + rd.step) % 9]}`,
+      number: 1, kmh, abilities,
+      mult: { velocity: m3(Correction.kmhScore(kmh)), control: m3(abilities.control), movement: m3(abilities.movement) },
+      staminaThreshold: Math.floor(abilities.stamina / 2), special: [rd.step % 2 ? 'slider' : 'fork'], fatigued: false,
+      overall: Math.round((Correction.kmhScore(kmh) + abilities.control + abilities.stamina + abilities.movement) / 4),
+    };
+    return {
+      id: rd.step, name: picked.name, short: picked.name, pref: picked.pref,
+      trait: tTrait, traitLabel: CONFIG.LABELS.trait[tTrait], overall, lineup, pitcher,
+    };
+  }
   const PLAY_DEFAULT = Object.freeze({ selectedPitch: 'fastball', pitchingForm: 'overhand', battingForm: 'standard', myPitch: { direction: 'down', amount: 50 }, motion: { armSwing: 50, release: 50, swingSpeed: 50 } });
+  const CALENDAR_DEFAULT = Object.freeze({
+    year: 1, generation: 1, phase: 'qualifier', step: 1,
+    eliminated: false, eliminatedAt: null, champion: false,
+    koshienWins: 0, streak: 0, maxStreak: 0, results: [], history: [],
+  });
 
   // 6球団の2回総当たり（円順列）。自チームは弱い順に当たり、ホーム5・ビジター5
   function makeSchedule() {
@@ -1631,12 +2030,24 @@ const { League, Correction } = (() => {
   }
   const s = {
     season: 1, round: 0, schedule: makeSchedule(),
+    calendar: Util.copy(CALENDAR_DEFAULT),
     play: Util.copy(PLAY_DEFAULT),
     career: { hits: 0, homeruns: 0, strikeouts: 0, leagueWins: 0 },
     seasonHistory: [], lastResult: null,
   };
   let current = null;
   let pending = null;
+  Events.on('protagonist:created', (p) => {
+    if (p && Number.isInteger(p.generation)) s.calendar.generation = p.generation;
+    if (s.calendar.phase === 'graduation') {
+      s.calendar.phase = 'qualifier';
+      s.calendar.step = 1;
+      s.calendar.eliminated = false;
+      s.calendar.eliminatedAt = null;
+      s.calendar.champion = false;
+      s.calendar.results = [];
+    }
+  });
 
   const scoreOk = (score) => Array.isArray(score) && score.length === 2 && score.every((n) => Number.isInteger(n) && n >= 0 && n <= 99);
   const resultsOf = (schedule = s.schedule) => schedule.map((games) => games.map((g) => (g.score ? g.score.slice() : null)));
@@ -1753,30 +2164,184 @@ const { League, Correction } = (() => {
   }
   const getSeason = () => ({ season: s.season, played: s.round, nextRound: s.round < CONFIG.LEAGUE.rounds ? s.round + 1 : null, rounds: CONFIG.LEAGUE.rounds, complete: s.round >= CONFIG.LEAGUE.rounds });
 
+  // 年度カレンダーと大会トーナメント（地方予選3試合→甲子園本大会3試合→年度終了）
+  function isYearComplete() {
+    return s.calendar.phase === 'yearEnd' || s.calendar.phase === 'graduation' || s.calendar.eliminated || s.calendar.champion || s.calendar.step > TOURNAMENT_ROUNDS.length;
+  }
+  function getTournamentBracket(year = s.calendar.year) {
+    return TOURNAMENT_ROUNDS.map((rd) => {
+      const opp = generateOpponentSchool(year, rd.step);
+      const played = s.calendar.results.find((r) => r.step === rd.step) || null;
+      const home = rd.step % 2 === 1;
+      const isNext = !isYearComplete() && s.calendar.step === rd.step;
+      const locked = rd.stage === 'koshien' && s.calendar.step <= 3 && !s.calendar.champion;
+      return {
+        ...rd, home, isNext, locked,
+        opponent: { id: opp.id, name: opp.name, pref: opp.pref, trait: opp.trait, traitLabel: opp.traitLabel, overall: opp.overall },
+        result: played ? played.result : null,
+        us: played ? played.us : null,
+        them: played ? played.them : null,
+      };
+    });
+  }
+  function getNextTournamentMatch() {
+    if (isYearComplete()) return null;
+    const step = Util.clamp(s.calendar.step, 1, TOURNAMENT_ROUNDS.length);
+    const rd = TOURNAMENT_ROUNDS[step - 1];
+    const opp = generateOpponentSchool(s.calendar.year, step);
+    const home = step % 2 === 1;
+    return {
+      year: s.calendar.year, step: rd.step, round: rd.step,
+      stage: rd.stage, stageLabel: rd.stageLabel, roundInStage: rd.round, label: rd.label,
+      home, opponentId: opp.id,
+      opponent: { id: opp.id, name: opp.name, short: opp.name, pref: opp.pref, trait: opp.trait, traitLabel: opp.traitLabel, overall: opp.overall },
+    };
+  }
+  function getCalendar() {
+    const bracket = getTournamentBracket(s.calendar.year);
+    const wins = s.calendar.results.filter((r) => r.result === 'W').length;
+    const losses = s.calendar.results.filter((r) => r.result === 'L').length;
+    return {
+      ...Util.copy(s.calendar),
+      complete: isYearComplete(),
+      wins, losses,
+      nextMatch: getNextTournamentMatch(),
+      bracket,
+    };
+  }
+  function recordTournamentMatch(result, usScore, themScore, meta = null) {
+    if (isYearComplete()) return { yearEnded: true, champion: s.calendar.champion, eliminated: s.calendar.eliminated };
+    const step = Util.clamp(meta && meta.step ? meta.step : s.calendar.step, 1, TOURNAMENT_ROUNDS.length);
+    const rd = TOURNAMENT_ROUNDS[step - 1];
+    const opp = generateOpponentSchool(s.calendar.year, step);
+    const home = meta && typeof meta.home === 'boolean' ? meta.home : (step % 2 === 1);
+    const won = result === 'W';
+    const us = Number.isInteger(usScore) ? usScore : (won ? 3 : 1);
+    const them = Number.isInteger(themScore) ? themScore : (won ? 1 : 3);
+    s.calendar.results = s.calendar.results.filter((r) => r.step !== step);
+    s.calendar.results.push({
+      step: rd.step, stage: rd.stage, label: rd.label,
+      opponentName: opp.name, opponentPref: opp.pref, opponentOverall: opp.overall,
+      home, result: won ? 'W' : 'L', us, them,
+    });
+    if (won) {
+      s.career.leagueWins += 1;
+      if (step === 3) {
+        s.calendar.step = 4;
+        s.calendar.phase = 'koshien';
+      } else if (step >= TOURNAMENT_ROUNDS.length) {
+        s.calendar.step = TOURNAMENT_ROUNDS.length + 1;
+        s.calendar.phase = 'yearEnd';
+        s.calendar.champion = true;
+        s.calendar.koshienWins += 1;
+        s.calendar.streak += 1;
+        if (s.calendar.streak > s.calendar.maxStreak) s.calendar.maxStreak = s.calendar.streak;
+      } else {
+        s.calendar.step = step + 1;
+        s.calendar.phase = step + 1 <= 3 ? 'qualifier' : 'koshien';
+      }
+    } else {
+      s.calendar.eliminated = true;
+      s.calendar.eliminatedAt = rd.label;
+      s.calendar.phase = 'yearEnd';
+      s.calendar.streak = 0;
+    }
+    Events.emit('record:updated', { ...s.career });
+    return { yearEnded: isYearComplete(), champion: s.calendar.champion, eliminated: s.calendar.eliminated, step: rd.step, label: rd.label };
+  }
+  function playTournamentRound(result = 'W', score = null) {
+    if (isYearComplete()) return { ok: false, reason: '今年度の大会は終了しています' };
+    const next = getNextTournamentMatch();
+    const won = result === 'W';
+    const us = score && Number.isInteger(score.us) ? score.us : (won ? 3 : 1);
+    const them = score && Number.isInteger(score.them) ? score.them : (won ? 1 : 3);
+    const r = recordTournamentMatch(won ? 'W' : 'L', us, them, next);
+    Save.commit('tournamentRound');
+    return { ok: true, ...r, calendar: getCalendar() };
+  }
+  function yearEndReward() {
+    if (!isYearComplete()) return null;
+    const rank = s.calendar.champion ? 1 : s.calendar.step >= 4 ? 2 : s.calendar.step === 3 ? 3 : 4;
+    const base = CONFIG.ECONOMY.seasonRankRewards[rank - 1];
+    const title = s.calendar.champion ? '甲子園優勝' : (s.calendar.eliminatedAt ? `${s.calendar.eliminatedAt}敗退` : '大会終了');
+    return { rank, title, ...base };
+  }
+  function advanceYear() {
+    const reward = yearEndReward();
+    if (!reward || !CONFIG.FEATURES.leagueRewards) return { ok: false, reason: '今年度の大会がまだ終わっていません' };
+    const gain = { coins: reward.coins || 0, guaranteeTickets: reward.guaranteeTickets || 0 };
+    const granted = Economy.earn(gain, `yearEnd:${s.calendar.year}:${reward.rank}`, 'league', { commit: false });
+    const finishedYear = s.calendar.year;
+    const resultLabel = reward.title;
+    s.calendar.history.unshift({
+      year: finishedYear, generation: s.calendar.generation,
+      schoolName: Growth.getTeamName(), resultLabel,
+      champion: s.calendar.champion, koshienWins: s.calendar.koshienWins, streak: s.calendar.streak,
+    });
+    s.calendar.history = s.calendar.history.slice(0, 30);
+    const grad = Growth.processYearEnd(finishedYear);
+    s.calendar.year += 1;
+    s.season += 1;
+    s.calendar.step = 1;
+    s.calendar.eliminated = false;
+    s.calendar.eliminatedAt = null;
+    s.calendar.champion = false;
+    s.calendar.results = [];
+    s.calendar.phase = grad.protagonistGraduated ? 'graduation' : 'qualifier';
+    s.lastResult = null;
+    current = null;
+    pending = null;
+    Events.emit('season:advanced', { season: s.season, year: s.calendar.year, rank: reward.rank, reward: granted, graduation: grad });
+    Save.commit('yearAdvance');
+    return { ok: true, rank: reward.rank, reward: granted, season: s.season, year: s.calendar.year, graduation: grad, nextScreen: grad.protagonistGraduated ? 'graduation' : 'home' };
+  }
+
   // 試合設定（仕様書 A-12 の約束）。倍率はここで計算し、エンジン本体は掛けるだけ
   function buildMatchConfig(mode = 'league') {
+    const isOfficial = mode === 'league' || mode === 'tournament';
     const base = {
       mode, innings: CONFIG.LEAGUE.innings, seed: 0, play: Util.copy(s.play),
       unlockedPitches: Economy.getUnlocks().pitches,
-      correction: { enabled: CONFIG.FEATURES.correction && mode === 'league', k },
+      correction: { enabled: CONFIG.FEATURES.correction && isOfficial, k },
     };
-    if (mode !== 'league') return { ...base, userSide: 'away', teams: null }; // 現行モードは現行のまま
-    const next = getNextMatch();
+    if (!isOfficial) return { ...base, userSide: 'away', teams: null }; // 現行モードは現行のまま
+    const school = Growth.getSchool();
+    const uTrait = school && school.selected ? school.trait : null;
+    const uBonus = (stat) => Correction.traitBonus(uTrait, stat);
     const snap = Growth.getTeamSnapshot();
     const lineup = snap.lineup.map((b) => ({
       order: b.order, cardId: b.cardId, name: b.name, number: b.number, pos: b.pos,
       abilities: { meet: b.abilities.meet, power: b.abilities.power, speed: b.abilities.speed, defense: b.abilities.defense },
-      // 適性外の-30%は能力値を書き換えず、この倍率から MatchEngine.HOOKS.fielderRange へ通す。
-      mult: { contact: m3(b.abilities.meet), power: m3(b.abilities.power), speed: m3(b.abilities.speed), defense: m3(b.abilities.defense) * b.defenseFactor },
+      // 適性外の-30%と学校特性補正は能力値を書き換えず、この倍率から MatchEngine.HOOKS へ通す。
+      mult: {
+        contact: m3(b.abilities.meet, uBonus('meet')),
+        power: m3(b.abilities.power, uBonus('power')),
+        speed: m3(b.abilities.speed, uBonus('speed')),
+        defense: m3(b.abilities.defense, uBonus('defense')) * b.defenseFactor,
+      },
     }));
     const st = snap.starter;
     const a = st.abilities;
     const pitcher = {
       cardId: st.cardId, name: st.name, number: st.number, kmh: a.kmh,
       abilities: { control: a.control, stamina: a.stamina, movement: a.movement },
-      mult: { velocity: m3(Correction.kmhScore(a.kmh)), control: m3(a.control), movement: m3(a.movement) },
+      mult: {
+        velocity: m3(Correction.kmhScore(a.kmh), uBonus('velocity')),
+        control: m3(a.control, uBonus('control')),
+        movement: m3(a.movement, uBonus('movement')),
+      },
       staminaThreshold: Math.floor(a.stamina / 2), special: st.special.slice(), fatigued: st.fatigued, overall: st.overall,
     };
+    if (mode === 'tournament') {
+      const next = getNextTournamentMatch() || { year: s.calendar.year, step: 1, stage: 'qualifier', stageLabel: '地方予選', label: '地方予選 1回戦', home: true };
+      const opp = generateOpponentSchool(s.calendar.year, next.step);
+      return {
+        ...base, userSide: next.home ? 'home' : 'away', seed: s.calendar.year * 1000 + next.step * 17,
+        tournament: { year: s.calendar.year, step: next.step, stage: next.stage, stageLabel: next.stageLabel, label: next.label, opponent: { name: opp.name, pref: opp.pref, trait: opp.trait, traitLabel: opp.traitLabel, overall: opp.overall } },
+        teams: { user: { id: 0, name: snap.name, lineup, pitcher }, opponent: { id: opp.id, name: opp.name, pref: opp.pref, trait: opp.trait, traitLabel: opp.traitLabel, overall: opp.overall, lineup: opp.lineup, pitcher: opp.pitcher } },
+      };
+    }
+    const next = getNextMatch();
     const cpu = generateCpuTeam(next.opponentId, s.season);
     return {
       ...base, userSide: next.home ? 'home' : 'away', seed: s.season * 1000 + next.round * 10 + next.opponentId,
@@ -1791,7 +2356,7 @@ const { League, Correction } = (() => {
     return true;
   }
 
-  // 試合の通知を受ける：記録（リーグ戦は試合終了時にまとめる）と結果
+  // 試合の通知を受ける：記録（公式戦は試合終了時にまとめる）と結果
   function flush() {
     if (!pending) return;
     s.career.hits += pending.hits;
@@ -1801,8 +2366,13 @@ const { League, Correction } = (() => {
     Events.emit('record:updated', { ...s.career });
   }
   Events.on('match:start', (e) => {
-    const next = getNextMatch();
-    current = { mode: e.mode, userSide: e.userSide, round: e.mode === 'league' ? next.round : null, opponentId: e.mode === 'league' ? next.opponentId : null };
+    if (e.mode === 'tournament') {
+      const next = getNextTournamentMatch() || { step: 1, stage: 'qualifier', label: '地方予選 1回戦', home: e.userSide === 'home', opponent: generateOpponentSchool(s.calendar.year, 1) };
+      current = { mode: 'tournament', userSide: e.userSide, round: next.step, step: next.step, stage: next.stage, label: next.label, home: next.home, opponentId: next.step, opponentName: next.opponent.name };
+    } else {
+      const next = getNextMatch();
+      current = { mode: e.mode, userSide: e.userSide, round: e.mode === 'league' && next ? next.round : null, opponentId: e.mode === 'league' && next ? next.opponentId : null };
+    }
     pending = { hits: 0, homeruns: 0, strikeouts: 0 };
   });
   Events.on('match:hit', (e) => {
@@ -1818,15 +2388,27 @@ const { League, Correction } = (() => {
     if (!current) return;
     flush();
     const userIsHome = current.userSide === 'home';
-    const userName = current.mode === 'league' ? Growth.getTeamName() : 'あなた';
-    const oppName = current.mode === 'league' ? nameOf(current.opponentId) : '相手';
+    const isOfficial = current.mode === 'league' || current.mode === 'tournament';
+    const userName = isOfficial ? Growth.getTeamName() : 'あなた';
+    const oppName = current.mode === 'tournament'
+      ? (current.opponentName || '相手校')
+      : current.mode === 'league' ? nameOf(current.opponentId) : '相手';
     s.lastResult = {
-      mode: e.mode, modeLabel: CONFIG.LABELS.mode[e.mode], result: e.result, score: { ...e.score }, userSide: current.userSide,
-      round: current.round, opponentId: current.opponentId,
+      mode: e.mode, modeLabel: current.label || CONFIG.LABELS.mode[e.mode], result: e.result, score: { ...e.score }, userSide: current.userSide,
+      round: current.round, step: current.step || null, stage: current.stage || null, stageLabel: current.label || null,
+      opponentId: current.opponentId, opponentName: oppName,
       homeName: userIsHome ? userName : oppName, awayName: userIsHome ? oppName : userName,
-      mvp: e.mvp, recorded: false,
+      mvp: e.mvp, recorded: false, yearEnded: false, champion: false, eliminated: false,
     };
-    if (e.mode === 'league' && CONFIG.FEATURES.leagueProgress) {
+    if (e.mode === 'tournament' && CONFIG.FEATURES.tournament) {
+      const us = userIsHome ? e.score.home : e.score.away;
+      const them = userIsHome ? e.score.away : e.score.home;
+      const tRes = recordTournamentMatch(e.result, us, them, current);
+      s.lastResult.recorded = true;
+      s.lastResult.yearEnded = tRes.yearEnded;
+      s.lastResult.champion = tRes.champion;
+      s.lastResult.eliminated = tRes.eliminated;
+    } else if (e.mode === 'league' && CONFIG.FEATURES.leagueProgress) {
       const roundIndex = current.round - 1;
       const game = s.schedule[roundIndex] && s.schedule[roundIndex].find((g) => g.home === 0 || g.away === 0);
       if (game && !game.score && scoreOk([e.score.home, e.score.away])) {
@@ -1845,11 +2427,13 @@ const { League, Correction } = (() => {
   Events.on('match:aborted', () => { current = null; pending = null; });
 
   function seasonReward() {
+    if (CONFIG.FEATURES.tournament && isYearComplete()) return yearEndReward();
     if (s.round < CONFIG.LEAGUE.rounds) return null;
     const rank = getStandings().find((r) => r.isUser).rank;
     return { rank, ...CONFIG.ECONOMY.seasonRankRewards[Math.min(rank, 4) - 1] };
   }
   function advanceSeason() {
+    if (CONFIG.FEATURES.tournament && isYearComplete()) return advanceYear();
     const reward = seasonReward();
     if (!reward || !CONFIG.FEATURES.leagueRewards) return { ok: false, reason: 'シーズンがまだ終わっていません' };
     const gain = { coins: reward.coins || 0, guaranteeTickets: reward.guaranteeTickets || 0 };
@@ -1875,15 +2459,50 @@ const { League, Correction } = (() => {
     }
     return { rounds: playedRounds(schedule), games: schedule.flat().filter((g) => scoreOk(g.score)).length, results: resultsOf(schedule) };
   }
+  function testScope(fn) {
+    const before = Util.copy(s);
+    const beforeCurrent = current && Util.copy(current);
+    const beforePending = pending && Util.copy(pending);
+    return Growth.testScope(() => {
+      try { return fn(); }
+      finally {
+        Object.keys(s).forEach((key) => { delete s[key]; });
+        Object.assign(s, before);
+        current = beforeCurrent;
+        pending = beforePending;
+      }
+    });
+  }
 
   Save.register('league', {
     exportSlice: () => ({
+      calendar: Util.copy(s.calendar),
       league: { season: s.season, results: resultsOf() },
       seasonHistory: Util.copy(s.seasonHistory),
       stats: { career: { ...s.career } },
       settings: Util.copy(s.play),
     }),
     importSlice: (data) => {
+      if (data.calendar && typeof data.calendar === 'object') {
+        const c = data.calendar;
+        const phases = ['qualifier', 'koshien', 'yearEnd', 'graduation'];
+        s.calendar = {
+          year: Number.isInteger(c.year) && c.year >= 1 ? c.year : 1,
+          generation: Number.isInteger(c.generation) && c.generation >= 1 ? c.generation : 1,
+          phase: phases.includes(c.phase) ? c.phase : 'qualifier',
+          step: Number.isInteger(c.step) ? Util.clamp(c.step, 1, TOURNAMENT_ROUNDS.length + 1) : 1,
+          eliminated: !!c.eliminated,
+          eliminatedAt: typeof c.eliminatedAt === 'string' ? c.eliminatedAt : null,
+          champion: !!c.champion,
+          koshienWins: Number.isInteger(c.koshienWins) && c.koshienWins >= 0 ? c.koshienWins : 0,
+          streak: Number.isInteger(c.streak) && c.streak >= 0 ? c.streak : 0,
+          maxStreak: Number.isInteger(c.maxStreak) && c.maxStreak >= 0 ? c.maxStreak : 0,
+          results: Array.isArray(c.results) ? Util.copy(c.results) : [],
+          history: Array.isArray(c.history) ? Util.copy(c.history).slice(0, 30) : [],
+        };
+      } else {
+        s.calendar = Util.copy(CALENDAR_DEFAULT);
+      }
       if (data.league && typeof data.league === 'object') {
         if (Number.isInteger(data.league.season) && data.league.season >= 1) s.season = data.league.season;
         const results = Array.isArray(data.league.results)
@@ -1915,14 +2534,20 @@ const { League, Correction } = (() => {
 
   const League = {
     getTeams, getStandings, getSchedule, getNextMatch, getSeason, buildMatchConfig,
+    getCalendar, getTournamentBracket, getNextTournamentMatch, isYearComplete,
+    recordTournamentMatch, playTournamentRound, yearEndReward, advanceYear, generateOpponentSchool,
     getLastResult: () => (s.lastResult ? { ...s.lastResult } : null),
     getCareer: () => ({ ...s.career }),
     getPlaySettings: () => Util.copy(s.play),
     updatePlaySettings, formatPct, settleMatch, advanceSeason, seasonReward,
-    isSeasonComplete: () => s.round >= CONFIG.LEAGUE.rounds,
+    isSeasonComplete: () => (CONFIG.FEATURES.tournament ? isYearComplete() : s.round >= CONFIG.LEAGUE.rounds),
     testSeasonSimulation, simulateCpuGame: (season, round, game) => simulateCpuGame(season, round, game),
-    cpuSeasonBonus: cpuBonus, generateCpuTeam,
-    resultDestination: (result = s.lastResult) => (result && result.mode === 'league' && result.round >= CONFIG.LEAGUE.rounds ? 'season' : 'pregame'),
+    cpuSeasonBonus: cpuBonus, generateCpuTeam, testScope,
+    resultDestination: (result = s.lastResult) => {
+      if (result && result.mode === 'tournament') return result.yearEnded ? 'season' : 'pregame';
+      if (result && result.mode === 'league' && typeof result.round === 'number') return result.round >= CONFIG.LEAGUE.rounds ? 'season' : 'pregame';
+      return isYearComplete() ? 'season' : 'pregame';
+    },
   };
   return { League, Correction };
 })();
@@ -1969,7 +2594,7 @@ const MatchEngine = (() => {
   let selectedPitch = 'fastball';
   let fielders = [];
 
-  const matchMode = () => cfg.mode === 'league' || cfg.mode === 'exhibition';
+  const matchMode = () => cfg.mode === 'league' || cfg.mode === 'tournament' || cfg.mode === 'exhibition';
   const userBatting = () => !matchMode() || ((game.half === 'top') === (cfg.userSide === 'away'));
   const activeSide = () => (userBatting() ? 'user' : 'opponent');
   const pitchingSide = () => (userBatting() ? 'opponent' : 'user');
@@ -1989,7 +2614,7 @@ const MatchEngine = (() => {
       status, phase: game.phase, batting: userBatting(), selectedPitch,
       pitches: (cfg.unlockedPitches || ['fastball']).map((id) => ({ id, name: (PITCHES[id] || PITCHES.fastball).name })),
       canPitch: state === 'running' && game.phase === 'ready', canSwing: state === 'running' && game.phase === 'pitch' && userBatting(),
-      canFinish: cfg.mode !== 'league' && game.phase === 'ready', attempts: game.attempts,
+      canFinish: cfg.mode !== 'league' && cfg.mode !== 'tournament' && game.phase === 'ready', attempts: game.attempts,
       total: cfg.mode === 'challenge10' ? 10 : null,
     });
   }
@@ -2275,8 +2900,10 @@ const View = (() => {
     const tag = opts.go ? 'button' : opts.tag || 'div';
     const attrs = opts.go ? ` type="button" data-go="player" data-id="${c.id}" aria-label="${esc(c.name)}の詳細"` : '';
     const body = opts.size === 'is-mini' ? `<span class="pc-ranks">${miniRanks(c)}</span>` : `<span class="pc-abs">${abilityList(c)}</span>`;
+    const gradeTag = c.grade ? `<span class="tag-grade">${c.grade}年</span>` : '';
+    const protagTag = c.isProtagonist ? `<span class="tag-protag">${esc(c.protagonistBadge || '主人公')}</span>` : '';
     const sub = `${'★'.repeat(c.rarity)} ${c.rarityName}　Lv${c.lv}${opts.caption ? `　${esc(opts.caption)}` : ''}`;
-    return `<${tag} class="pcard r${c.rarity}${opts.size ? ` ${opts.size}` : ''}"${attrs}><span class="pc-top"><span class="pc-pos">${c.posLabel}</span><span class="pc-ovr"><small>総合</small><b>${c.overall}</b></span></span><span class="pc-fig">${figure(c)}</span><span class="pc-name">${esc(c.name)}</span><span class="pc-sub">${sub}</span>${body}</${tag}>`;
+    return `<${tag} class="pcard r${c.rarity}${opts.size ? ` ${opts.size}` : ''}"${attrs}><span class="pc-top"><span class="pc-pos">${c.posLabel}</span><span class="pc-ovr"><small>総合</small><b>${c.overall}</b></span></span><span class="pc-fig">${figure(c)}</span><span class="pc-name">${esc(c.name)}${protagTag}${gradeTag}</span><span class="pc-sub">${sub}</span>${body}</${tag}>`;
   }
   // 相手の先発（カードマスタにいない選手）をカードの形で見せる
   function oppPitcherCard(p) {
@@ -2285,17 +2912,26 @@ const View = (() => {
   }
   function boardRows(next, teams, userOverall) {
     const user = { name: Growth.getTeamName(), ovr: userOverall, me: true };
-    const opp = { name: teams[next.opponentId].name, ovr: teams[next.opponentId].overall, me: false };
+    const opp = next.opponent
+      ? { name: `${next.opponent.name}（${next.opponent.pref}）`, ovr: next.opponent.overall, me: false }
+      : { name: teams[next.opponentId].name, ovr: teams[next.opponentId].overall, me: false };
     const [away, home] = next.home ? [opp, user] : [user, opp];
     const row = (t, side) => `<div class="board-row"><span class="board-side">${side}</span><span class="board-team${t.me ? ' me' : ''}">${esc(t.name)}</span><span class="board-num led">${t.ovr}</span></div>`;
     return row(away, '先攻') + row(home, '後攻');
   }
-  const lineupRow = (b) => `<button class="lu" type="button" data-go="player" data-id="${b.cardId}"><span class="lu-no">${b.order}</span><span class="lu-pos${b.fit ? '' : ' misfit'}">${b.posLabel}</span><span class="lu-main"><b>${esc(b.name)}</b><span class="mini-abs">${miniAbs(b)}</span>${b.fit ? '' : '<small class="warn">守備 −30%（適性外）</small>'}</span><span class="lu-ovr">${b.overall}</span></button>`;
-  const lineupEditRow = (b, index) => `<div class="lu lu-edit"><span class="lu-no">${b.order}</span><button class="lu-pos${b.fit ? '' : ' misfit'}" type="button" data-act="cyclePosition" data-index="${index}" aria-label="${b.order}番 ${esc(b.name)}の守備位置を変更">${b.posLabel}</button><button class="lu-main" type="button" data-go="player" data-id="${b.cardId}"><b>${esc(b.name)}</b><span class="mini-abs">${miniAbs(b)}</span>${b.fit ? '<small>守備位置を押すと交代</small>' : '<small class="warn">守備 −30%（適性外）</small>'}</button><span class="lu-ovr">${b.overall}</span><button class="lu-swap" type="button" data-act="cycleLineupPlayer" data-index="${index}">控え野手と交代</button></div>`;
-  const rotationRow = (p, index) => `<div class="lu"><span class="lu-no">${p.slot}</span><span class="lu-pos">投</span><button class="lu-main" type="button" data-go="player" data-id="${p.cardId}"><b>${esc(p.name)}${p.isNext ? '<span class="next-tag">次の先発</span>' : ''}</b><span class="mini-abs">${miniAbs(p)}</span><small>得意球種：${p.specialNames.join('・')}${p.fatigued ? '　疲労 −15%' : ''}</small></button><span class="lu-ovr">${p.overall}</span><button class="lu-swap" type="button" data-act="cycleRotationPlayer" data-index="${index}">所持投手と交代</button></div>`;
+  const badgeHtml = (p) => `${p.isProtagonist ? `<span class="tag-protag">${esc(p.protagonistBadge || '主人公')}</span>` : ''}${p.grade ? `<span class="tag-grade">${p.grade}年</span>` : ''}`;
+  const lineupRow = (b) => `<button class="lu" type="button" data-go="player" data-id="${b.cardId}"><span class="lu-no">${b.order}</span><span class="lu-pos${b.fit ? '' : ' misfit'}">${b.posLabel}</span><span class="lu-main"><b>${esc(b.name)}${badgeHtml(b)}</b><span class="mini-abs">${miniAbs(b)}</span>${b.fit ? '' : '<small class="warn">守備 −30%（適性外）</small>'}</span><span class="lu-ovr">${b.overall}</span></button>`;
+  const lineupEditRow = (b, index) => `<div class="lu lu-edit"><span class="lu-no">${b.order}</span><button class="lu-pos${b.fit ? '' : ' misfit'}" type="button" data-act="cyclePosition" data-index="${index}" aria-label="${b.order}番 ${esc(b.name)}の守備位置を変更">${b.posLabel}</button><button class="lu-main" type="button" data-go="player" data-id="${b.cardId}"><b>${esc(b.name)}${badgeHtml(b)}</b><span class="mini-abs">${miniAbs(b)}</span>${b.fit ? '<small>守備位置を押すと交代</small>' : '<small class="warn">守備 −30%（適性外）</small>'}</button><span class="lu-ovr">${b.overall}</span><button class="lu-swap" type="button" data-act="cycleLineupPlayer" data-index="${index}"${b.isProtagonist ? ' disabled' : ''}>${b.isProtagonist ? '主人公（固定）' : '控え野手と交代'}</button></div>`;
+  const rotationRow = (p, index) => `<div class="lu"><span class="lu-no">${p.slot}</span><span class="lu-pos">投</span><button class="lu-main" type="button" data-go="player" data-id="${p.cardId}"><b>${esc(p.name)}${badgeHtml(p)}${p.isNext ? '<span class="next-tag">次の先発</span>' : ''}</b><span class="mini-abs">${miniAbs(p)}</span><small>得意球種：${p.specialNames.join('・')}${p.fatigued ? '　疲労 −15%' : ''}</small></button><span class="lu-ovr">${p.overall}</span><button class="lu-swap" type="button" data-act="cycleRotationPlayer" data-index="${index}"${p.isProtagonist ? ' disabled' : ''}>${p.isProtagonist ? '主人公（固定）' : '所持投手と交代'}</button></div>`;
   const standingsTable = (rows) => `<div class="panel tbl-wrap"><table class="tbl"><thead><tr><th>位</th><th class="t-team">球団</th><th>勝</th><th>敗</th><th>分</th><th>勝率</th><th>差</th></tr></thead><tbody>${rows.map((r) => `<tr class="${r.isUser ? 'me' : ''}"><td>${r.rank}</td><td class="t-team">${esc(r.short)}</td><td>${r.w}</td><td>${r.l}</td><td>${r.d}</td><td>${r.pctText}</td><td>${r.gbText}</td></tr>`).join('')}</tbody></table></div>`;
+  const bracketRows = (bracket) => bracket.map((rd) => {
+    const res = rd.result
+      ? `<span class="res ${rd.result}">${{ W: '勝', L: '負', D: '分' }[rd.result]} ${rd.us}-${rd.them}</span>`
+      : `<span class="res${rd.isNext ? ' next' : ''}">${rd.isNext ? '次戦' : rd.locked ? '未進出' : '—'}</span>`;
+    return `<div class="sched-row${rd.isNext ? ' is-next' : ''}"><span class="rd">${esc(rd.label)}</span><span class="vs">${esc(rd.opponent.name)}<small>（${esc(rd.opponent.pref)}・${esc(rd.opponent.traitLabel)}・総合${rd.opponent.overall}）</small></span><span class="ha">${rd.home ? '後攻' : '先攻'}</span>${res}</div>`;
+  }).join('');
   const seg = (items, key, cur, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([k, t]) => `<button type="button" data-act="setParam" data-key="${key}" data-val="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
-  return { icon, draft, lockNote, pageHead, card, oppPitcherCard, boardRows, lineupRow, lineupEditRow, rotationRow, standingsTable, seg, miniAbs, LB };
+  return { icon, draft, lockNote, pageHead, card, oppPitcherCard, boardRows, lineupRow, lineupEditRow, rotationRow, standingsTable, bracketRows, seg, miniAbs, LB };
 })();
 
 /* ---- 1 画面遷移：試合キャンバスのDOMアダプター ---- */
@@ -2412,9 +3048,15 @@ const Shell = (() => {
   function refreshHeader() {
     if (!$('hdr-name')) return;
     const w = Economy.getWallet();
-    const season = League.getSeason();
+    const cal = League.getCalendar();
+    const p = Growth.getProtagonist();
+    const stage = cal.phase === 'graduation'
+      ? '3年卒業・世代交代'
+      : cal.complete
+        ? (cal.champion ? '甲子園優勝・年度終了' : '大会終了・年度終了')
+        : (cal.nextMatch ? cal.nextMatch.label : '地方予選');
     $('hdr-name').textContent = Growth.getTeamName();
-    $('hdr-sub').textContent = season.complete ? `シーズン${season.season}　全10節終了` : `シーズン${season.season}　第${season.nextRound}節`;
+    $('hdr-sub').textContent = `${cal.year}年目（第${cal.generation}世代・${p.grade || 1}年） ${stage}`;
     countUp($('hdr-coins'), shownCoins === null ? w.coins : shownCoins, w.coins);
     shownCoins = w.coins;
     $('hdr-tickets').textContent = Util.fmt(w.scoutTickets);
@@ -2543,7 +3185,7 @@ const GameHud = (() => {
   return { bind, unbind, describeBatter };
 })();
 
-/* ---- 1 画面遷移：13画面（ホーム／試合ハブ／編成／スカウト／ショップ／ミッション／設定／試合前／試合／試合結果／シーズン終了／選手詳細／スカウト演出） ---- */
+/* ---- 1 画面遷移：15画面（主人公作成／卒業式／ホーム／大会／編成／スカウト／ショップ／ミッション／設定／試合前／試合／試合結果／年度終了／選手詳細／スカウト演出） ---- */
 const Screens = (() => {
   const { esc, fmt } = Util;
   const LB = CONFIG.LABELS;
@@ -2551,66 +3193,120 @@ const Screens = (() => {
   const RESULT = { W: '勝ち', L: '負け', D: '引き分け' };
   const S = {};
 
+  S.create = () => {
+    const schools = Growth.getSchools();
+    const curSchool = Growth.getSchool();
+    const curProtag = Growth.getProtagonist();
+    const cal = League.getCalendar();
+    const gen = curProtag.created ? curProtag.generation + 1 : (curProtag.generation || 1);
+    const schoolOpts = schools.map((sc) => `<option value="${esc(sc.id)}"${sc.id === curSchool.id ? ' selected' : ''}>${esc(sc.name)}（${esc(sc.pref)}・${esc(sc.traitLabel)}：${esc(sc.desc)}）</option>`).join('');
+    const posOpts = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'].map((pos) => `<option value="${pos}"${pos === (curProtag.pos || 'P') ? ' selected' : ''}>${LB.pos[pos]}（${LB.posName[pos]}）</option>`).join('');
+    const throwsOpts = [['R', '右投'], ['L', '左投']].map(([k, t]) => `<option value="${k}"${k === (curProtag.throws || 'R') ? ' selected' : ''}>${t}</option>`).join('');
+    const batsOpts = [['R', '右打'], ['L', '左打'], ['S', '両打']].map(([k, t]) => `<option value="${k}"${k === (curProtag.bats || 'R') ? ' selected' : ''}>${t}</option>`).join('');
+    return `<section class="screen">
+      <div class="sec-h first"><h2>主人公作成・母校選択</h2><p>第${gen}世代　${cal.year}年目</p></div>
+      <p class="note">『'98甲子園』準拠モード：1年生の主人公を作成し、母校を率いて3年間の地方予選・甲子園本大会に挑みます。主人公は卒業まで在籍保証されます。</p>
+      <div class="panel" id="create-form">
+        <div class="field"><label for="c-school">母校（架空12校・都道府県・チーム特性）</label><select id="c-school">${schoolOpts}</select></div>
+        <div class="field"><label for="c-name">主人公の名前（10文字まで）</label><input id="c-name" type="text" maxlength="10" value="${esc(curProtag.name || '蒼井 翔')}"></div>
+        <div class="field"><label for="c-pos">守備位置</label><select id="c-pos">${posOpts}</select></div>
+        <div class="field"><label for="c-throws">利き腕（投）</label><select id="c-throws">${throwsOpts}</select></div>
+        <div class="field"><label for="c-bats">打席（打）</label><select id="c-bats">${batsOpts}</select></div>
+        <div class="field"><label for="c-num">背番号（1〜99）</label><input id="c-num" type="number" min="1" max="99" step="1" value="${curProtag.number || 1}"></div>
+      </div>
+      <button class="btn btn-amber" type="button" data-act="submitCreate">入部して高校野球を始める</button>
+    </section>`;
+  };
+
+  S.graduation = () => {
+    const cal = League.getCalendar();
+    const grads = Growth.getGraduates();
+    const pGrad = grads.find((g) => g.isProtagonist) || Growth.getProtagonist();
+    const st = pGrad.stats || { games: 0, hits: 0, hr: 0, rbi: 0, k: 0, wins: 0 };
+    return `<section class="screen">
+      <div class="sec-h first"><h2>卒業式・世代交代</h2><p>第${pGrad.generation || 1}世代 3年間終了</p></div>
+      <div class="season-hero"><span>祝・卒業</span><b class="led">${esc(pGrad.name)}</b><span>${esc(pGrad.schoolName || Growth.getTeamName())}（${esc(pGrad.posLabel || '投')}・${esc(pGrad.throwsBatsLabel || '右投右打')}）</span></div>
+      <div class="sec-h"><h2>3年間の通算成績</h2><p>卒業生記録に永久保存されました</p></div>
+      <div class="panel">
+        <div class="kv"><span>最終能力</span><b>Lv${pGrad.lv || 1}　総合力 ${pGrad.overall || 50}</b></div>
+        <div class="kv"><span>打撃記録</span><b>${st.games || 0}試合　${st.hits || 0}安打　${st.hr || 0}本塁打　${st.rbi || 0}打点</b></div>
+        <div class="kv"><span>投手記録</span><b>${st.wins || 0}勝　${st.k || 0}奪三振</b></div>
+        <div class="kv"><span>甲子園通算</span><b>優勝 ${cal.koshienWins}回（最高${cal.maxStreak}連覇）</b></div>
+      </div>
+      <p class="note">財布（コイン・チケット）、ショップ解禁、卒業生記録、通算記録、および進級した在校生（新2・3年生）は次の世代へ引き継がれます。</p>
+      <button class="btn btn-amber" type="button" data-act="startNextGeneration">新1年生の主人公を作成する</button>
+    </section>`;
+  };
+
   S.home = () => {
-    const season = League.getSeason();
-    const me = League.getStandings().find((r) => r.isUser);
-    const next = League.getNextMatch();
+    const cal = League.getCalendar();
+    const next = cal.nextMatch;
     const ovr = Growth.teamOverall();
+    const school = Growth.getSchool();
+    const protag = Growth.getProtagonist();
+    const protagCard = Growth.getCard('PROTAG');
     const starter = Growth.getCard(Growth.getRotation().find((p) => p.isNext).cardId);
     const cleanup = Growth.getCard(Growth.getLineup()[3].cardId);
+    const secondCard = protagCard && starter && starter.id !== 'PROTAG' ? starter : cleanup;
     const daily = Missions.list('daily');
     const cap = Economy.getDailyCap();
     const badge = Missions.unclaimedCount();
+    const createBanner = !protag.created
+      ? `<div class="panel"><div class="kv"><span>新入部員登録</span><b>未作成</b></div><p class="note">最初に主人公と母校を決定してください。</p><button class="btn btn-amber" type="button" data-go="create">主人公作成・母校選択へ</button></div>`
+      : '';
     const board = next
-      ? `<div class="board" role="group" aria-label="次の試合"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, League.getTeams(), ovr)}<div class="board-foot"><span>数字はチーム総合力</span><span>${next.home ? 'ホーム' : 'ビジター'}</span></div></div>`
-      : '<div class="board" role="group" aria-label="シーズン全日程終了"><div class="board-head"><span>全10節終了</span><span>シーズン結果待ち</span></div><p class="note">全日程を消化しました。シーズン結果へ進んで順位報酬を受け取れます。</p></div>';
+      ? `<div class="board" role="group" aria-label="次の試合"><div class="board-head"><span>次の公式戦</span><span class="led">${esc(next.label)}</span></div>${View.boardRows(next, League.getTeams(), ovr)}<div class="board-foot"><span>母校特性：${esc(school.traitLabel)}</span><span>相手特性：${esc(next.opponent.traitLabel)}</span></div></div>`
+      : `<div class="board" role="group" aria-label="今年度の大会終了"><div class="board-head"><span>${cal.champion ? '甲子園全国制覇！' : '今年度の大会終了'}</span><span>年度終了処理待ち</span></div><p class="note">${cal.champion ? '甲子園本大会を制覇しました！年度終了へ進んで報酬受取と進級・卒業を行います。' : `${esc(cal.eliminatedAt || '大会')}で敗退しました。年度終了処理へ進んで進級・卒業を行います。`}</p></div>`;
     return `<section class="screen">
+      ${createBanner}
       <div class="status"><div class="ovr"><small>チーム総合力</small><b>${ovr}</b></div>
-        <dl class="facts"><div class="fact"><dt>順位</dt><dd><b>${me.rank}</b>位</dd></div><div class="fact"><dt>勝率</dt><dd><b>${me.pctText}</b></dd></div>
-        <div class="fact wide"><dt>成績（${season.played}試合）</dt><dd><b>${me.w}</b>勝 <b>${me.l}</b>敗 <b>${me.d}</b>分</dd></div></dl></div>
+        <dl class="facts"><div class="fact"><dt>年度・学年</dt><dd><b>${cal.year}</b>年目・<b>${protag.grade}</b>年</dd></div><div class="fact"><dt>甲子園優勝</dt><dd><b>${cal.koshienWins}</b>回（連覇<b>${cal.streak}</b>）</dd></div>
+        <div class="fact wide"><dt>母校（${esc(school.pref)}・${esc(school.traitLabel)}）</dt><dd><b>${esc(school.name)}</b>　今季<b>${cal.wins}</b>勝<b>${cal.losses}</b>敗</dd></div></dl></div>
       ${board}
-      <button class="btn btn-turf" type="button" data-act="startLeague">${League.isSeasonComplete() ? 'シーズン結果へ' : '試合開始'}</button>
-      <div class="sec-h"><h2>先発予定と4番打者</h2><p>押すと詳細</p></div>
-      <div class="cards2">${View.card(starter, { go: true, caption: '先発予定' })}${View.card(cleanup, { go: true, caption: '4番' })}</div>
-      <button class="row-link" type="button" data-go="missions">${View.icon('checklist')}<span><b>ミッション</b><small>デイリー ${daily.filter((m) => m.done).length}/${daily.length} 達成${cap.reached ? '　非リーグ試合・広告は上限' : ''}</small></span>${badge ? `<span class="badge" aria-label="未受取 ${badge}件">${badge}</span>` : '<span></span>'}${View.icon('chevron')}</button>
+      <button class="btn btn-turf" type="button" data-act="startLeague">${cal.complete ? '年度終了・進級処理へ' : '大会試合へ進む'}</button>
+      <div class="sec-h"><h2>主人公と主力選手</h2><p>押すと詳細</p></div>
+      <div class="cards2">${View.card(protagCard || starter, { go: true, caption: protagCard ? protag.roleLabel : '先発予定' })}${View.card(secondCard, { go: true, caption: secondCard.type === 'P' ? '先発予定' : '4番' })}</div>
+      <button class="row-link" type="button" data-go="missions">${View.icon('checklist')}<span><b>ミッション</b><small>デイリー ${daily.filter((m) => m.done).length}/${daily.length} 達成${cap.reached ? '　非公式戦・広告は上限' : ''}</small></span>${badge ? `<span class="badge" aria-label="未受取 ${badge}件">${badge}</span>` : '<span></span>'}${View.icon('chevron')}</button>
     </section>`;
   };
 
   S.match = () => {
-    const season = League.getSeason();
-    const next = League.getNextMatch();
-    const teams = League.getTeams();
-    const sched = League.getSchedule().map((rd) => {
-      const u = rd.user;
-      const isNext = !!next && rd.round === next.round;
-      const res = u.result ? `<span class="res ${u.result}">${{ W: '勝', L: '負', D: '分' }[u.result]} ${u.us}-${u.them}</span>` : `<span class="res${isNext ? ' next' : ''}">${isNext ? '次' : '—'}</span>`;
-      return `<div class="sched-row${isNext ? ' is-next' : ''}"><span class="rd">第${rd.round}節</span><span class="vs">${esc(teams[u.opponentId].name)}</span><span class="ha">${u.home ? 'ホーム' : 'ビジター'}</span>${res}</div>`;
-    }).join('');
+    const cal = League.getCalendar();
+    const next = cal.nextMatch;
+    const school = Growth.getSchool();
+    const qual = cal.bracket.filter((r) => r.stage === 'qualifier');
+    const koshien = cal.bracket.filter((r) => r.stage === 'koshien');
     const board = next
-      ? `<div class="board"><div class="board-head"><span>次の試合</span><span class="led">第${next.round}節</span></div>${View.boardRows(next, teams, Growth.teamOverall())}</div>`
-      : '<div class="board"><div class="board-head"><span>全10節終了</span><span>シーズン結果待ち</span></div><p class="note">日程の全試合が確定しています。</p></div>';
+      ? `<div class="board"><div class="board-head"><span>次の公式戦</span><span class="led">${esc(next.label)}</span></div>${View.boardRows(next, League.getTeams(), Growth.teamOverall())}</div>`
+      : `<div class="board"><div class="board-head"><span>${cal.champion ? '甲子園優勝' : '今年度の大会終了'}</span><span>年度終了待ち</span></div><p class="note">今年度の全日程が確定しています。年度終了処理へ進んでください。</p></div>`;
     const mode = (m, title, sub) => `<button class="mode" type="button" data-act="playMode" data-mode="${m}">${View.icon('ball')}<span><b>${title}</b><small>${sub}</small></span><span></span>${View.icon('chevron')}</button>`;
     return `<section class="screen">
-      <div class="sec-h first"><h2>シーズン${season.season}</h2><p>第${season.played}節まで消化</p></div>
+      <div class="sec-h first"><h2>${cal.year}年目 大会トーナメント</h2><p>甲子園優勝 ${cal.koshienWins}回・${cal.streak}連覇中（最高${cal.maxStreak}連覇）</p></div>
       ${board}
-      <button class="btn btn-turf" type="button" data-act="startLeague">${League.isSeasonComplete() ? 'シーズン結果へ' : '試合開始'}</button>
-      <div class="sec-h"><h2>順位表</h2><p>勝率は引き分けを除く</p></div>${View.standingsTable(League.getStandings())}
-      <div class="sec-h"><h2>日程</h2><p>自チームの10試合</p></div><div class="panel">${sched}</div>
-      <div class="sec-h"><h2>その他のモード</h2><p>リーグの成績には入りません</p></div>
+      <button class="btn btn-turf" type="button" data-act="startLeague">${cal.complete ? '年度終了・進級処理へ' : '試合開始'}</button>
+      <div class="sec-h"><h2>地方予選（${esc(school.pref)}大会・3試合勝ち抜き）</h2><p>敗退で年度終了</p></div>
+      <div class="panel">${View.bracketRows(qual)}</div>
+      <div class="sec-h"><h2>甲子園本大会（全国大会・3試合勝ち抜き）</h2><p>予選優勝で出場</p></div>
+      <div class="panel">${View.bracketRows(koshien)}</div>
+      <div class="sec-h"><h2>その他のモード</h2><p>大会の勝敗には入りません</p></div>
       <div class="modes">${mode('practice', '練習', '現行の練習モード')}${mode('challenge10', '10球チャレンジ', '現行のまま')}${mode('exhibition', 'エキシビション', '現行の3回制の試合')}</div>
     </section>`;
   };
 
   S.pregame = () => {
-    if (League.isSeasonComplete()) return `<section class="screen">${View.pageHead('試合前')}<div class="board"><div class="board-head"><span>全10節終了</span><span>シーズン結果待ち</span></div><p class="note">次の試合はありません。シーズン結果へ進んでください。</p></div><button class="btn btn-turf" type="button" data-go="season">シーズン結果へ</button></section>`;
-    const cfg = League.buildMatchConfig('league');
-    const next = League.getNextMatch();
+    if (League.isSeasonComplete()) return `<section class="screen">${View.pageHead('試合前')}<div class="board"><div class="board-head"><span>今年度の大会終了</span><span>年度終了待ち</span></div><p class="note">次の大会試合はありません。年度終了へ進んでください。</p></div><button class="btn btn-turf" type="button" data-go="season">年度終了へ</button></section>`;
+    const mode = CONFIG.FEATURES.tournament ? 'tournament' : 'league';
+    const cfg = League.buildMatchConfig(mode);
+    const next = CONFIG.FEATURES.tournament ? League.getNextTournamentMatch() : League.getNextMatch();
     const u = cfg.teams.user;
+    const headLabel = CONFIG.FEATURES.tournament
+      ? `${next.label}　${next.home ? '後攻' : '先攻'}`
+      : `第${next.round}節　${next.home ? 'ホーム（後攻）' : 'ビジター（先攻）'}`;
     return `<section class="screen">${View.pageHead('試合前')}
-      <div class="board"><div class="board-head"><span>第${next.round}節　${next.home ? 'ホーム（後攻）' : 'ビジター（先攻）'}</span><span>総合力</span></div>${View.boardRows(next, League.getTeams(), Growth.teamOverall())}</div>
+      <div class="board"><div class="board-head"><span>${esc(headLabel)}</span><span>総合力</span></div>${View.boardRows(next, League.getTeams(), Growth.teamOverall())}</div>
       <div class="sec-h"><h2>先発投手</h2><p>${u.pitcher.fatigued ? '疲労 −15%' : '疲労なし'}</p></div>
       <div class="cards2">${View.card(Growth.getCard(u.pitcher.cardId), { go: true, caption: '自軍' })}${View.oppPitcherCard(cfg.teams.opponent.pitcher)}</div>
-      <div class="sec-h"><h2>スタメン</h2><p>チーム総合力 ${Growth.teamOverall()}</p></div>
+      <div class="sec-h"><h2>スタメン</h2><p>チーム総合力 ${Growth.teamOverall()}（母校特性：${esc(Growth.getSchool().traitLabel)}）</p></div>
       <div class="panel lineup">${Growth.getLineup().map(View.lineupRow).join('')}</div>
       <div class="btn-row"><button class="btn btn-line" type="button" data-go="team">オーダー変更</button><button class="btn btn-turf" type="button" data-act="playball">プレイボール</button></div>
     </section>`;
@@ -2625,54 +3321,74 @@ const Screens = (() => {
 
   S.result = () => {
     const r = League.getLastResult();
-    if (!r) return `<section class="screen">${View.pageHead('試合結果')}<p class="note">表示できる結果がありません。</p><button class="btn btn-line" type="button" data-go="match">試合ハブへ</button></section>`;
-    const league = r.mode === 'league';
+    if (!r) return `<section class="screen">${View.pageHead('試合結果')}<p class="note">表示できる結果がありません。</p><button class="btn btn-line" type="button" data-go="match">大会画面へ</button></section>`;
+    const official = r.mode === 'league' || r.mode === 'tournament';
     const rw = Economy.getLastMatchRewards();
     const gx = Growth.getLastExpGain();
     const row = (label, value) => `<div class="kv"><span>${label}</span><b class="num">${value}</b></div>`;
-    const rewards = league && rw ? `<div class="sec-h"><h2>コイン</h2><p>${rw.granted ? '付与済み' : '表示のみ（リーグ報酬は未実装）'}</p></div><div class="panel">${row(`ヒット ${rw.hits}本 ×${CONFIG.ECONOMY.hitCoins}`, fmt(rw.hitCoins))}${row(`本塁打 ${rw.homeruns}本 ×${CONFIG.ECONOMY.homerunCoins}`, fmt(rw.homerunCoins))}${row(`試合報酬（${RESULT[rw.result]}）`, fmt(rw.resultCoins))}${row('合計', fmt(rw.total))}</div>` : '';
-    const mvp = league && r.mvp ? Growth.getCard(r.mvp) : null;
+    const rewards = official && rw ? `<div class="sec-h"><h2>コイン</h2><p>${rw.granted ? '付与済み' : '表示のみ'}</p></div><div class="panel">${row(`ヒット ${rw.hits}本 ×${CONFIG.ECONOMY.hitCoins}`, fmt(rw.hitCoins))}${row(`本塁打 ${rw.homeruns}本 ×${CONFIG.ECONOMY.homerunCoins}`, fmt(rw.homerunCoins))}${row(`試合報酬（${RESULT[rw.result]}）`, fmt(rw.resultCoins))}${row('合計', fmt(rw.total))}</div>` : '';
+    const mvp = official && r.mvp ? Growth.getCard(r.mvp) : null;
+    const tourNote = r.mode === 'tournament'
+      ? (r.champion ? '<p class="note">甲子園本大会決勝に勝利し、全国制覇を達成しました！</p>' : r.eliminated ? `<p class="note">${esc(r.stageLabel || '今大会')}で敗退となり、今年度の大会は終了しました。</p>` : '<p class="note">勝利！次のラウンドへ進出します。</p>')
+      : '';
     return `<section class="screen">
-      <div class="sec-h first"><h2>${league ? `第${r.round}節の結果` : `${r.modeLabel}の結果`}</h2></div>
+      <div class="sec-h first"><h2>${r.mode === 'league' ? `第${r.round}節の結果` : `${esc(r.modeLabel)}の結果`}</h2></div>
       <div class="board"><div class="board-head"><span>試合終了</span><span class="res-badge ${r.result}">${RESULT[r.result]}</span></div>
         <div class="board-row"><span class="board-side">先攻</span><span class="board-team${r.userSide === 'away' ? ' me' : ''}">${esc(r.awayName)}</span><span class="board-num led">${r.score.away}</span></div>
         <div class="board-row"><span class="board-side">後攻</span><span class="board-team${r.userSide === 'home' ? ' me' : ''}">${esc(r.homeName)}</span><span class="board-num led">${r.score.home}</span></div></div>
-      ${league ? rewards : '<p class="note">現行モードでは、ヒットと本塁打のコインはその場で入ります。</p>'}
+      ${tourNote}
+      ${official ? rewards : '<p class="note">現行モードでは、ヒットと本塁打のコインはその場で入ります。</p>'}
       ${gx ? `<div class="sec-h"><h2>育成</h2><p>経験値付与済み</p></div><div class="panel">${row('出場選手', `${gx.rows.length}人`)}${row('出場', `+${CONFIG.GROWTH.appearanceExp}`)}${r.result === 'W' ? row('勝利', `+${CONFIG.GROWTH.winExp}`) : ''}${r.mvp ? row('MVP', `+${CONFIG.GROWTH.mvpExp}`) : ''}</div>` : ''}
       ${mvp ? `<div class="sec-h"><h2>MVP</h2><p>押すと詳細</p></div><div class="cards2">${View.card(mvp, { go: true, caption: 'MVP' })}<p class="note">出場で＋60、勝利で＋40、MVPで＋100の経験値を獲得しました。</p></div>` : ''}
-      <div class="stack">${league ? (League.resultDestination(r) === 'season' ? '<button class="btn btn-turf" type="button" data-go="season">シーズン結果へ</button>' : '<button class="btn btn-turf" type="button" data-act="startLeague">次の試合へ</button>') : ''}<div class="btn-row"><button class="btn btn-line" type="button" data-go="match">試合ハブ</button><button class="btn btn-line" type="button" data-go="home">ホーム</button></div></div>
+      <div class="stack">${official ? (League.resultDestination(r) === 'season' ? '<button class="btn btn-turf" type="button" data-go="season">年度終了・進級処理へ</button>' : '<button class="btn btn-turf" type="button" data-act="startLeague">次の試合へ</button>') : ''}<div class="btn-row"><button class="btn btn-line" type="button" data-go="match">大会画面</button><button class="btn btn-line" type="button" data-go="home">ホーム</button></div></div>
     </section>`;
   };
 
   S.season = () => {
-    const rows = League.getStandings();
-    const me = rows.find((r) => r.isUser);
+    const cal = League.getCalendar();
+    const rw = League.yearEndReward() || { rank: 4, title: '年度終了', coins: 500, guaranteeTickets: 0 };
+    const owned = Growth.getOwnedCards('overall');
+    const gradList = owned.filter((c) => c.grade === 3);
+    const promoList = owned.filter((c) => c.grade < 3);
+    const protag = Growth.getProtagonist();
+    const tierLabels = ['甲子園優勝', '甲子園出場', '地方予選決勝', '地方予選敗退'];
     const rewards = CONFIG.ECONOMY.seasonRankRewards.map((x, i) => {
-      const mine = i === Math.min(me.rank, 4) - 1;
-      return `<div class="kv"><span>${x.label}${mine ? '（あなた）' : ''}</span><b>${fmt(x.coins)}コイン${x.guaranteeTickets ? `＋★3以上確定チケット${x.guaranteeTickets}枚` : ''}</b></div>`;
+      const mine = i === rw.rank - 1;
+      return `<div class="kv"><span>${tierLabels[i]}${mine ? '（今季成績）' : ''}</span><b>${fmt(x.coins)}コイン${x.guaranteeTickets ? `＋★3以上確定チケット${x.guaranteeTickets}枚` : ''}</b></div>`;
     }).join('');
-    return `<section class="screen">${View.pageHead('シーズン終了')}
-      <div class="season-hero"><span>最終順位</span><b class="led">${me.rank}</b><span>位</span></div>
-      <div class="sec-h"><h2>順位報酬</h2></div><div class="panel">${rewards}</div>
-      <div class="sec-h"><h2>最終順位表</h2></div>${View.standingsTable(rows)}
-      <button class="btn btn-amber" type="button" data-act="claimSeason"${League.isSeasonComplete() ? '' : ' disabled'}>報酬を受け取って次のシーズンへ</button>
+    return `<section class="screen">${View.pageHead('年度終了・進級と卒業')}
+      <div class="season-hero"><span>${cal.year}年目 最終結果</span><b class="led">${esc(rw.title)}</b><span>甲子園優勝 通算${cal.koshienWins}回（${cal.streak}連覇）</span></div>
+      <div class="sec-h"><h2>大会報酬</h2></div><div class="panel">${rewards}</div>
+      <div class="sec-h"><h2>3年生の卒業（${gradList.length}人）</h2><p>所持から外れ、卒業生記録に残ります</p></div>
+      <div class="panel">${gradList.length ? gradList.map((c) => `<div class="kv"><span>${esc(c.name)}${c.isProtagonist ? '（主人公）' : ''}　${c.posLabel}</span><b>Lv${c.lv}　総合${c.overall} → 卒業</b></div>`).join('') : '<p class="note">今年度の3年生はいません。</p>'}</div>
+      <div class="sec-h"><h2>1・2年生の進級（${promoList.length}人）</h2><p>全員1学年上がります</p></div>
+      <div class="panel"><div class="kv"><span>進級対象</span><b>1年生→2年生、2年生→3年生（計${promoList.length}人）</b></div>${protag.grade >= 3 ? '<p class="note warn">主人公が3年生を終えたため、卒業式を経て次の世代の主人公作成へ進みます。</p>' : ''}</div>
+      <button class="btn btn-amber" type="button" data-act="claimSeason"${League.isSeasonComplete() ? '' : ' disabled'}>報酬を受け取り進級・卒業処理を行う</button>
     </section>`;
   };
 
   S.team = (p) => {
     const tab = p.tab || 'order';
     const sort = p.sort || 'overall';
+    const school = Growth.getSchool();
+    const protag = Growth.getProtagonist();
     let body;
     if (tab === 'pitchers') {
-      body = `<div class="sec-h"><h2>先発ローテ</h2><p>リーグ戦ごとに順番に先発</p></div><div class="panel lineup">${Growth.getRotation().map(View.rotationRow).join('')}</div><p class="note">各枠の「所持投手と交代」で、ローテ外の総合力上位投手と入れ替えます。</p>`;
+      body = `<div class="sec-h"><h2>先発ローテ</h2><p>公式戦ごとに順番に先発</p></div><div class="panel lineup">${Growth.getRotation().map(View.rotationRow).join('')}</div><p class="note">各枠の「所持投手と交代」で、ローテ外の総合力上位投手と入れ替えます。主人公が投手のときはローテに固定されます。</p>`;
     } else if (tab === 'list') {
       const chips = [['overall', '総合力'], ['rarity', 'レア度'], ['lv', 'Lv'], ['pos', '守備位置']].map(([k, t]) => `<button class="chip-btn" type="button" data-act="setParam" data-key="sort" data-val="${k}" aria-pressed="${sort === k}">${t}</button>`).join('');
       const cards = Growth.getOwnedCards(sort);
-      body = `<div class="sec-h"><h2>所持選手</h2><p>${cards.length}人</p></div><div class="chips" role="group" aria-label="並べ替え">${chips}</div><div class="grid3">${cards.map((c) => View.card(c, { go: true, size: 'is-mini' })).join('')}</div>`;
+      body = `<div class="sec-h"><h2>所持選手（在校生）</h2><p>${cards.length}人</p></div><div class="chips" role="group" aria-label="並べ替え">${chips}</div><div class="grid3">${cards.map((c) => View.card(c, { go: true, size: 'is-mini' })).join('')}</div>`;
+    } else if (tab === 'graduates') {
+      const grads = Growth.getGraduates();
+      const rows = grads.length
+        ? grads.map((g) => `<div class="kv"><span><b>${esc(g.name)}</b>${g.isProtagonist ? '<span class="tag-protag">主人公</span>' : ''}　<small>${g.graduatedYear}年目卒・${esc(g.schoolName || school.name)}・${esc(g.posLabel)}</small></span><b>Lv${g.lv} 総合${g.overall}（${g.type === 'P' ? `${g.stats && g.stats.wins || 0}勝 ${g.stats && g.stats.k || 0}奪三振` : `${g.stats && g.stats.hits || 0}安打 ${g.stats && g.stats.hr || 0}本`}）</b></div>`).join('')
+        : '<p class="note">まだ卒業生はいません。年度終了時に3年生が卒業すると記録されます。</p>';
+      body = `<div class="sec-h"><h2>卒業生記録</h2><p>${grads.length}人（世代をまたいで保存）</p></div><div class="panel">${rows}</div>`;
     } else {
-      body = `<div class="sec-h"><h2>スタメン</h2><p>8守備位置＋DH　総合力 ${Growth.teamOverall()}</p></div><div class="panel lineup">${Growth.getLineup().map(View.lineupEditRow).join('')}</div><button class="btn btn-line" type="button" data-act="autoLineup">おまかせ編成</button><p class="note">守備位置ボタンで位置を交代し、「控え野手と交代」でスタメン外の総合力上位選手と入れ替えます。適性外は守備範囲が30%低下します。おまかせ編成は投手ローテも更新します。</p>`;
+      body = `<div class="sec-h"><h2>スタメン</h2><p>8守備位置＋DH　総合力 ${Growth.teamOverall()}</p></div><div class="panel lineup">${Growth.getLineup().map(View.lineupEditRow).join('')}</div><button class="btn btn-line" type="button" data-act="autoLineup">おまかせ編成</button><p class="note">母校：${esc(school.name)}（${esc(school.pref)}・${esc(school.traitLabel)}：${esc(school.desc)}）。主人公（${esc(protag.name)}・${protag.grade}年）は卒業まで在籍します。</p>`;
     }
-    return `<section class="screen"><div class="sec-h first"><h2>編成</h2><p>8守備位置＋DH</p></div>${View.seg([['order', 'オーダー'], ['pitchers', '投手'], ['list', '選手一覧']], 'tab', tab, '編成の表示')}${body}</section>`;
+    return `<section class="screen"><div class="sec-h first"><h2>編成・部員名鑑</h2><p>${esc(school.name)}（${esc(school.traitLabel)}）</p></div>${View.seg([['order', 'オーダー'], ['pitchers', '投手'], ['list', '選手一覧'], ['graduates', '卒業生']], 'tab', tab, '編成の表示')}${body}</section>`;
   };
 
   S.player = (p) => {
@@ -2682,11 +3398,14 @@ const Screens = (() => {
     const pips = Array.from({ length: CONFIG.GROWTH.limitBreakMax }, (_, i) => `<i class="${i < c.lb ? 'on' : ''}"></i>`).join('');
     return `<section class="screen">${View.pageHead('選手詳細')}
       ${View.card(c, { size: 'is-big' })}
-      <div class="panel detail"><div class="kv"><span>レベル</span><b class="num">Lv${c.lv}<small> / ${c.maxLv}</small></b></div><div class="kv"><span>経験値</span><b class="num">${c.exp}<small> / ${c.expNext}</small></b></div><span class="prog"><i style="width:${pct}%"></i></span>
+      <div class="panel detail">
+        <div class="kv"><span>学年・立場</span><b>${esc(c.roleLabel || c.gradeLabel || '2年生')}${c.isProtagonist ? '（卒業まで在籍保証）' : ''}</b></div>
+        <div class="kv"><span>投打</span><b>${esc(c.throwsBatsLabel || '右投右打')}</b></div>
+        <div class="kv"><span>レベル</span><b class="num">Lv${c.lv}<small> / ${c.maxLv}</small></b></div><div class="kv"><span>経験値</span><b class="num">${c.exp}<small> / ${c.expNext}</small></b></div><span class="prog"><i style="width:${pct}%"></i></span>
         <div class="kv"><span>限界突破</span><span class="pips" aria-label="限界突破 ${c.lb}/${CONFIG.GROWTH.limitBreakMax}">${pips}</span></div>
         ${c.type === 'P' ? `<div class="kv"><span>得意球種</span><b>${c.specialNames.join('・')}</b></div>` : `<div class="kv"><span>守備位置</span><b>${c.posLabel}（${c.posName}）</b></div>`}</div>
       <button class="btn btn-amber" type="button" data-act="train" data-id="${c.id}"${c.owned && c.lv < c.maxLv ? '' : ' disabled'}>特訓（100コインで経験値＋150）</button>
-      <p class="note">重複獲得で限界突破が1段階進みます。上限4回の後はコインへ変換します。</p>
+      <p class="note">重複獲得で限界突破が1段階進みます。上限4回の後はコインへ変換します（主人公は重複変換・通常引退の対象外）。</p>
     </section>`;
   };
 
@@ -2695,8 +3414,8 @@ const Screens = (() => {
     const pct = (v) => `${Math.round(v * 100)}%`;
     const rateRow = (r) => `<tr><td class="t-team">${'★'.repeat(r)} ${LB.rarity[r]}</td><td>${pct(info.rates[r])}</td><td>${info.guaranteeRates[r] ? pct(info.guaranteeRates[r]) : '—'}</td></tr>`;
     return `<section class="screen">
-      <div class="sec-h first"><h2>スカウト</h2><p>累計 ${info.totalPulls || 0}回</p></div>
-      <div class="scout-hero"><div class="scout-pity"><span>★4確定まで</span><b class="led">${info.pityRemaining}</b><span>回</span></div><p class="note">★4が出ないまま50回目のスカウトは★4が確定します</p></div>
+      <div class="sec-h first"><h2>新入部員スカウト</h2><p>累計 ${info.totalPulls || 0}回（新規加入は全員1年生）</p></div>
+      <div class="scout-hero"><div class="scout-pity"><span>★4確定まで</span><b class="led">${info.pityRemaining}</b><span>回</span></div><p class="note">スカウトで加入する選手は全員1年生として入部します。★4が出ないまま50回目は★4確定です。</p></div>
       <div class="scout-btns">
         <button class="btn btn-amber two-line" type="button" data-act="scout" data-kind="single"><span>単発スカウト</span><span class="cost">${View.icon('coin', 'ic-coin sm')} 300 または ${View.icon('ticket', 'sm')} 1枚</span></button>
         <button class="btn btn-amber two-line" type="button" data-act="scout" data-kind="ten"><span>10連スカウト</span><span class="cost">${View.icon('coin', 'ic-coin sm')} 3,000　10人目は★3以上</span></button>
@@ -2713,11 +3432,11 @@ const Screens = (() => {
     const res = (p.results || [])[0];
     const c = res ? Growth.getCard(res.cardId) : null;
     if (!c) return `<section class="screen">${View.pageHead('スカウト')}<p class="note">結果がありません。</p></section>`;
-    const summary = (p.results || []).map((x) => { const card = Growth.getCard(x.cardId); return `<button class="kv" type="button" data-go="player" data-id="${esc(x.cardId)}"><span>${card ? esc(card.name) : esc(x.cardId)}　${card ? '★'.repeat(card.rarity) : ''}</span><b>${esc(x.status)}　詳細へ</b></button>`; }).join('');
+    const summary = (p.results || []).map((x) => { const card = Growth.getCard(x.cardId); return `<button class="kv" type="button" data-go="player" data-id="${esc(x.cardId)}"><span>${card ? esc(card.name) : esc(x.cardId)}　${card ? `${card.grade}年 ${'★'.repeat(card.rarity)}` : ''}</span><b>${esc(x.status)}　詳細へ</b></button>`; }).join('');
     return `<section class="reveal">
       <p class="reveal-kind">${KIND[p.kind] || 'スカウト'}</p>
       <button class="flip r${c.rarity}${p.opened ? ' is-open' : ''}" type="button" id="flip" data-act="flipCard" aria-label="カードをめくる"><span class="flip-in"><span class="flip-face flip-back">${View.icon('ball')}<span>タップでめくる</span></span><span class="flip-face flip-front">${View.card(c, { tag: 'span' })}</span></span></button>
-      <div class="reveal-after" id="reveal-after"${p.opened ? '' : ' hidden'}><p class="reveal-tag"><span class="new">${res.status}</span>${esc(c.name)}　${'★'.repeat(c.rarity)}${c.rarityName}</p>${p.results && p.results.length > 1 ? `<div class="panel">${summary}</div>` : ''}
+      <div class="reveal-after" id="reveal-after"${p.opened ? '' : ' hidden'}><p class="reveal-tag"><span class="new">${res.status}</span>${esc(c.name)}（${c.grade}年生）　${'★'.repeat(c.rarity)}${c.rarityName}</p>${p.results && p.results.length > 1 ? `<div class="panel">${summary}</div>` : ''}
         <div class="btn-row"><button class="btn btn-line" type="button" data-act="back">スカウトに戻る</button><button class="btn btn-amber" type="button" data-go="player" data-id="${c.id}">選手詳細</button></div></div>
       <button class="skip" type="button" id="skip" data-act="flipCard"${p.opened ? ' hidden' : ''}>スキップ</button>
     </section>`;
@@ -2789,13 +3508,15 @@ const Screens = (() => {
   const AFTER = {
     home() { const lb = LoginBonus.check(); if (lb.show) { LoginBonus.markShown(); Shell.openModal('loginBonus'); } },
     game(p) {
-      const cfg = League.buildMatchConfig(p.mode || 'league');
+      const defaultMode = CONFIG.FEATURES.tournament ? 'tournament' : 'league';
+      const cfg = League.buildMatchConfig(p.mode || defaultMode);
       GameHud.bind(cfg);
       GameSurface.mount(document.getElementById('engine-mount'));
       MatchEngine.start(cfg);
     },
   };
   const META = Object.freeze({
+    create: { tab: 'home' }, graduation: { tab: 'match' },
     home: { tab: 'home' }, match: { tab: 'match' }, team: { tab: 'team' }, scout: { tab: 'scout' }, shop: { tab: 'shop' },
     missions: { tab: 'home' }, config: { tab: null }, pregame: { tab: 'match' }, game: { immersive: true }, result: { tab: 'match' },
     season: { tab: 'match' }, player: { tab: 'team' }, reveal: { immersive: true },
@@ -2842,8 +3563,14 @@ const Router = (() => {
   }
   // 同じ画面のまま表示だけ切り替える（画面内のタブ・並べ替え）。履歴は積まない
   function refresh(patch = {}) { top().params = { ...top().params, ...patch }; render(); }
-  // 起動は常にホームから（途中の画面のURLで開いても試合や演出は始めない：NAV-04）
-  function start() { stack = [{ name: 'home', params: {} }]; write('replaceState'); render(); }
+  // 初回起動・v1移行直後は主人公作成から、世代終了時は卒業画面から、それ以外はホームから開始
+  function start() {
+    const cal = League.getCalendar();
+    const initial = cal.phase === 'graduation' ? 'graduation' : (!Growth.hasProtagonist() ? 'create' : 'home');
+    stack = [{ name: initial, params: {} }];
+    write('replaceState');
+    render();
+  }
   function handleBack(fromBrowser) {
     const keep = () => { if (fromBrowser && historyOk) write('pushState'); };
     if (Shell.hasOverlay()) { keep(); return; }                                       // デモ広告中は戻らない
@@ -2863,8 +3590,29 @@ const Actions = {
   noop() {},
   back: () => Router.back(),
   setParam: (el) => Router.refresh({ [el.dataset.key]: el.dataset.val }),
-  startLeague: () => Router.go(League.isSeasonComplete() ? 'season' : 'pregame'),
-  playball: () => Router.go('game', { mode: 'league' }),
+  submitCreate() {
+    const v = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+    const r = Growth.createProtagonist({
+      schoolId: v('c-school'),
+      name: v('c-name'),
+      pos: v('c-pos'),
+      throws: v('c-throws'),
+      bats: v('c-bats'),
+      number: Number(v('c-num')) || 1,
+    });
+    if (!r.ok) { Shell.toast(r.reason); return; }
+    Shell.toast(`${r.school.name}に${r.protagonist.name}（1年生）が入部しました`);
+    Router.replace('home');
+  },
+  startNextGeneration() {
+    Router.replace('create');
+  },
+  startLeague: () => {
+    if (League.getCalendar().phase === 'graduation') { Router.go('graduation'); return; }
+    if (!Growth.hasProtagonist()) { Router.go('create'); return; }
+    Router.go(League.isSeasonComplete() ? 'season' : 'pregame');
+  },
+  playball: () => Router.go('game', { mode: CONFIG.FEATURES.tournament ? 'tournament' : 'league' }),
   playMode: (el) => Router.go('game', { mode: el.dataset.mode }),
   pause() {
     if (!MatchEngine.isRunning() || Shell.hasModal()) return;
@@ -2958,8 +3706,13 @@ const Actions = {
   claimSeason() {
     const r = League.advanceSeason();
     if (!r.ok) { Shell.toast(r.reason); return; }
-    Shell.toast(`順位報酬を受け取り、シーズン${r.season}を始めました`);
-    Router.replace('home');
+    if (r.nextScreen === 'graduation') {
+      Shell.toast('3年生の主人公が卒業を迎えました');
+      Router.replace('graduation');
+    } else {
+      Shell.toast(`報酬を受け取り、${r.year || r.season}年目へ進級しました`);
+      Router.replace('home');
+    }
   },
   scout(el) {
     const r = Growth.scout(el.dataset.kind);
@@ -3287,6 +4040,146 @@ const MatchFlow = (() => {
       MatchEngine.abort();
       return pitch === 'curve' || `ユーザー解禁がfastballのみのときCPU球種=${pitch}`;
     } finally { off(); if (MatchEngine.isRunning()) MatchEngine.abort(); }
+  }));
+  t('段階A 主人公作成と在籍保証', () => League.testScope(() => {
+    const r = Growth.createProtagonist({ name: '熱血 太郎', pos: 'SS', throws: 'R', bats: 'L', number: 6, schoolId: 'SCH01' });
+    const c1 = Growth.getCard('PROTAG');
+    const dup = Growth.acquire('PROTAG');
+    const y1 = Growth.processYearEnd(1);
+    const c2 = Growth.getCard('PROTAG');
+    const y2 = Growth.processYearEnd(2);
+    const c3 = Growth.getCard('PROTAG');
+    const ok = r.ok && Growth.hasProtagonist() && c1.owned && c1.isProtagonist && c1.protagonistBadge === '主人公'
+      && c1.name === '熱血 太郎' && c1.pos === 'SS' && c1.throws === 'R' && c1.bats === 'L' && c1.number === 6 && c1.grade === 1
+      && dup.coins === 0 && /主人公/.test(dup.status)
+      && !y1.protagonistGraduated && c2.owned && c2.grade === 2
+      && !y2.protagonistGraduated && c3.owned && c3.grade === 3;
+    return ok || JSON.stringify({ r, c1, dup, y1, c2, y2, c3 });
+  }));
+  t('段階A 学校選択と特性補正', () => League.testScope(() => {
+    const schools = Growth.getSchools();
+    const H = MatchEngine.HOOKS;
+    Growth.selectSchool('SCH01'); // 打撃型（power+5, meet+2）
+    const cfgBat = League.buildMatchConfig('tournament');
+    const bBat = cfgBat.teams.user.lineup[0];
+    const rawMeet = bBat.abilities.meet;
+    const expectedBatContact = Math.round(Correction.multiplier(rawMeet, 2) * 1000) / 1000;
+    const batExit = H.exitVelocity(100, bBat, cfgBat);
+    Growth.selectSchool('SCH03'); // 機動型（speed+5, meet+2）
+    const cfgMob = League.buildMatchConfig('tournament');
+    const bMob = cfgMob.teams.user.lineup[0];
+    const mobSpeed = H.runSpeed(100, bMob, cfgMob);
+    Growth.selectSchool('SCH02'); // 守備型（defense+5, control+3）
+    const cfgDef = League.buildMatchConfig('tournament');
+    const bDef = cfgDef.teams.user.lineup[0];
+    const defRange = H.fielderRange(100, bDef, cfgDef);
+    const batRange = H.fielderRange(100, bBat, cfgBat);
+    const ok = schools.length === 12
+      && schools.every((sc) => sc.id && sc.name && sc.pref && ['batting', 'mobility', 'defense'].includes(sc.trait))
+      && near(bBat.mult.contact, expectedBatContact, 1e-9)
+      && batExit > H.exitVelocity(100, bDef, cfgDef)
+      && mobSpeed > H.runSpeed(100, bDef, cfgDef)
+      && defRange > batRange;
+    return ok || JSON.stringify({ len: schools.length, bBatMult: bBat.mult, expectedBatContact, batExit, mobSpeed, defRange, batRange });
+  }));
+  t('段階A 学年付与と既存セーブ移行', () => League.testScope(() => {
+    Economy.earn({ coins: 1000 }, 'test:grade', 'debug');
+    const pulled = Growth.scout('single', { seed: 77, payment: 'coins' });
+    const pulledId = pulled.results[0].cardId;
+    const pulledGrade = Growth.getGrade(pulledId);
+    const legacyV2 = Save.peek();
+    delete legacyV2.grades;
+    delete legacyV2.school;
+    delete legacyV2.protagonist;
+    delete legacyV2.calendar;
+    delete legacyV2.graduates;
+    const bag = { [CONFIG.STORAGE.main]: JSON.stringify(legacyV2) };
+    const mem = { getItem: (k) => (k in bag ? bag[k] : null), setItem: (k, v) => { bag[k] = String(v); }, removeItem: (k) => { delete bag[k]; } };
+    Save.load(mem);
+    const afterFirst = JSON.parse(bag[CONFIG.STORAGE.main]);
+    const allGrade2 = Object.keys(afterFirst.cards).every((id) => Growth.getGrade(id) === 2 && afterFirst.grades.byCard[id] === 2);
+    Growth.processYearEnd(1); // 2年生→3年生へ進級
+    bag[CONFIG.STORAGE.main] = Save.exportText();
+    Save.load(mem); // 2回目の読込では2年生へ上書き移行しない
+    const keptGrade3 = Growth.getGrade('S01') === 3;
+    return (pulledGrade === 1 && allGrade2 && afterFirst.grades.migrated === true && keptGrade3) || JSON.stringify({ pulledGrade, allGrade2, keptGrade3 });
+  }));
+  t('段階A 予選敗退での年度終了', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '予選 球児', pos: 'P', throws: 'R', bats: 'R', number: 1, schoolId: 'SCH01' });
+    const r1 = League.playTournamentRound('W', { us: 4, them: 1 });
+    const r2 = League.playTournamentRound('L', { us: 1, them: 3 });
+    const afterLoss = League.playTournamentRound('W', { us: 5, them: 0 });
+    const cal = League.getCalendar();
+    const dest = League.resultDestination({ mode: 'tournament', yearEnded: r2.yearEnded });
+    return (r1.ok && !r1.yearEnded && r2.ok && r2.yearEnded && r2.eliminated && !afterLoss.ok && cal.eliminated && cal.eliminatedAt === '地方予選 準決勝' && cal.phase === 'yearEnd' && !cal.champion && dest === 'season') || JSON.stringify({ r1, r2, afterLoss, cal, dest });
+  }));
+  t('段階A 甲子園優勝と連覇記録', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '連覇 王者', pos: 'P', throws: 'L', bats: 'L', number: 1, schoolId: 'SCH04' });
+    for (let i = 0; i < 6; i += 1) League.playTournamentRound('W', { us: 3, them: 0 });
+    const y1 = League.getCalendar();
+    League.advanceYear();
+    for (let i = 0; i < 6; i += 1) League.playTournamentRound('W', { us: 4, them: 1 });
+    const y2 = League.getCalendar();
+    League.advanceYear();
+    League.playTournamentRound('L', { us: 0, them: 2 });
+    const y3 = League.getCalendar();
+    const ok = y1.champion && y1.koshienWins === 1 && y1.streak === 1 && y1.maxStreak === 1
+      && y2.champion && y2.koshienWins === 2 && y2.streak === 2 && y2.maxStreak === 2
+      && !y3.champion && y3.eliminated && y3.koshienWins === 2 && y3.streak === 0 && y3.maxStreak === 2;
+    return ok || JSON.stringify({ y1, y2, y3 });
+  }));
+  t('段階A 進級と卒業（卒業生記録）', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '進級 確認', pos: 'C', throws: 'R', bats: 'R', number: 2, schoolId: 'SCH02' });
+    // 初期部員（2年生）を1度進級させて3年生にし、主人公（1年生→2年生）と同時に確認
+    const step1 = Growth.processYearEnd(1);
+    const s01Before = Growth.getCard('S01');
+    const protagBefore = Growth.getCard('PROTAG');
+    const step2 = Growth.processYearEnd(2);
+    const s01After = Growth.getCard('S01');
+    const protagAfter = Growth.getCard('PROTAG');
+    const grads = Growth.getGraduates();
+    const s01Grad = grads.find((g) => g.cardId === 'S01');
+    const ok = s01Before.grade === 3 && protagBefore.grade === 2
+      && step2.graduated.some((g) => g.cardId === 'S01')
+      && !s01After.owned && protagAfter.owned && protagAfter.grade === 3
+      && !!s01Grad && s01Grad.graduatedYear === 2;
+    return ok || JSON.stringify({ step1, s01Before, protagBefore, s01After, protagAfter, s01Grad });
+  }));
+  t('段階A 世代交代での引き継ぎ範囲', () => League.testScope(() => {
+    Growth.createProtagonist({ name: '初代 主将', pos: '1B', throws: 'R', bats: 'R', number: 3, schoolId: 'SCH01' });
+    Economy.earn({ coins: 2000, scoutTickets: 3 }, 'test:gen', 'debug');
+    Economy.buyUnlock('pitch-curve');
+    for (let yr = 1; yr <= 3; yr += 1) {
+      if (yr === 1) {
+        for (let i = 0; i < 6; i += 1) League.playTournamentRound('W', { us: 5, them: 1 });
+      } else {
+        League.playTournamentRound('L', { us: 1, them: 2 });
+      }
+      const adv = League.advanceYear();
+      if (yr === 3 && adv.nextScreen !== 'graduation') return `3年終了時の遷移先が違う: ${JSON.stringify(adv)}`;
+    }
+    const calAtGrad = League.getCalendar();
+    const walletBefore = Economy.getWallet();
+    const unlocksBefore = Economy.getUnlocks();
+    const careerBefore = League.getCareer();
+    const gradsBefore = Growth.getGraduates();
+    const gen1Grad = gradsBefore.find((g) => g.isProtagonist && g.name === '初代 主将');
+    const created2 = Growth.createProtagonist({ name: '二代目 主将', pos: 'P', throws: 'L', bats: 'L', number: 18, schoolId: 'SCH06' });
+    const calAfter = League.getCalendar();
+    const p2 = Growth.getProtagonist();
+    const walletAfter = Economy.getWallet();
+    const unlocksAfter = Economy.getUnlocks();
+    const careerAfter = League.getCareer();
+    const gradsAfter = Growth.getGraduates();
+    const ok = calAtGrad.phase === 'graduation' && !!gen1Grad
+      && created2.ok && p2.name === '二代目 主将' && p2.generation === 2 && p2.grade === 1
+      && calAfter.phase === 'qualifier' && calAfter.step === 1 && calAfter.generation === 2
+      && calAfter.koshienWins === 1 && calAfter.maxStreak === 1
+      && walletAfter.coins === walletBefore.coins && walletAfter.scoutTickets === walletBefore.scoutTickets
+      && unlocksAfter.pitches.includes('curve') && JSON.stringify(unlocksAfter) === JSON.stringify(unlocksBefore)
+      && careerAfter.leagueWins === careerBefore.leagueWins && careerAfter.leagueWins >= 6
+      && gradsAfter.some((g) => g.isProtagonist && g.name === '初代 主将');
+    return ok || JSON.stringify({ calAtGrad, gen1Grad, p2, calAfter, walletAfter, unlocksAfter, careerAfter });
   }));
 })();
 
