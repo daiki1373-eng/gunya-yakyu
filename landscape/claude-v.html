@@ -4502,10 +4502,10 @@ function mkPlayer(pos,St,used){const v=()=>cl(Math.round(St+ri(-9,9)),12,97);let
  if(pos===1){p.velo=cl(p.velo+8,20,97);p.ctrl=cl(p.ctrl+5,20,97);p.brk=cl(p.brk+6,20,97);p.stam=cl(p.stam+6,20,97);p.meet-=8;p.power-=8}return p}
 const mkTeam=(name,short,c,c2,St,mine)=>({name,short,color:c,color2:c2,S:St,mine,lineup:[],relief:[]});
 const orderLine=a=>{const hero=a.find(p=>p.hero),rest=a.filter(p=>p!==hero).sort((x,y)=>(y.meet+y.power)-(x.meet+x.power));if(hero)rest.splice(3,0,hero);return rest};
-function genMates(){const used=new Set([S.hero.name]);S.mates={};for(let p=1;p<=9;p++)if(p!==S.hero.pos)S.mates[p]=mkPlayer(p,S.tS,used);S.relief=mkPlayer(1,S.tS-3,used);SPCH.forEach(c=>{if(R()<.5){if(c.pos!==S.hero.pos)S.mates[c.pos]=spChar(c);else if(c.pos===1&&R()<.5)S.relief=spChar(c)}})}
+function genMates(){if(S.bench)for(const p of [...Object.values(S.mates||{}),S.relief])if(p&&p.rar)S.bench.push(p);const used=new Set([S.hero.name]);S.mates={};for(let p=1;p<=9;p++)if(p!==S.hero.pos)S.mates[p]=mkPlayer(p,S.tS,used);S.relief=mkPlayer(1,S.tS-3,used);SPCH.forEach(c=>{if(R()<.5){if(c.pos!==S.hero.pos)S.mates[c.pos]=spChar(c);else if(c.pos===1&&R()<.5)S.relief=spChar(c)}})}
 function buildMine(){const sc=SCH(),t=mkTeam(sc.n,sc.s,sc.c,sc.c2,S.tS,true),h=S.hero,a=[];
- for(let p=1;p<=9;p++){if(p===h.pos)a.push(h.inj>0?Object.assign(mkPlayer(p,S.tS-4),{sub:1}):heroP(h));else a.push(applySp(Object.assign({},S.mates[p],{pc:0})))}
- t.lineup=orderLine(a);t.relief=[applySp(Object.assign({},S.relief,{pc:0}))];return t}
+ for(let p=1;p<=9;p++){if(p===h.pos)a.push(h.inj>0?Object.assign(applySp(Object.assign({},(S.bench||[]).filter(q=>q.pos===p).sort((x,y)=>(y.meet+y.power)-(x.meet+x.power))[0]||mkPlayer(p,S.tS-4))),{sub:1,pc:0}):heroP(h));else a.push(applySp(Object.assign({},S.mates[p],{pc:0})))}
+ t.lineup=Array.isArray(S.ord)&&S.ord.length===9&&S.ord.every(p=>Number.isInteger(p)&&p>=1&&p<=9)&&new Set(S.ord).size===9?S.ord.map(p=>a[p-1]):orderLine(a);t.relief=[applySp(Object.assign({},S.relief,{pc:0}))];return t}
 function mkOpp(r){const St=[36,42,48,56,64,72][r]+(S.grade-1)*2+Math.min(6,S.gen-1),pr=pick(PRE);let cc;do{cc=pick(COLS)}while(cc[0]===SCH().c);
  const t=mkTeam(pr+pick(SUF),pr,cc[0],cc[1],St,false),used=new Set(),a=[];for(let p=1;p<=9;p++)a.push(mkPlayer(p,St,used));t.lineup=orderLine(a);t.relief=[mkPlayer(1,St-4,used),mkPlayer(1,St-6,used)];return t}
 /* ===== 描画 ===== */
@@ -5020,21 +5020,44 @@ ${gen?'':'<label>試合のイニング数<select id="inn"><option>3</option><opt
 function selSch(i){NG.sc=i;SCHOOLS.forEach((_,j)=>{const e=$('#sc'+j);if(e)e.classList.toggle('on',j===i)})}
 function ngGo(){const nm=PENDNAME!==null?PENDNAME:(($('#nm')?.value||'球児').trim().slice(0,6)),ps=+$('#ps').value,th=$('#th').value,bt=$('#bt').value,sp=$('#sp').value;PENDNAME=null;
 if(NG.gen){S.gen++;S.hero=newHero(nm,ps,th,bt,sp);S.grade=1;S.tS=SCH().st+ri(-2,5)+Math.min(S.titles,3)*2;genMates();S.ph='spring';S.slots=4;S.round=0;S.res=[]}
-else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0};genMates()}
+else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0,coin:1000,bench:[],ord:null,pity:0};genMates()}
 MSG='';HM='main';save();hub()}
-function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));if(S.hero&&!S.hero.sp)S.hero.sp='human';HM='main';MSG='';hub()}catch(e){newGame()}}
+function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));if(S.hero&&!S.hero.sp)S.hero.sp='human';if(S.coin===undefined)S.coin=1000;if(S.bench===undefined)S.bench=[];if(S.ord===undefined)S.ord=null;if(S.pity===undefined)S.pity=0;HM='main';MSG='';hub()}catch(e){newGame()}}
 const STN=[['meet','ミート','#f55'],['power','パワー','#f90'],['speed','走力','#4c4'],['field','守備','#4ad'],['arm','肩','#aaf'],['velo','球速','#f5a'],['ctrl','制球','#5df'],['brk','変化球','#da5'],['stam','スタミナ','#ee5']];
 const PR={meet:'打撃練習',power:'筋力トレ',speed:'ダッシュ',field:'守備練習',arm:'遠投',velo:'投げ込み',ctrl:'制球練習',brk:'変化球',stam:'走り込み'};
 function hub(){titleFlow=false;bgmStop();V.mode='yard';hudOff();const h=S.hero,sc=SCH();
 const bars=STN.map(([k,l,c])=>`<div class="st"><span>${l}</span><div class="bar"><i style="width:${h[k]}%;background:${c}"></i></div><b>${k==='velo'?Math.round(105+h.velo*.5)+'km':h[k]}</b></div>`).join('');
 const ph=S.ph==='spring'?`${S.grade}年生・春季練習`:`${S.grade}年生・夏の大会 次：${RL[S.round]}`;let m='';
 if(HM==='practice')m=`<h2>練習メニュー</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:0 8px">${STN.map(([k])=>`<button class="mb" style="font-size:17px;padding:8px" onclick="doPractice('${k}')">${PR[k]}</button>`).join('')}<button class="mb" style="font-size:17px;padding:8px" onclick="doPractice('team')">チーム練習</button></div><button class="mb" onclick="HM='main';hub()">もどる</button>`;
+else if(HM==='scout')m=scout();
+else if(HM==='form')m=form();
 else m=`<h2>${ph}</h2><div class="tx" style="min-height:62px;white-space:pre-line;color:#ffe9a0">${MSG||'練習で能力を伸ばそう！'}</div><div class="tx">練習できる回数：残り ${S.slots}回</div>
 <button class="mb" ${S.slots<=0||h.inj>0?'disabled':''} onclick="HM='practice';hub()">練習する</button><button class="mb" ${S.slots<=0?'disabled':''} onclick="doRest()">休養する</button>
 <button class="mb go" onclick="${S.ph==='spring'?'goTour()':'startMatch()'}">${S.ph==='spring'?'夏の大会へ進む':RL[S.round]+'へ！'}</button>
-<div style="display:flex;gap:8px"><button class="mb" onclick="records()">記録</button><button class="mb" onclick="help2()">ヘルプ</button><button class="mb" onclick="title()">タイトル</button></div>`;
+<div style="display:flex;gap:8px"><button class="mb" onclick="HM='scout';scoutResults=[];hub()">スカウト</button><button class="mb" onclick="HM='form';hub()">編成</button><button class="mb" onclick="records()">記録</button><button class="mb" onclick="help2()">ヘルプ</button><button class="mb" onclick="title()">タイトル</button></div>`;
 ui(`<div class="pn" style="left:20px;top:20px;width:470px;height:500px"><div class="tx" style="color:#9df">${sc.n}　${S.gen}代目</div><div style="font-size:28px;font-weight:bold;margin:2px 0 6px">${h.name}<small style="font-size:15px"> ${S.grade}年 ${PN[h.pos]}・${SPEC[h.sp||'human'].n} ${h.thr==='R'?'右':'左'}投${h.bat==='R'?'右':'左'}打</small></div>
 <div class="st"><span>疲労</span><div class="bar"><i style="width:${h.fat}%;background:${h.fat>70?'#e33':h.fat>40?'#ea3':'#3c3'}"></i></div><b>${h.fat}</b></div>${h.inj>0?`<div class="warn">ケガ：あと${h.inj}試合 離脱</div>`:''}${bars}<div class="tx">チーム力 ${Math.round(S.tS)}　${S.res.slice(-2).join('<br>')}</div></div><div class="pn" style="left:510px;top:20px;width:430px;height:500px">${m}</div>`)}
+let scoutResults=[];
+const scoutRefund=[0,100,200,500,1000];
+function scoutPlayer(rar){
+ let p;if(rar===3&&R()<.25)p=spChar(pick(SPCH));
+ else{p=mkPlayer(ri(1,9),S.tS+[0,-14,-7,1,9][rar]);if(rar>=3&&R()<.2)p.sp=pick(['beetle','dog','panda'])}
+ p.rar=rar;return p}
+function doScout(n){if((n!==1&&n!==10)||S.coin<n*300)return;
+ S.coin-=n*300;scoutResults=[];const draws=[];
+ for(let i=0;i<n;i++){const r=R(),rar=S.pity>=49?4:r<.03?4:r<.15?3:r<.5?2:1;S.pity=rar===4?0:S.pity+1;draws.push(rar)}
+ if(n===10&&!draws.some(r=>r>=3))draws[9]=3;
+ for(const rar of draws){const p=scoutPlayer(rar),dup=[...Object.values(S.mates),S.relief,...S.bench,S.hero].some(q=>q&&q.name===p.name&&q.pos===p.pos),coin=dup||S.bench.length>=20?scoutRefund[rar]:0;
+ if(coin)S.coin+=coin;else S.bench.push(p);scoutResults.push({p,coin})}
+ HM='scout';save();hub()}
+function rosterLabel(p){return `${'★'.repeat(p.rar||0)} ${p.name} ${PN[p.pos]}${p.sp?'・'+SPEC[p.sp].n:''} ミート${p.meet} パワー${p.power}${p.pos===1?' 球速'+p.velo:''}`}
+function scout(){return `<h2>スカウト</h2><div class="tx">コイン ${S.coin}　ベンチ ${S.bench.length}/20</div><button class="mb" ${S.coin<300?'disabled':''} onclick="doScout(1)">単発 300コイン</button><button class="mb" ${S.coin<3000?'disabled':''} onclick="doScout(10)">10連 3000コイン</button><div class="tx" style="max-height:260px;overflow:auto">${scoutResults.map(({p,coin})=>`<div>${rosterLabel(p)} ${coin?'→'+coin+'コイン':'新規'}</div>`).join('')}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
+function moveOrder(i,d){const a=buildMine().lineup.map(p=>p.pos),j=i+d;if(i<0||i>=9||j<0||j>=9)return;[a[i],a[j]]=[a[j],a[i]];S.ord=a;save();hub()}
+function autoOrder(){S.ord=null;save();hub()}
+function swapBench(i,relief){const p=S.bench[i];if(!p)return;
+ if(relief){if(p.pos!==1)return;[S.relief,S.bench[i]]=[p,S.relief]}
+ else{if(p.pos===S.hero.pos||!S.mates[p.pos])return;[S.mates[p.pos],S.bench[i]]=[p,S.mates[p.pos]]}save();hub()}
+function form(){const lineup=buildMine().lineup;return `<h2>編成</h2><div style="max-height:380px;overflow:auto"><div class="tx">打順 <button onclick="autoOrder()">自動</button></div>${lineup.map((p,i)=>`<div class="tx">${i+1} ${p.name} ${PN[p.pos]} <button ${i===0?'disabled':''} onclick="moveOrder(${i},-1)">↑</button><button ${i===8?'disabled':''} onclick="moveOrder(${i},1)">↓</button></div>`).join('')}<h3>先発</h3>${Array.from({length:9},(_,i)=>{const pos=i+1,p=pos===S.hero.pos?S.hero:S.mates[pos];return `<div class="tx">${rosterLabel(p)}${pos===S.hero.pos?' 主人公・固定':''}</div>`}).join('')}<h3>控え投手</h3><div class="tx">${rosterLabel(S.relief)}</div><h3>ベンチ ${S.bench.length}/20</h3>${S.bench.map((p,i)=>`<div class="tx">${rosterLabel(p)}${p.pos!==S.hero.pos&&S.mates[p.pos]?`<button onclick="swapBench(${i},false)">先発と交代</button>`:''}${p.pos===1?`<button onclick="swapBench(${i},true)">控えと交代</button>`:''}</div>`).join('')||'<div class="tx">ベンチなし</div>'}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
 function help2(){ui(`<div class="pn" style="left:60px;top:30px;width:840px;height:480px"><div class="tx" style="font-size:17px">疲労が高いと試合で能力が下がり、ケガの原因になります。練習の合間に「休養」を挟みましょう。ケガ中は練習できず、試合にも出られません。<br>打撃は「球が近づいてきたらボタン」。球種・コースを見て打法を使い分けよう。<br>投球はボタンの<b>タップ位置</b>がコース指定です。</div><button class="mb" style="width:200px" onclick="hub()">もどる</button></div>`)}
 function doPractice(k){const h=S.hero;if(S.slots<=0||h.inj>0)return;S.slots--;
 if(k==='team'){S.tS=Math.min(80,S.tS+.9);h.fat=cl(h.fat+7,0,100);MSG='チーム練習！ チーム力が少し上がった'}
@@ -5046,6 +5069,7 @@ function goTour(){S.ph='tour';S.round=0;S.slots=2;S.res=[];MSG='いよいよ夏�
 async function startMatch(){uiOff();const opp=mkOpp(S.round),r=await playMatch(opp,RL[S.round]);afterMatch(r)}
 function afterMatch(r){const h=S.hero;h.rec.g++;let note='';
 if(G.heroOut)h.inj=Math.max(0,h.inj-1);else{h.fat=cl(h.fat+(h.pos===1?Math.min(40,Math.round(G.heroPC/4)):8),0,100);if(h.fat>80&&R()<.2){h.inj=ri(1,3);note=`⚠ 試合でケガ！（${h.inj}試合離脱）`}}
+const reward=r.win?200:100;S.coin=(S.coin===undefined?1000:S.coin)+reward;note+=(note?'\n':'')+'コイン +'+reward;
 if(r.win&&h.pos===1&&!G.heroOut)h.rec.w++;S.res.push(`${RL[S.round]} ${r.win?'○':'●'} ${r.me}-${r.you} ${r.opp}`);LASTR=r;save();
 const home=G.myTop?'you':'me',away=G.myTop?'me':'you',n=Math.max(G.maxInn,G.line.me.length,G.line.you.length),hd=[];for(let i=0;i<n;i++)hd.push(i+1);
 const row=k=>`<tr><td>${G[k].short}</td>${hd.map(i=>`<td>${G.line[k][i-1]===undefined?'-':G.line[k][i-1]}</td>`).join('')}<th>${G.sc[k]}</th></tr>`;
