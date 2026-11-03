@@ -584,15 +584,16 @@ return{win:G.sc.me>G.sc.you,me:G.sc.me,you:G.sc.you,opp:opp.name,label,called:G.
 /* ===== 画面 ===== */
 const ui=h=>{const u=$('#ui');u.innerHTML=h;u.style.display='block'},uiOff=()=>{const u=$('#ui');u.style.display='none';u.innerHTML=''};
 let HM='main',MSG='',NG=null;
+let PENDNAME=null;
 let titleStarting=false,titleHasSave=false;
-function title(){V.mode='title';V.t0=nw();titleStarting=false;hudOff();try{titleHasSave=!!localStorage.getItem(KEY)}catch(e){titleHasSave=false}
+function title(){PENDNAME=null;V.mode='title';V.t0=nw();titleStarting=false;hudOff();try{titleHasSave=!!localStorage.getItem(KEY)}catch(e){titleHasSave=false}
 ui(`<div class="ttl" aria-label="ぐにゃぐにゃベースボール"><div class="title-main"><button class="mb go big" onclick="startMain()">${titleHasSave?'つづきから':'はじめから'}</button></div><div class="tver">Ver 1.0</div><button class="ticon" aria-label="あそびかた" onclick="help()">？</button></div>`)}
 function startMain(){
  if(titleStarting||V.mode!=='title')return;
  const button=$('.title-main .big');if(!button)return;
  titleStarting=true;button.classList.add('hit');const helpButton=$('.ticon');if(helpButton)helpButton.style.pointerEvents='none';sndFan();
  const has=titleHasSave,startedAt=V.t0;
- setTimeout(()=>{if(V.mode!=='title'||V.t0!==startedAt)return;V.mode='yard';if(has)loadGame();else newGame()},380);
+ setTimeout(()=>{if(V.mode!=='title'||V.t0!==startedAt)return;if(has){V.mode='yard';loadGame()}else nameEntry()},380);
 }
 function help(){if(titleStarting)return;ui(`<div class="pn" style="left:60px;top:30px;width:840px;height:480px"><h2>あそびかた</h2><div class="tx">
 球が来たらタイミングよくボタンを押す！ボタンが打法です：通常打ち／長打狙い(強振・当たりにくい)／流し打ち(逆方向)／バント(送りに)。早いと引っ張り、遅いと流れます。ストライクゾーンの枠は出ません。球をよく見よう。<br>
@@ -602,17 +603,24 @@ function help(){if(titleStarting)return;ui(`<div class="pn" style="left:60px;top
 大会の合間に練習で能力アップ。ただし<b>疲労</b>がたまると試合で能力が下がり、ケガもします。休養で回復。<br>
 地方予選3勝→甲子園3勝で優勝！ 3年の夏が終わると卒業し、新しい主人公で世代交代します。セーブは自動です。<br>PCキー：Z/X/C/V=打法、矢印=投球コース、1〜5=球種、F=投球フォーム</div>
 <button class="mb" style="width:200px;margin:10px auto" onclick="title()">もどる</button></div>`)}
+function nameEntry(){V.mode='title';
+ui(`<div class="pn" style="left:300px;top:230px;width:360px"><h2>名前を入力</h2>
+<label>名前<input id="nmE" maxlength="6" value="青野 翔"></label>
+<button class="mb go" onclick="nameGo()">決定</button>
+<button class="mb" style="width:140px;margin:8px auto 0;font-size:16px;padding:6px" onclick="window.title()">もどる</button></div>`)}
+function nameGo(){PENDNAME=($('#nmE').value.trim().slice(0,6)||'球児');tone(740,.07,'square',.07);V.mode='yard';newGame()}
 function newGame(gen){NG={sc:gen?S.sc:0,gen:!!gen};
+const nameRow=PENDNAME!==null&&!gen?`<div class="tx">名前：${PENDNAME.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>`:'<label>名前<input id="nm" maxlength="6" value="青野 翔"></label>';
 const op=PN.map((n,i)=>i?`<option value="${i}">${n}</option>`:'').join('');
 ui(`<div class="pn" style="left:30px;top:18px;width:900px;height:504px;display:flex;gap:18px"><div style="width:330px"><h2>主人公をつくる</h2>
-<label>名前<input id="nm" maxlength="6" value="青野 翔"></label><label>守備位置<select id="ps">${op}</select></label>
+${nameRow}<label>守備位置<select id="ps">${op}</select></label>
 <label>投げ<select id="th"><option value="R">右投げ</option><option value="L">左投げ</option></select></label><label>打ち<select id="bt"><option value="R">右打ち</option><option value="L">左打ち</option></select></label>
 <label>種族<select id="sp"><option value="human">人間（バランス）</option><option value="beetle">カブトムシ（長打特化・鈍足）</option><option value="dog">イヌ（俊足・守備）</option><option value="panda">パンダ（変化・制球）</option></select></label>
 ${gen?'':'<label>試合のイニング数<select id="inn"><option>3</option><option selected>5</option><option>7</option><option>9</option></select></label>'}</div>
 <div style="flex:1"><h2>${gen?SCH().n+'（世代交代）':'学校をえらぶ'}</h2>${gen?'':SCHOOLS.map((s,i)=>`<div class="sch" id="sc${i}" onclick="selSch(${i})"><b style="color:${s.c==='#e8e8f0'?'#fff':s.c}">■</b> <b>${s.n}</b>（チーム力${s.st}）<br>${s.d}</div>`).join('')}
 <button class="mb go" onclick="ngGo()">この内容で始める！</button></div></div>`);if(!gen)selSch(0)}
 function selSch(i){NG.sc=i;SCHOOLS.forEach((_,j)=>{const e=$('#sc'+j);if(e)e.classList.toggle('on',j===i)})}
-function ngGo(){const nm=($('#nm').value||'球児').trim().slice(0,6),ps=+$('#ps').value,th=$('#th').value,bt=$('#bt').value,sp=$('#sp').value;
+function ngGo(){const nm=PENDNAME!==null?PENDNAME:(($('#nm')?.value||'球児').trim().slice(0,6)),ps=+$('#ps').value,th=$('#th').value,bt=$('#bt').value,sp=$('#sp').value;PENDNAME=null;
 if(NG.gen){S.gen++;S.hero=newHero(nm,ps,th,bt,sp);S.grade=1;S.tS=SCH().st+ri(-2,5)+Math.min(S.titles,3)*2;genMates();S.ph='spring';S.slots=4;S.round=0;S.res=[]}
 else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0};genMates()}
 MSG='';HM='main';save();hub()}
