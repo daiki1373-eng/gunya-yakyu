@@ -456,6 +456,99 @@ svg{display:block}
 .nameplate{top:468px}
 .rv-ui>*{position:absolute}
 .rv-cut>*{position:absolute}
+/* ===== v0.2.0 additions ===== */
+input{-webkit-user-select:text;user-select:text}
+.tgear{position:absolute;right:22px;top:20px;z-index:6}
+.bubble{max-width:210px;text-wrap:balance}
+/* tour plate (home) */
+.tour{position:absolute;right:26px;top:198px;width:340px;height:150px;border-radius:22px;border:4px solid var(--ink);padding:8px 16px 6px;z-index:4;
+  background:linear-gradient(180deg,rgba(70,32,176,.95),rgba(28,12,92,.95));box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 6px 0 var(--ink)}
+.tr-h{display:flex;justify-content:space-between;font-size:16px;color:#cbbcff}
+.tr-n{font-size:27px;line-height:1.15;color:#ffd23f}
+.trk{display:grid;grid-template-columns:1fr 1fr 52px;align-items:center;gap:6px;margin-top:4px}
+.seg{display:flex;gap:6px;justify-content:center;padding:5px 6px;border-radius:14px;background:rgba(0,0,0,.3)}
+.pip{width:26px;height:16px;border-radius:8px;background:#3a2a8a;border:3px solid var(--ink)}
+.pip.on{background:linear-gradient(180deg,#ffe97a,#ff9a1f)}
+.pip.now{background:#fff;animation:blinkt 1s ease-in-out infinite}
+.tro{display:flex;justify-content:center}.tro svg{width:40px;height:40px;filter:grayscale(.85) brightness(.75)}
+.trl{display:grid;grid-template-columns:1fr 1fr 52px;gap:6px;font-size:13px;text-align:center;color:#cbbcff;margin-top:2px}
+.tr-s{font-size:17px;margin-top:2px;text-align:center;--sw:6px}
+.power{top:356px;height:56px;padding:4px 16px;flex-direction:row;align-items:center;gap:10px}
+.power b{font-size:28px}
+.power .pcl{position:static;margin-left:auto;font-size:15px}
+/* first-time guides */
+.guide{position:absolute;left:226px;bottom:122px;z-index:9;display:flex;align-items:center;gap:10px;padding:8px 14px 8px 12px;border-radius:22px;background:#fff;color:var(--ink);font-size:21px;border:4px solid var(--ink);box-shadow:0 5px 0 var(--ink);animation:gbob 1.1s ease-in-out infinite}
+.guide::after{content:"";position:absolute;right:-13px;top:50%;width:20px;height:20px;margin-top:-10px;background:#fff;border-right:4px solid var(--ink);border-top:4px solid var(--ink);transform:rotate(45deg)}
+.guide .gf{width:38px;height:38px;display:block;transform:rotate(70deg)}
+.guide button{padding:2px 12px;border-radius:12px;background:#e8e0ff;border:3px solid var(--ink);font-size:15px;color:var(--ink)}
+@keyframes gbob{0%,100%{transform:translateX(0)}50%{transform:translateX(10px)}}
+.coach{position:absolute;left:430px;top:268px;z-index:9;display:flex;align-items:center;gap:10px;padding:8px 20px 8px 10px;border-radius:20px;background:#fff;color:var(--ink);font-size:23px;border:4px solid var(--ink);box-shadow:0 5px 0 var(--ink);animation:cbob 1s ease-in-out infinite;pointer-events:none}
+.coach .cf{width:44px;height:44px;display:block;animation:tapf .9s ease-in-out infinite}
+@keyframes cbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes tapf{0%,100%{transform:translateY(0) rotate(-10deg)}50%{transform:translateY(8px) rotate(-10deg)}}
+.tskip{position:absolute;right:26px;bottom:24px;z-index:9}
+/* name entry */
+.nchar{position:absolute;left:130px;top:214px;width:300px;height:375px;z-index:3}
+.bubble.nb{left:420px;top:210px;max-width:230px}
+.npanel{position:absolute;left:660px;top:196px;width:560px;padding:26px 30px 30px;border-radius:30px;border:5px solid var(--ink);text-align:center;z-index:4;
+  background:linear-gradient(180deg,#4a29b8,#25118a);box-shadow:inset 0 4px 0 rgba(255,255,255,.22),0 10px 0 var(--ink),0 24px 40px rgba(0,0,0,.4)}
+.npanel h2{font-size:40px;margin-bottom:18px;--sw:12px}
+.nrow{display:flex;gap:12px;align-items:center;justify-content:center}
+#nameIn{width:340px;height:62px;border-radius:18px;border:4px solid var(--ink);background:#fff;color:var(--ink);font:inherit;font-weight:900;font-size:30px;text-align:center;outline:none;box-shadow:inset 0 4px 0 rgba(0,0,0,.1)}
+#nameIn:focus{box-shadow:0 0 0 5px #ffd23f,inset 0 4px 0 rgba(0,0,0,.1)}
+#nameIn::placeholder{color:#b9aee0}
+.npanel p{margin:12px 0 22px;font-size:19px;color:#cbbcff}
+/* settings */
+.sth{position:absolute;left:100px;top:22px;font-size:44px;--sw:14px}
+.scard{position:absolute;left:190px;right:190px;padding:14px 28px 16px;border-radius:28px;border:5px solid var(--ink);z-index:3;
+  background:linear-gradient(180deg,rgba(66,30,170,.95),rgba(28,12,92,.95));box-shadow:inset 0 4px 0 rgba(255,255,255,.2),0 8px 0 var(--ink)}
+.scard h3{font-size:26px;margin-bottom:6px;color:#ffd23f;--sw:8px}
+.srow{display:flex;align-items:center;gap:14px;height:62px}
+.sl{width:280px;font-size:26px;display:flex;flex-direction:column;line-height:1.1}
+.sl small{font-size:14px;color:#cbbcff;font-weight:700;margin-top:3px;-webkit-text-stroke:0;text-shadow:none}
+.pips{display:flex;gap:6px;flex:1}
+.pips i{flex:1;height:32px;border-radius:9px;background:#2a1a6e;border:3px solid var(--ink);cursor:pointer;transition:transform .08s}
+.pips i.on{background:linear-gradient(180deg,#8cf5b6,#1fc46a);box-shadow:inset 0 3px 0 rgba(255,255,255,.5)}
+.pips i:active{transform:scale(.88)}
+.sv{width:56px;text-align:right;font-size:26px}
+.btn.round.sm{width:46px;height:46px;font-size:30px;padding:0;line-height:1}
+.tgl{position:relative;width:132px;height:46px;border-radius:23px;border:4px solid var(--ink);background:#3a2a8a;display:flex;align-items:center;justify-content:flex-end;padding:0 14px;font-size:20px;transition:background .15s;margin-left:auto}
+.tgl i{position:absolute;left:4px;top:3px;width:30px;height:30px;border-radius:50%;background:#fff;border:3px solid var(--ink);transition:left .15s}
+.tgl.on{background:linear-gradient(180deg,#8cf5b6,#1fc46a);justify-content:flex-start}
+.tgl.on i{left:calc(100% - 38px)}
+.ver2{font-size:26px;color:#ffd23f}.vs2{font-size:15px;color:#cbbcff}
+.sbtns{position:absolute;right:190px;bottom:20px;display:flex;gap:14px;z-index:3}
+/* news */
+.nlist{position:absolute;left:30px;top:106px;width:430px;bottom:30px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:4px 8px 10px 4px;touch-action:pan-y;scrollbar-width:none}
+.nlist::-webkit-scrollbar{display:none}
+.nit{position:relative;text-align:left;padding:10px 16px 12px;border-radius:20px;border:4px solid var(--ink);display:block;flex:none;
+  background:linear-gradient(180deg,rgba(66,30,170,.95),rgba(28,12,92,.95));box-shadow:0 5px 0 var(--ink);transition:transform .07s}
+.nit.sel{background:linear-gradient(180deg,#7b4dff,#4524c8);box-shadow:0 5px 0 var(--ink),0 0 0 4px #ffd23f}
+.nit:active{transform:translateY(4px)}
+.nit b{display:block;font-size:22px;margin-top:6px;line-height:1.25}
+.ntag{display:inline-block;padding:1px 12px;border-radius:10px;border:3px solid var(--ink);font-size:15px}
+.ndt{margin-left:10px;font-size:16px;color:#cbbcff}
+.ndot{position:absolute;right:14px;top:12px;width:16px;height:16px;border-radius:50%;background:var(--red);border:3px solid var(--ink)}
+.nslot{position:absolute;left:490px;right:30px;top:106px;display:flex;gap:14px}
+.evc{position:relative;flex:1;height:178px;padding:14px 18px;border-radius:24px;border:4px solid var(--ink);background:linear-gradient(100deg,#1fd0ff,#2d7bff 70%,#6a3bff);box-shadow:0 6px 0 var(--ink);display:flex;flex-direction:column;gap:4px;overflow:hidden}
+.evc.soon{background:linear-gradient(100deg,#6b5aa8,#3d2f7e);filter:saturate(.7)}
+.evc b{font-size:27px;line-height:1.1}
+.evc small{font-size:16px;font-weight:700}
+.evs{align-self:flex-start;padding:1px 12px;border-radius:10px;background:var(--red);border:3px solid var(--ink);font-size:15px}
+.evc.soon .evs{background:#8a7ad0}
+.evc .btn{position:absolute;right:16px;bottom:20px}
+.evt{margin-top:auto;font-size:15px}
+.ndet{position:absolute;left:490px;right:30px;top:304px;bottom:30px;padding:18px 26px;border-radius:26px;border:4px solid var(--ink);
+  background:linear-gradient(180deg,rgba(66,30,170,.95),rgba(28,12,92,.95));box-shadow:0 6px 0 var(--ink);overflow-y:auto;scrollbar-width:none}
+.ndet h3{font-size:34px;margin:10px 0 8px;--sw:10px;line-height:1.2}
+.ndet p{font-size:22px;line-height:1.7;color:#ece4ff;font-weight:700}
+#s-name{background:#1a0c4d}
+
+.trl{grid-template-columns:1fr 1fr 64px;font-size:12px;white-space:nowrap}
+.trk{grid-template-columns:1fr 1fr 64px}
+.tr-n{font-size:26px}
+.evc .btn,.tskip{top:auto}
+.scard[style*="372px"]{top:386px!important}
 
 </style>
 </head>
@@ -466,6 +559,9 @@ svg{display:block}
   <section class="screen" id="s-gacha"></section>
   <section class="screen" id="s-roster"></section>
   <section class="screen" id="s-match"></section>
+  <section class="screen" id="s-name"></section>
+  <section class="screen" id="s-settings"></section>
+  <section class="screen" id="s-news"></section>
   <nav id="tabbar"></nav>
 
   <div id="reveal">
@@ -534,39 +630,72 @@ const INK='#2a1457';
 
 /* ---------------- save ---------------- */
 const SAVE_KEY='gunyaBaseball.proto.v1';
-const defaults=()=>({gems:3000,coins:1200,pity:0,pulls:0,owned:{p01:1},main:'p01',exp:0,lv:1,wins:0,plays:0,lastLogin:'',mute:false});
-function load(){try{const j=JSON.parse(localStorage.getItem(SAVE_KEY));const d=Object.assign(defaults(),j&&typeof j==='object'?j:{});if(!d.owned||typeof d.owned!=='object')d.owned={p01:1};return d}catch(e){return defaults()}}
+const VERSION='0.2.0';
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const defaults=()=>({gems:0,coins:0,pity:0,pulls:0,owned:{p01:1},main:'p01',exp:0,lv:1,wins:0,plays:0,lastLogin:'',mute:false,
+  name:'',tutDone:false,firstReward:false,guide:true,tour:{stage:0,wins:0,gen:1,titles:0},newsRead:[],
+  musicVol:.6,sfxVol:.8,vibe:true,calm:(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}})()});
+function load(){try{const raw=localStorage.getItem(SAVE_KEY),j=JSON.parse(raw);const d=Object.assign(defaults(),j&&typeof j==='object'?j:{});
+  if(!d.owned||typeof d.owned!=='object')d.owned={p01:1};
+  d.tour=Object.assign({stage:0,wins:0,gen:1,titles:0},d.tour&&typeof d.tour==='object'?d.tour:{});
+  if(!Array.isArray(d.newsRead))d.newsRead=[];
+  // saves made by v0.1 (no tutorial flags): treat as veterans so nothing they own is locked
+  if(j&&typeof j==='object'&&j.tutDone===undefined){const vet=(j.plays>0||j.pulls>0||j.wins>0||Object.keys(d.owned).length>1);d.tutDone=vet;d.firstReward=vet;d.guide=false;if(vet&&!d.name)d.name='ルーキー'}
+  ['musicVol','sfxVol'].forEach(k=>{d[k]=clamp(+d[k]||0,0,1)});return d}catch(e){return defaults()}}
 let S=load();
 function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){}}
-const vib=p=>{try{if(!S.mute&&navigator.vibrate)navigator.vibrate(p)}catch(e){}};
+const vib=p=>{try{if(!S.mute&&S.vibe&&navigator.vibrate)navigator.vibrate(p)}catch(e){}};
 
-/* ---------------- audio (WebAudio synth, no assets) ---------------- */
+/* ---------------- audio (WebAudio synth: SFX bus + music bus, no assets) ---------------- */
 const AU=(()=>{
-  let ctx=null,master=null,nbuf=null;
+  let ctx=null,master=null,sfxBus=null,musBus=null,nbuf=null,duck=1,pend=null,timer=null,cur=null,step=0,next=0;
   const hz=m=>440*Math.pow(2,(m-69)/12);
+  const apply=()=>{if(!ctx)return;const t=ctx.currentTime;sfxBus.gain.setTargetAtTime(S.mute?0:S.sfxVol,t,.02);musBus.gain.setTargetAtTime(S.mute?0:S.musicVol*.85*duck,t,.1)};
   const init=()=>{if(ctx){if(ctx.state==='suspended')ctx.resume();return}
     try{const C=window.AudioContext||window.webkitAudioContext;ctx=new C();master=ctx.createGain();master.gain.value=.6;
       const comp=ctx.createDynamicsCompressor();master.connect(comp);comp.connect(ctx.destination);
-      const len=Math.floor(ctx.sampleRate*1.5);nbuf=ctx.createBuffer(1,len,ctx.sampleRate);const d=nbuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1}catch(e){ctx=null}};
+      sfxBus=ctx.createGain();musBus=ctx.createGain();sfxBus.connect(master);musBus.connect(master);
+      const len=Math.floor(ctx.sampleRate*1.5);nbuf=ctx.createBuffer(1,len,ctx.sampleRate);const d=nbuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;
+      apply();if(pend)bgmPlay(pend,true)}catch(e){ctx=null}};
   const ok=()=>ctx&&!S.mute;
-  const tone=(f,d=.15,type='sine',v=.2,slide=1,delay=0)=>{if(!ok())return;const t=ctx.currentTime+delay;const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
+  const tone=(f,d=.15,type='sine',v=.2,slide=1,delay=0,bus=null)=>{if(!ok())return;const t=ctx.currentTime+delay;const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
     if(slide!==1)o.frequency.exponentialRampToValueAtTime(Math.max(30,f*slide),t+d);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+d);
-    o.connect(g);g.connect(master);o.start(t);o.stop(t+d+.03)};
-  const noise=(d=.2,v=.2,f=1200,type='highpass',delay=0,f2=0)=>{if(!ok())return;const t=ctx.currentTime+delay;const s=ctx.createBufferSource();s.buffer=nbuf;const fl=ctx.createBiquadFilter();fl.type=type;
+    o.connect(g);g.connect(bus||sfxBus);o.start(t);o.stop(t+d+.03)};
+  const noise=(d=.2,v=.2,f=1200,type='highpass',delay=0,f2=0,bus=null)=>{if(!ok())return;const t=ctx.currentTime+delay;const s=ctx.createBufferSource();s.buffer=nbuf;const fl=ctx.createBiquadFilter();fl.type=type;
     fl.frequency.setValueAtTime(f,t);if(f2)fl.frequency.exponentialRampToValueAtTime(f2,t+d);const g=ctx.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+d);
-    s.connect(fl);fl.connect(g);g.connect(master);s.start(t,Math.random()*.4);s.stop(t+d+.03)};
+    s.connect(fl);fl.connect(g);g.connect(bus||sfxBus);s.start(t,Math.random()*.4);s.stop(t+d+.03)};
+  /* ---- music: two tiny generative loops (title = bouncy, home = mellow) ---- */
+  const TR={
+    title:{bpm:132,drive:true,ch:[[60,64,67],[55,59,62],[57,60,64],[53,57,60]],bass:[1,0,0,1,0,1,0,0],
+      mel:[76,0,79,0,81,0,79,76, 74,0,76,0,79,0,0,0, 81,0,84,0,81,0,79,0, 76,0,74,76,72,0,0,0]},
+    home:{bpm:96,drive:false,ch:[[57,60,64],[53,57,60],[60,64,67],[55,59,62]],bass:[1,0,0,0,0,1,0,0],
+      mel:[0,0,72,0,76,0,0,0, 0,0,74,0,72,0,69,0, 0,0,76,0,79,0,0,0, 79,0,76,0,74,0,0,0]}};
+  const sched=(tr,s,dl)=>{const ch=tr.ch[Math.floor(s/8)%4],b=s%8,m=tr.mel[s];
+    if(tr.bass[b])tone(hz(ch[0]-24),.22,'triangle',.3,1,dl,musBus);
+    if(tr.drive){if(b===2||b===6)ch.forEach(n=>tone(hz(n),.1,'square',.03,1,dl,musBus));
+      if(s%4===0)tone(130,.12,'sine',.38,.3,dl,musBus);if(s%8===4)noise(.1,.1,1800,'bandpass',dl,0,musBus);if(s%2===0)noise(.04,.035,7000,'highpass',dl,0,musBus)}
+    else{if(b===0)ch.forEach(n=>tone(hz(n),.9,'sine',.04,1,dl,musBus));if(s%16===0)tone(110,.2,'sine',.3,.4,dl,musBus);if(s%4===2)noise(.03,.022,8000,'highpass',dl,0,musBus)}
+    if(m)tone(hz(m),tr.drive?.14:.24,tr.drive?'square':'triangle',tr.drive?.04:.07,1,dl,musBus)};
+  const bgmPlay=(n,force)=>{pend=n;if(!ctx)return;if(cur===n&&!force)return;clearInterval(timer);cur=n;if(!n)return;const tr=TR[n],dur=60/tr.bpm/4;step=0;next=ctx.currentTime+.08;
+    timer=setInterval(()=>{if(!ctx||ctx.state!=='running')return;while(next<ctx.currentTime+.3){if(next>=ctx.currentTime-.05)sched(tr,step,Math.max(0,next-ctx.currentTime));next+=dur;step=(step+1)%32}},90)};
+  const setDuck=on=>{duck=on?0:1;apply()};
   const sfx={
     tap(){tone(900,.07,'triangle',.16,1.4)},
     ok(){tone(660,.09,'triangle',.18);tone(990,.14,'triangle',.18,1,.07)},
     back(){tone(520,.1,'triangle',.16,.7)},
+    toggle(on){tone(on?760:520,.08,'square',.07);tone(on?1020:380,.1,'triangle',.12,1,.06)},
     coin(){tone(1318,.08,'square',.06);tone(1760,.18,'square',.06,1,.07)},
     wipe(){noise(.4,.16,400,'bandpass',0,3200)},
     poke(){tone(300,.16,'sine',.25,2.2);tone(620,.12,'triangle',.1,1.5,.03)},
+    count(i){tone(980+i*130,.07,'square',.09);tone(1470+i*195,.1,'triangle',.07,1,.05)},   // pitch counter
+    tick(){tone(1700,.035,'sine',.1)},                                                        // timing metronome
     drop(){tone(150,.32,'sine',.6,.35);noise(.12,.25,320,'lowpass')},
     step(i){tone(hz(60+i*3),.26,'sawtooth',.06,1.5);tone(hz(72+i*4),.3,'triangle',.13);noise(.22,.08,1500+i*500,'bandpass',0,6000)},
     rise(d){tone(180,d,'sawtooth',.05,8);noise(d,.07,300,'bandpass',0,5000)},
     crack(){noise(.2,.5,2500,'highpass');tone(90,.22,'square',.2,.4)},
     burst(){noise(.8,.55,5000,'lowpass',0,200);tone(110,.7,'sawtooth',.18,.3)},
+    rare(r){if(r<4)return;[84,88,91,96].forEach((m,i)=>tone(hz(m+(r>=6?i:0)),.5,'sine',.1,1,i*.07));tone(55,.9,'sine',.55,.5);if(r>=5){noise(1.2,.2,600,'bandpass',.1,6000);[72,79,84,91].forEach(m=>tone(hz(m),1.4,'triangle',.07,1,.3))}
+      if(r>=6){for(let i=0;i<14;i++)tone(hz(96+i*2),.12,'sine',.07,1,.4+i*.06)}},
     bolt(){noise(.14,.4,3000,'highpass');tone(70,.3,'sawtooth',.22,.5)},
     glitch(){for(let i=0;i<7;i++)tone(rand(120,1800),.05,'square',.07,1,i*.045)},
     star(i){tone(hz(72+[0,2,4,7,9][i%5]),.22,'triangle',.2);tone(hz(84+[0,2,4,7,9][i%5]),.18,'sine',.08)},
@@ -574,7 +703,8 @@ const AU=(()=>{
       seq.forEach((m,i)=>{const d=i*(r>=5?.075:.1);tone(hz(m),.32,'triangle',.17,1,d);tone(hz(m)*2,.25,'sine',.06,1,d)});
       if(r>=4){[60,64,67].forEach(m=>tone(hz(m),.9,'sawtooth',.05,1,.15))}
       if(r>=5){noise(1.6,.18,2000,'highpass',.1);[72,76,79,84].forEach(m=>tone(hz(m),1.2,'square',.04,1,.5))}},
-    hit(k){noise(.09,.6,2500,'highpass');tone(k==='hr'?210:140,.15,'square',.25,.4);if(k==='hr')noise(.6,.2,1200,'bandpass',.05,300)},
+    hit(k){noise(.07,.7,2800,'highpass');tone(k==='hr'?190:150,.16,'square',.28,.4);tone(900,.05,'triangle',.2,.5);       // bat crack
+      if(k==='hr'){noise(.7,.22,1400,'bandpass',.04,260);tone(80,.5,'sine',.5,.4,.02);[.12,.24].forEach(d=>noise(.1,.1,2400,'highpass',d))}},
     swing(){noise(.18,.22,600,'bandpass',0,2600)},
     whiff(){noise(.24,.2,900,'bandpass',0,350)},
     pitch(){noise(.36,.12,500,'bandpass',0,1800)},
@@ -583,7 +713,7 @@ const AU=(()=>{
     lose(){[67,64,60,55].forEach((m,i)=>tone(hz(m),.3,'triangle',.16,1,i*.16))},
     ball(){tone(220,.1,'square',.1,1.5)}
   };
-  return{init,sfx,get ctx(){return ctx}};
+  return{init,apply,sfx,bgm:{play:bgmPlay,duck:setDuck},suspend(){if(ctx&&ctx.state==='running')ctx.suspend()},resume(){if(ctx&&ctx.state==='suspended')ctx.resume()},get ctx(){return ctx}};
 })();
 const SFX=new Proxy({},{get:(_,k)=>(...a)=>{try{AU.sfx[k](...a)}catch(e){}}});
 
@@ -602,6 +732,9 @@ const IC={
   back:`<svg viewBox="0 0 48 48" style="width:34px;height:34px"><path d="M30 8 14 24l16 16" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M30 8 14 24l16 16" fill="none" stroke="${INK}" stroke-width="0"/></svg>`,
   gear:`<svg viewBox="0 0 48 48" style="width:32px;height:32px"><circle cx="24" cy="24" r="8" fill="none" stroke="#fff" stroke-width="6"/><path d="M24 4v8M24 36v8M4 24h8M36 24h8M10 10l6 6M32 32l6 6M38 10l-6 6M16 32l-6 6" stroke="#fff" stroke-width="6" stroke-linecap="round"/></svg>`,
   close:`<svg viewBox="0 0 48 48" style="width:30px;height:30px"><path d="M10 10l28 28M38 10 10 38" stroke="#fff" stroke-width="8" stroke-linecap="round"/></svg>`,
+  news:`<svg viewBox="0 0 48 48"><path d="M7 19h9l19-11v32L16 29H7z" fill="#ffd23f" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/><path d="M14 29l3 12h7l-3-12" fill="#ffa51f" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/><path d="M40 17c3 3 3 11 0 14" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></svg>`,
+  finger:`<svg viewBox="0 0 48 48"><path d="M19 4c3 0 5 2 5 5v15l4-1c2-.5 4 .5 4.5 2l3-.5c2-.3 4 .8 4.5 2.5l1.5-.3c2 0 3.5 1.7 3.5 4v5c0 7-5 13-12 13H24c-5 0-9-3-11-7L8 31c-1-2 0-4 2-4 1.5 0 3 1 4 2.5l1 1.5V9c0-3 2-5 4-5z" fill="#fff" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/></svg>`,
+  trophy:`<svg viewBox="0 0 48 48"><path d="M13 5h22v13c0 7-5 12-11 12S13 25 13 18z" fill="#ffd23f" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/><path d="M13 9H6c0 8 3 12 8 13M35 9h7c0 8-3 12-8 13" fill="none" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/><rect x="20" y="30" width="8" height="7" fill="#ffa51f" stroke="${INK}" stroke-width="3"/><rect x="13" y="37" width="22" height="6" rx="2" fill="#ffa51f" stroke="${INK}" stroke-width="3.5"/></svg>`,
   star:`<svg viewBox="0 0 48 48"><path d="M24 3l6.2 13.4 14.4 1.8-10.6 10 2.8 14.4L24 35.4 11.2 42.6 14 28.2 3.4 18.2l14.4-1.8z" fill="#ffd23f" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/></svg>`
 };
 
@@ -658,6 +791,17 @@ function pullOne(){
 }
 const pityLeft=()=>PITY-S.pity;
 function addExp(n){S.exp+=n;let need=100+S.lv*50;while(S.exp>=need){S.exp-=need;S.lv++;need=100+S.lv*50}}
+
+/* ---------------- tour: 地方予選3勝 -> 甲子園3勝 -> 全国制覇 -> 世代交代 ---------------- */
+const STAGES=[
+  {n:'地方予選',rounds:['1回戦','2回戦','決勝'],base:[4,4,5],opp:['ぐにゃ高校','ふにゃ商業','ぽよぽよ学園','ぷるぷる工業','にゃんにゃん女子']},
+  {n:'甲子園',rounds:['1回戦','準決勝','決勝'],base:[5,6,6],opp:['ぐにゃ学園','怪物 ぷにゃ高','ぐにゃ神宮の覇者','虹ヶ丘 ぐにゃ館']}];
+const genBonus=()=>Math.min(24,(S.tour.gen-1)*3);
+function tourNext(){const t=S.tour,st=STAGES[t.stage];return{stage:st.n,round:st.rounds[t.wins],target:st.base[t.wins]+Math.min(3,t.gen-1),restKoshien:t.stage===0?3-t.wins:0,restTitle:(t.stage===0?3:0)+3-t.wins}}
+function oppFor(tn){const st=STAGES[S.tour.stage],look=OPP[(S.tour.wins+S.tour.stage*2)%OPP.length];
+  return Object.assign({},look,{n:st.opp[(S.tour.wins*2+S.tour.gen+S.tour.stage)%st.opp.length],acc:S.tour.stage?[...look.acc,'shades']:look.acc})}
+function tourWin(){const t=S.tour;t.wins++;if(t.wins<3)return'round';if(t.stage===0){t.stage=1;t.wins=0;return'koshien'}
+  t.stage=0;t.wins=0;t.gen++;t.titles++;return'champion'}
 
 /* =====================================================================
    Ragdoll character: SVG parts + spring physics (noodle arms / lagging head)
@@ -855,12 +999,15 @@ function modal({title,html,buttons=[],cls=''}){const m=$('#modal');m._b=buttons;
   m.innerHTML=`<div class="mbox ${cls}"><h3 class="ol">${title}</h3><div class="mb">${html}</div><div class="mbtn">${buttons.map((b,i)=>`<button class="btn ${b.c||'violet'}" data-mb="${i}">${b.t}${b.shine?'<i class="sh"></i>':''}</button>`).join('')}</div></div>`;m.classList.add('on')}
 function closeModal(){const m=$('#modal');m.classList.remove('on');m.innerHTML=''}
 
-let busy=false,cur='title';
+let busy=false,cur='title',PREV='home';
+const BGM_MAP={title:'title',name:'title',home:'home',gacha:'home',roster:'home',news:'home',match:null};
+const syncBgm=()=>{if(cur in BGM_MAP)AU.bgm.play(BGM_MAP[cur])};
 const SCREENS={};
 function showScreen(id){cur=id;if(id!=='match'&&M.on){M.on=false;M.tk++}$$('.screen').forEach(s=>s.classList.toggle('on',s.id==='s-'+id));
   const tb=$('#tabbar'),showTab=['home','gacha','roster'].includes(id);tb.classList.toggle('on',showTab);if(showTab)renderTabs(id);
-  if(SCREENS[id])SCREENS[id]()}
-async function go(id,after){if(busy)return;busy=true;const w=$('#wipe');w.className='in';SFX.wipe();await sleepRaw(440);showScreen(id);if(after)after();w.className='out';await sleepRaw(480);w.className='';busy=false}
+  syncBgm();if(SCREENS[id])SCREENS[id]()}
+async function go(id,after){if(busy)return;if(!S.tutDone&&['home','gacha','roster','news'].includes(id))id=(S.name?'match':'name');
+  if((id==='settings'||id==='news')&&cur!==id)PREV=cur;busy=true;const w=$('#wipe');w.className='in';SFX.wipe();await sleepRaw(440);showScreen(id);if(after)after();w.className='out';await sleepRaw(480);w.className='';busy=false}
 
 function renderTabs(active){$('#tabbar').innerHTML=`
   <button class="tab ${active==='home'?'on':''}" data-act="tab" data-to="home">${IC.home}<span>ホーム</span></button>
@@ -873,7 +1020,7 @@ function renderTabs(active){$('#tabbar').innerHTML=`
 const expPct=()=>clamp(S.exp/(100+S.lv*50)*100,0,100);
 const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
 function hdr(back){const d=mainDef();return`<div class="hdr">${back?`<button class="btn round violet" data-act="back">${IC.back}</button>`
-  :`<div class="pbadge"><div class="pav"><div class="pc" data-cid="${d.id}"></div></div><div class="pinfo"><div class="plv ol">Lv.<span class="v-lv">${S.lv}</span> <small>ルーキー</small></div><div class="pbar"><i class="v-exp" style="width:${expPct()}%"></i></div></div></div>`}
+  :`<div class="pbadge"><div class="pav"><div class="pc" data-cid="${d.id}"></div></div><div class="pinfo"><div class="plv ol">Lv.<span class="v-lv">${S.lv}</span> <small>${esc(S.name||'ルーキー')}</small></div><div class="pbar"><i class="v-exp" style="width:${expPct()}%"></i></div></div></div>`}
   <div class="grow"></div>
   <div class="cur">${IC.coin.replace('<svg','<svg class="ic"')}<b class="ol v-coins">${fmt(S.coins)}</b><button class="plus" data-act="toast" data-msg="コインは試合でもらえるよ!">+</button></div>
   <div class="cur">${IC.gem.replace('<svg','<svg class="ic"')}<b class="ol v-gems">${fmt(S.gems)}</b><button class="plus" data-act="freegems">+</button></div>
@@ -904,7 +1051,7 @@ const BG_ROSTER={k:'r',sky:['#1b0f6e','#3b25c4','#5f7bff','#9fd0ff'],sun:'#e8f4f
 
 /* ---------------- TITLE ---------------- */
 SCREENS.title=function renderTitle(){
-  const root=$('#s-title');root.dataset.act='start';
+  const root=$('#s-title');
   root.innerHTML=`<div class="rays"></div>
   <svg class="tsvg" viewBox="0 0 1280 720" preserveAspectRatio="none"><defs><radialGradient id="tsun"><stop offset="0" stop-color="#fff6c8" stop-opacity=".9"/><stop offset=".5" stop-color="#ffd0f0" stop-opacity=".3"/><stop offset="1" stop-color="#ff80d0" stop-opacity="0"/></radialGradient>
    <pattern id="tcrowd" width="16" height="14" patternUnits="userSpaceOnUse"><circle cx="4" cy="5" r="3" fill="#ff9ad0"/><circle cx="12" cy="9" r="3" fill="#ffe27a"/><circle cx="12" cy="2" r="2" fill="#7fe8ff"/></pattern>
@@ -917,7 +1064,7 @@ SCREENS.title=function renderTitle(){
   <div class="logo"><div class="logo-l1">${'ぐにゃぐにゃ'.split('').map((c,i)=>`<span class="lg" style="--i:${i}"><i class="lw">${c}</i><i class="lo">${c}</i><i class="lf">${c}</i></span>`).join('')}</div><div class="lg2"><span>ベースボール</span></div></div>
   <div class="tch" style="left:60px;width:270px;height:340px" id="tcL"></div><div class="tch" style="right:60px;width:270px;height:340px" id="tcR"></div>
   <div class="tstart"><div class="pulse"><button class="btn gold xl" data-act="start">はじめる<i class="sh"></i></button></div><div class="tap ol">TAP TO START</div></div>
-  <div class="ver">PROTOTYPE v0.1</div>`;
+  <div class="ver">PROTOTYPE v${VERSION}</div><button class="btn round violet tgear" data-act="settings">${IC.gear}</button>`;
   const fl=$('#floaties');const shapes=[`<svg width="30" height="30" viewBox="0 0 48 48"><path d="M24 3l6.2 13.4 14.4 1.8-10.6 10 2.8 14.4L24 35.4 11.2 42.6 14 28.2 3.4 18.2l14.4-1.8z" fill="#ffe36a" stroke="${INK}" stroke-width="4"/></svg>`,
     `<svg width="34" height="34" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#fff" stroke="${INK}" stroke-width="5"/><path d="M14 12q14 20 0 40M50 12q-14 20 0 40" fill="none" stroke="#ff4b6e" stroke-width="4"/></svg>`,
     `<svg width="26" height="26" viewBox="0 0 48 48"><path d="M24 3 45 24 24 45 3 24z" fill="#7ff2ff" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/></svg>`];
@@ -926,6 +1073,20 @@ SCREENS.title=function renderTitle(){
 };
 
 /* ---------------- HOME ---------------- */
+function tourPlateHTML(){const t=S.tour,tn=tourNext(),pip=seg=>[0,1,2].map(i=>{let c='pip';if(t.stage>seg||(t.stage===seg&&i<t.wins))c+=' on';else if(t.stage===seg&&i===t.wins)c+=' now';return`<i class="${c}"></i>`}).join('');
+  const rest=t.stage===0?`甲子園まで あと ${3-t.wins}勝`:`全国制覇まで あと ${3-t.wins}勝`;
+  return`<div class="tour"><div class="tr-h"><span>第${t.gen}世代${t.titles?` ・ 優勝${t.titles}回`:''}</span><span>次の試合</span></div>
+  <div class="tr-n ol ol4">${tn.stage} ${tn.round}</div>
+  <div class="trk"><div class="seg">${pip(0)}</div><div class="seg">${pip(1)}</div><div class="tro">${IC.trophy}</div></div>
+  <div class="trl"><span>地方予選</span><span>甲子園</span><span>全国制覇</span></div><div class="tr-s ol ol4">${rest}</div></div>`}
+const NEWS=[
+  {id:'n4',tag:'イベント',col:'#ff4fa3',date:'11/03',title:'ホームランダービー 開催中!',body:'5球勝負で、ぴったりタイミングを ねらってホームラン!\n大会ツアー(地方予選3勝→甲子園3勝)を勝ち進んで、全国制覇を めざそう。優勝すると世代交代ボーナスがもらえるよ。'},
+  {id:'n3',tag:'アップデート',col:'#46e38c',date:'11/03',title:'v0.2.0 大会モード・BGM・設定を追加',body:'・はじめての打席と名前入力\n・大会ツアーと世代交代\n・BGMと効果音の音量を別々に調整できる設定画面\n・お知らせ画面'},
+  {id:'n2',tag:'ガチャ',col:'#42e6ff',date:'11/03',title:'提供割合と天井について',body:'SECRET 0.01% / ★5 1% / ★4 3% / ★3 12% / ★2 35% / ★1 48.99%。\n同じレア度の中は すべて同じ確率です。50連目までに★4以上が出なければ、50連目で★4以上が確定します。'},
+  {id:'n1',tag:'お知らせ',col:'#b866ff',date:'11/01',title:'ぐにゃぐにゃベースボール へようこそ',body:'このゲームはプロトタイプです。課金要素はありません。\nセーブはこの端末のブラウザに保存されます。'}];
+const EVENTS=[{title:'ホームランダービー',sub:'開催中',cta:true,desc:'毎週日曜 23:59 まで。5球でホームランを狙え!'},{title:'ぐにゃぐにゃ 秋祭り',sub:'もうすぐ',cta:false,desc:'次のイベントは じゅんび中です。おたのしみに!'}];
+const unreadCount=()=>NEWS.filter(n=>!S.newsRead.includes(n.id)).length;
+
 const HOME_LINES=['今日も ぐにゃっと いこうぜ!','ガチャ、引いてく?','試合で ホームラン ねらうよ!','つんつん しないでよ〜','ぐにゃぐにゃ〜'];
 function eventEnd(){const d=new Date(),e=new Date(d.getFullYear(),d.getMonth(),d.getDate()+((7-d.getDay())%7),23,59,59);if(e<=d)e.setDate(e.getDate()+7);return e}
 function evText(){let ms=Math.max(0,eventEnd()-new Date());const dd=Math.floor(ms/864e5);ms-=dd*864e5;const h=Math.floor(ms/36e5);ms-=h*36e5;const m=Math.floor(ms/6e4);ms-=m*6e4;const s=Math.floor(ms/1e3);
@@ -935,27 +1096,28 @@ SCREENS.home=function renderHome(){
   root.innerHTML=`${bgSVG(BG_HOME)}<div class="hrays"></div>${hdr()}
   <div class="bandrow">
     <button class="ban b1" data-act="tab" data-to="gacha"><span class="tag">開催中</span><div class="bart"><div class="pc" data-cid="p16"></div></div><div class="bt"><b class="ol">ぐにゃ球場ガチャ</b><small>★5 1% ・ 50連で★4以上確定</small></div><i class="sh"></i></button>
-    <button class="ban b2" data-act="match"><span class="tag">イベント</span><div class="bart"><div class="pc" data-cid="p10"></div></div><div class="bt"><b class="ol">ホームランダービー</b><small>終了まで <span id="evT">${evText()}</span></small></div><i class="sh"></i></button>
+    <button class="ban b2" data-act="match"><span class="tag">イベント</span><div class="bart"><div class="pc" data-cid="p10"></div></div><div class="bt"><b class="ol">ホームランダービー</b><small>終了まで <span class="evT">${evText()}</span></small></div><i class="sh"></i></button>
     <button class="ban b3" data-act="toast" data-msg="デイリーミッションは準備中です"><span class="tag">毎日</span><div class="bart"><div class="pc" data-cid="p07"></div></div><div class="bt"><b class="ol">デイリーミッション</b><small>クリアで ジェムが もらえる</small></div><i class="sh"></i></button>
   </div>
   <div class="tools">
-    <button class="tool ol" data-act="toast" data-msg="ミッションは準備中です"><div class="tb">${IC.list}<i class="dot">3</i></div>ミッション</button>
+    <button class="tool ol" data-act="news"><div class="tb">${IC.news}${unreadCount()?`<i class="dot">${unreadCount()}</i>`:''}</div>お知らせ</button>
+    <button class="tool ol" data-act="toast" data-msg="ミッションは準備中です"><div class="tb">${IC.list}</div>ミッション</button>
     <button class="tool ol" data-act="toast" data-msg="プレゼントボックスは からっぽ!"><div class="tb">${IC.gift}</div>プレゼント</button>
-    <button class="tool ol" data-act="toast" data-msg="ランキングは準備中です"><div class="tb">${IC.crown}</div>ランキング</button>
   </div>
   <div class="ped"><i></i><b></b><u></u></div>
   <div class="hchar" data-act="hpoke"><div class="pc" data-cid="${d.id}"></div></div>
   <div class="bubble" id="bubble">${d.line}</div>
   <div class="nameplate"><div class="np-s ol ol4" style="color:${RAR[d.r].col}">${starsTxt(d.r)}　<span style="color:#cbbcff;font-size:.8em">${d.role}</span></div><div class="np-n ol ol4">${d.n}</div></div>
-  <div class="power"><small>チームパワー</small><b class="ol v-power">${fmt(teamPower())}</b><div class="pcl">所持選手 ${Object.keys(S.owned).filter(i=>BYID[i]).length}/${ROSTER.length}</div></div>
-  <div class="vs ol">今日の相手　ぐにゃ高校</div>
+  ${tourPlateHTML()}
+  <div class="power"><small>チームパワー</small><b class="ol v-power">${fmt(teamPower())}</b><div class="pcl">所持 ${Object.keys(S.owned).filter(i=>BYID[i]).length}/${ROSTER.length}</div></div>
   <div class="matchbtn"><div class="halo2"></div><div class="pulse"><button class="btn gold" data-act="match">試合<small class="ol ol4">5球勝負!</small><i class="sh"></i></button></div></div>
-  <div class="ticker"><div>◆ ぐにゃ球場ガチャ 開催中!　◆ 試合に勝つとジェムがもらえるよ　◆ 選手をタップすると…ぐにゃっ!</div></div>`;
+  <div class="ticker" data-act="news"><div>◆ ぐにゃ球場ガチャ 開催中!　◆ 試合に勝つとジェムがもらえるよ　◆ 選手をタップすると…ぐにゃっ!</div></div>`;
+  if(S.guide&&S.pulls===0)root.insertAdjacentHTML('beforeend',`<div class="guide"><i class="gf">${IC.finger}</i><span>ガチャで 選手を スカウトしよう!</span><button data-act="guideoff">とばす</button></div>`);
   mountChars(root,'idle');
   const hc=$('.hchar .pc',root);if(hc&&hc._g){hc._g.setPose('cheer');setTimeout(()=>hc._g&&hc._g.setPose('idle'),1100)}
   setTimeout(maybeLogin,900);
 };
-function maybeLogin(){if(cur!=='home'||S.lastLogin===todayStr()||$('#modal').classList.contains('on'))return;S.lastLogin=todayStr();S.gems+=500;S.coins+=300;save();
+function maybeLogin(){if(cur!=='home'||!S.tutDone||S.lastLogin===todayStr()||$('#modal').classList.contains('on'))return;S.lastLogin=todayStr();S.gems+=500;S.coins+=300;save();
   modal({title:'ログインボーナス!',html:`<div class="reward"><div>${IC.gem}<b class="ol">+500</b></div><div>${IC.coin}<b class="ol">+300</b></div></div><p style="margin-top:14px">今日も ぐにゃっと がんばろう!</p>`,buttons:[{t:'うけとる',c:'gold',shine:1,fn:()=>{refreshHUD();SFX.coin();confetti(60,{x:640,y:300,power:700,spread:Math.PI*.9,angle:-Math.PI/2})}}]});SFX.fanfare(3)}
 
 /* ---------------- GACHA ---------------- */
@@ -1000,9 +1162,46 @@ function charDetail(id){const d=BYID[id];if(!d||!S.owned[id])return;const n=S.ow
   mountChars($('#modal'),'cheer')}
 
 /* ---------------- settings / rates / free gems ---------------- */
-function openSettings(){modal({title:'メニュー',html:`<p>サウンド: <b>${S.mute?'OFF':'ON'}</b></p><p style="font-size:20px;color:#cbbcff;margin-top:6px">セーブはこの端末のブラウザに保存されます。課金要素はありません。</p>`,
-  buttons:[{t:S.mute?'サウンド ON':'サウンド OFF',c:'cyan',fn:()=>{S.mute=!S.mute;save();toast(S.mute?'サウンド OFF':'サウンド ON')}},{t:'データ初期化',c:'dark',fn:()=>confirmReset()},{t:'とじる',c:'violet'}]})}
-function confirmReset(){modal({title:'データを初期化?',html:'選手・ジェム・進行がすべて消えます。',buttons:[{t:'やめる',c:'violet'},{t:'初期化する',c:'pink',fn:()=>{S=defaults();save();refreshHUD();go('title')}}]})}
+/* ---------------- NAME ---------------- */
+const NAMES=['ぐにゃ太','ポヨ吉','ぷにお','ふにゃ子','バット丸','ぷるる','ホームラン君','ころりん'];
+SCREENS.name=function renderName(){
+  const root=$('#s-name');
+  root.innerHTML=`${bgSVG(BG_HOME)}<div class="hrays"></div>
+  <div class="nchar"><div class="pc" data-cid="p01"></div></div><div class="bubble nb">はじめまして! きみの なまえは?</div>
+  <div class="npanel"><h2 class="ol">なまえを おしえてね!</h2>
+    <div class="nrow"><input id="nameIn" maxlength="8" autocomplete="off" spellcheck="false" placeholder="${esc(pick(NAMES))}" value="${esc(S.name||'')}"><button class="btn sm cyan" data-act="namerand">おまかせ</button></div>
+    <p>8もじまで。あとで かえられないよ</p>
+    <div class="pulse"><button class="btn gold" data-act="nameok">けってい!<i class="sh"></i></button></div></div>`;
+  mountChars(root,'cheer');
+};
+function submitName(){const v=($('#nameIn').value||'').trim().slice(0,8)||'ルーキー';S.name=v;save();SFX.ok();go('match')}
+
+/* ---------------- SETTINGS ---------------- */
+SCREENS.settings=function renderSettings(){
+  const root=$('#s-settings');
+  const pips=k=>`<div class="pips">${Array.from({length:10},(_,i)=>`<i class="${i<Math.round(S[k]*10)?'on':''}" data-act="vol" data-k="${k}" data-v="${(i+1)/10}"></i>`).join('')}</div>`;
+  const vrow=(label,k)=>`<div class="srow"><span class="sl ol ol4">${label}</span><button class="btn round sm violet" data-act="volstep" data-k="${k}" data-d="-0.1">−</button>${pips(k)}<button class="btn round sm violet" data-act="volstep" data-k="${k}" data-d="0.1">＋</button><b class="sv ol ol4">${Math.round(S[k]*100)}</b></div>`;
+  const trow=(label,k,sub)=>`<div class="srow"><span class="sl ol ol4">${label}${sub?`<small>${sub}</small>`:''}</span><button class="tgl ${S[k]?'on':''}" data-act="tog" data-k="${k}"><i></i><span>${S[k]?'ON':'OFF'}</span></button></div>`;
+  root.innerHTML=`${bgSVG(BG_ROSTER)}<div class="hdr"><button class="btn round violet" data-act="back">${IC.back}</button><h2 class="ol sth">設定</h2></div>
+  <div class="scard" style="top:110px"><h3 class="ol ol4">サウンド</h3>${vrow('音楽','musicVol')}${vrow('効果音','sfxVol')}${trow('ミュート','mute','ぜんぶの音を消す')}</div>
+  <div class="scard" style="top:372px"><h3 class="ol ol4">そのほか</h3>${trow('振動','vibe','スマホのブルブル')}${trow('画面シェイク軽減','calm','ゆれ演出をやさしく')}
+    <div class="srow"><span class="sl ol ol4">バージョン</span><b class="ver2">v${VERSION}</b><small class="vs2">PROTOTYPE ・ ぐにゃぐにゃベースボール</small></div></div>
+  <div class="sbtns"><button class="btn sm cyan" data-act="news">お知らせ</button><button class="btn sm dark" data-act="reset">データ初期化</button></div>`;
+};
+
+/* ---------------- NEWS ---------------- */
+let newsSel=null;
+SCREENS.news=function renderNews(){
+  const root=$('#s-news');if(!newsSel)newsSel=NEWS[0].id;
+  if(!S.newsRead.includes(newsSel)){S.newsRead.push(newsSel);save()}
+  const n=NEWS.find(x=>x.id===newsSel)||NEWS[0];
+  root.innerHTML=`${bgSVG(BG_ROSTER)}<div class="hdr"><button class="btn round violet" data-act="back">${IC.back}</button><h2 class="ol sth">お知らせ</h2></div>
+  <div class="nlist">${NEWS.map(x=>`<button class="nit ${x.id===newsSel?'sel':''}" data-act="newsitem" data-id="${x.id}"><span class="ntag" style="background:${x.col}">${x.tag}</span><span class="ndt">${x.date}</span>${S.newsRead.includes(x.id)?'':'<i class="ndot"></i>'}<b>${x.title}</b></button>`).join('')}</div>
+  <div class="nslot">${EVENTS.map((e,i)=>`<div class="evc ${i?'soon':''}"><span class="evs">${e.sub}</span><b class="ol ol4">${e.title}</b><small>${e.desc}</small>${e.cta?`<span class="evt">終了まで <span class="evT">${evText()}</span></span><button class="btn sm gold" data-act="match">試合へ<i class="sh"></i></button>`:''}</div>`).join('')}</div>
+  <div class="ndet"><span class="ntag" style="background:${n.col}">${n.tag}</span><span class="ndt">${n.date}</span><h3 class="ol ol4">${n.title}</h3><p>${n.body.replace(/\n/g,'<br>')}</p></div>`;
+};
+
+function confirmReset(){modal({title:'データを初期化?',html:'選手・ジェム・進行がすべて消えます。',buttons:[{t:'やめる',c:'violet'},{t:'初期化する',c:'pink',fn:()=>{S=defaults();save();AU.apply();newsSel=null;go('title')}}]})}
 function openRates(){modal({title:'提供割合',cls:'rates',html:`<table class="rtab">${[6,5,4,3,2,1].map(r=>`<tr class="r${r}"><td><b style="color:${RAR[r].col}" class="ol ol4">${RAR[r].label}</b></td><td>${RAR[r].rate}%　<small style="color:#cbbcff">(${ROSTER.filter(c=>c.r===r).length}人)</small></td><td><button class="btn violet" data-act="preview" data-r="${r}">演出を見る</button></td></tr>`).join('')}</table>
   <p style="font-size:19px;color:#d8ccff;margin-top:6px;line-height:1.5">同じレア度の中は すべて 同じ確率。<br>${PITY}連目までに ★4以上が出なければ、${PITY}連目で ★4以上が 確定します。</p>`,buttons:[{t:'とじる',c:'violet'}]})}
 function openFreeGems(){modal({title:'ジェム ほじゅう',html:`このプロトタイプに 課金は ありません。<br>テスト用に 無料でジェムを補給できます。<div class="reward">${IC.gem}<b class="ol">+3,000</b></div>`,buttons:[{t:'とじる',c:'violet'},{t:'もらう',c:'gold',shine:1,fn:()=>{S.gems+=3000;save();refreshHUD();SFX.coin();toast('ジェム +3,000')}}]})}
@@ -1015,7 +1214,7 @@ const rq=s=>$(s,rv);
 const RC={1:'#ffffff',2:'#5fe08a',3:'#4aa8ff',4:'#c37bff',5:'#ffd34a',6:'#ff5fd2'};
 const rgba=(h,a)=>{const[r,g,b]=hex2rgb(h);return`rgba(${r},${g},${b},${a})`};
 const A=(el,kf,o={})=>{try{const a=el.animate(kf,{fill:'forwards',...o});if(rv.contains(el))RV.anims.push(a);return a.finished.catch(()=>{})}catch(e){return Promise.resolve()}};
-function shake(el,amp=10,dur=400){const kf=[],n=Math.ceil(dur/38);for(let i=0;i<=n;i++){const f=1-i/n;kf.push({transform:`translate(${rand(-amp,amp)*f}px,${rand(-amp,amp)*f}px)`})}el.animate(kf,{duration:dur})}
+function shake(el,amp=10,dur=400){if(S.calm){amp*=.2;dur*=.6}const kf=[],n=Math.ceil(dur/38);for(let i=0;i<=n;i++){const f=1-i/n;kf.push({transform:`translate(${rand(-amp,amp)*f}px,${rand(-amp,amp)*f}px)`})}el.animate(kf,{duration:dur})}
 
 function resetReveal(){
   RV.phase='anim';RV.anims.forEach(a=>{try{a.cancel()}catch(e){}});RV.anims=[];rv.style.animation='';rv.style.opacity=1;
@@ -1036,7 +1235,7 @@ async function playReveal(results,opts={}){
   const tk=++RV.token,alive=()=>RV.token===tk,W=ms=>sleepRaw(ms);
   RV.results=results;RV.n=results.length;RV.preview=!!opts.preview;
   const best=results.reduce((a,b)=>b.r>a.r?b:a,results[0]);RV.best=best;const R=best.r;
-  resetReveal();rq('.rv-prev').style.display=RV.preview?'block':'none';rv.classList.add('on');A(rv,[{opacity:0},{opacity:1}],{duration:220});
+  resetReveal();AU.bgm.duck(true);rq('.rv-prev').style.display=RV.preview?'block':'none';rv.classList.add('on');A(rv,[{opacity:0},{opacity:1}],{duration:220});
   const ball=rq('.rv-ball'),flash=rq('.rv-flash'),glow=rq('.rv-glow'),rays=rq('.rv-rays'),beam=rq('.rv-beam'),bg=rq('.rv-bg');
   await W(240);if(!alive())return;
   /* 1) the ball drops */
@@ -1056,7 +1255,7 @@ async function playReveal(results,opts={}){
   ball.classList.remove('shake','s2','s3');SFX.crack();vib(20);const ck=rq('.crack');ck.style.opacity=1;$$('.crack path',rv).forEach((p,i)=>A(p,[{strokeDashoffset:520},{strokeDashoffset:0}],{duration:240,delay:i*60}));
   await W(R>=4?520:340);if(!alive())return;
   /* 4) burst */
-  SFX.burst();vib(R>=4?[60,40,140]:30);ball.style.opacity=0;const C=RC[R];
+  SFX.burst();SFX.rare(R);vib(R>=4?[60,40,140]:30);ball.style.opacity=0;const C=RC[R];
   flash.style.background=R===6?'#fff':lighten(C,.7);A(flash,[{opacity:0},{opacity:1,offset:.1},{opacity:R>=5?.0:0}],{duration:R>=5?900:420});
   ring(640,360,C,{vr:1700,life:.8,lw:26});ring(640,360,'#fff',{vr:1000,life:.6,lw:10});
   sparks(R>=4?70:34,{x:640,y:360,power:1000,cols:R===6?RBC:[C,'#fff'],size:22,life:1.2});
@@ -1122,10 +1321,10 @@ function finishNow(){
   if(RV.results.length===1||RV.preview){const c=buildCard(RV.best);c.style.opacity=1;c.style.transform='scale(1.75)'}else buildGrid(false);
   setButtons();RV.phase='done';
 }
-function closeReveal(){RV.token++;RV.anims.forEach(a=>{try{a.cancel()}catch(e){}});RV.anims=[];rv.classList.remove('on');P.length=0;rq('.rv-grid').innerHTML='';rq('.rv-card').innerHTML='';SCREENS.gacha();refreshHUD()}
+function closeReveal(){AU.bgm.duck(false);RV.token++;RV.anims.forEach(a=>{try{a.cancel()}catch(e){}});RV.anims=[];rv.classList.remove('on');P.length=0;rq('.rv-grid').innerHTML='';rq('.rv-card').innerHTML='';SCREENS.gacha();refreshHUD()}
 function doPull(n){const cost=n===1?COST1:COST10;
   if(S.gems<cost){SFX.back();modal({title:'ジェムが たりないよ',html:`あと <b style="color:#ffd23f">${fmt(cost-S.gems)}</b> ジェム ひつようです`,buttons:[{t:'とじる',c:'violet'},{t:'ジェム補給',c:'gold',fn:openFreeGems}]});return false}
-  S.gems-=cost;const res=Array.from({length:n},pullOne);save();playReveal(res,{});refreshHUD();return true}
+  S.gems-=cost;S.guide=false;const res=Array.from({length:n},pullOne);save();playReveal(res,{});refreshHUD();return true}
 function previewRarity(r){const def=pick(ROSTER.filter(c=>c.r===r));playReveal([{def,r,isNew:false,count:1}],{preview:true})}
 rv.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;if(RV.phase==='card')showGridNow(RV.token)});
 
@@ -1139,7 +1338,7 @@ const PTYPE={
   curve:{n:'カーブ',dur:1.32,p:u=>u<=1?(u*u*.5+u*.5):1+(u-1)*1.5,off:p=>-Math.sin(clamp(p,0,1)*Math.PI)*115},
   gunya:{n:'ぐにゃ球!',dur:1.22,p:u=>u<=1?u+.07*Math.sin(u*TAU):u,off:p=>p<=1?38*Math.sin(p*TAU*2.5)*(1-.45*p):0}
 };
-const M={on:false,tk:0,state:'',pitch:null,score:0,target:5,n:0,max:5,swung:false,judged:false,contactAt:0,freezeUntil:0,opp:null,pitcher:null,batter:null,bonus:0,resolve:null,hintOff:false};
+const M={on:false,tut:false,label:'',tk:0,state:'',pitch:null,score:0,target:5,n:0,max:5,swung:false,judged:false,contactAt:0,freezeUntil:0,opp:null,pitcher:null,batter:null,bonus:0,resolve:null,hintOff:false};
 const BALLSVG=`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#fff" stroke="${INK}" stroke-width="5"/><path d="M14 12q14 20 0 40M50 12q-14 20 0 40" fill="none" stroke="#ff4b6e" stroke-width="3.5" stroke-linecap="round"/><path d="M14 12q14 20 0 40M50 12q-14 20 0 40" fill="none" stroke="#ff4b6e" stroke-width="9" stroke-dasharray="2 7"/></svg>`;
 function matchBG(){return`<svg class="bgsvg" viewBox="0 0 1280 720" preserveAspectRatio="none"><defs>
   <linearGradient id="mSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b0e68"/><stop offset=".5" stop-color="#6a2bd6"/><stop offset="1" stop-color="#ff7fb0"/></linearGradient>
@@ -1157,7 +1356,10 @@ function matchBG(){return`<svg class="bgsvg" viewBox="0 0 1280 720" preserveAspe
   <path d="M0 668Q640 598 1280 668V720H0Z" fill="#e2a05c"/><path d="M0 668Q640 598 1280 668" fill="none" stroke="#2a1457" stroke-width="4"/>
   <path d="M742 664l30 0 12 10-12 12h-30l-12-12z" fill="#fff" stroke="#2a1457" stroke-width="4" stroke-linejoin="round" transform="translate(0 -4)"/></svg>`}
 SCREENS.match=function buildMatch(){
-  const root=$('#s-match'),d=mainDef();M.opp=pick(OPP);M.target=randi(4,7);M.score=0;M.n=0;M.state='intro';M.swung=false;M.judged=false;M.bonus=(d.r-1)*7;M.hintOff=false;M.on=true;const tk=++M.tk;
+  const root=$('#s-match'),d=mainDef();M.tut=!S.tutDone;
+  if(M.tut){M.opp=Object.assign({},OPP[0],{n:'ぐにゃ高校 1年生'});M.target=2;M.max=3;M.label='はつだせき';M.bonus=0}
+  else{const tn=tourNext();M.opp=oppFor(tn);M.target=tn.target;M.max=5;M.label=tn.stage+' '+tn.round;M.bonus=(d.r-1)*7+genBonus()}
+  M.score=0;M.n=0;M.state='intro';M.swung=false;M.judged=false;M.hintOff=false;M.on=true;const tk=++M.tk;
   root.innerHTML=`${matchBG()}${Array.from({length:16},()=>`<i class="cam" style="left:${rand(90,1190)}px;top:${rand(170,340)}px;animation-delay:${-rand(0,3)}s;animation-duration:${rand(2.4,4.2)}s"></i>`).join('')}
   <div class="mfield"><div class="mact" id="mPit" style="left:${PIT.left}px;top:${PIT.top}px;width:${240*PIT.s}px;height:${300*PIT.s}px"></div><div class="mact" id="mBat" style="left:${BAT.left}px;top:${BAT.top}px;width:${240*BAT.s}px;height:${300*BAT.s}px"></div></div>
   <div class="mzone" id="mZone" style="left:${ZX}px;top:${ZY}px"><div class="zr" id="zr"></div><div class="zc"></div></div>
@@ -1165,8 +1367,8 @@ SCREENS.match=function buildMatch(){
   <div class="mhud"><button class="btn round violet mexit" data-act="mexit">${IC.close}</button>
     <div class="mscore"><div class="row"><div><span class="ol ol4">あなた</span> <b class="ol" id="mScore">0</b></div><span class="vsx ol ol4">VS ${M.opp.n}</span><div class="tg ol ol4">めざせ <b class="ol" id="mTarget">${M.target}</b>点</div></div><div class="mbar"><i id="mBar"></i></div></div>
     <div class="mpit"><div class="mdots" id="mDots">${'<i></i>'.repeat(M.max)}</div><div class="mptype ol ol4" id="mPtype"></div></div></div>
-  <div class="mbat">打者 <b>${d.n}</b><br>ミート補正 <b>${M.bonus?'+'+M.bonus+'ms':'なし'}</b></div>
-  <div class="mpop" id="mPop"></div><div class="mhint ol" id="mHint">リングが 小さくなったら タップ!</div><div class="mintro" id="mIntro"></div><div class="mtap" id="mTap"></div>`;
+  <div class="mbat"><b>${M.label}</b><br>打者 ${d.n}<br>ミート補正 <b>${M.tut?'おおきめ':(M.bonus?'+'+M.bonus+'ms':'なし')}</b></div>
+  <div class="mpop" id="mPop"></div>${M.tut?`<div class="coach" id="coach"><i class="cf">${IC.finger}</i><span>リングが ちいさく なったら タップ!</span></div><button class="btn sm dark tskip" data-act="tutskip">あんないスキップ</button>`:`<div class="mhint ol" id="mHint">リングが 小さくなったら タップ!</div>`}<div class="mintro" id="mIntro"></div><div class="mtap" id="mTap"></div>`;
   M.pitcher=makeChar(M.opp,{pose:'idle'});M.batter=makeChar(d,{pose:'ready',bat:true});$('#mPit').appendChild(M.pitcher.el);$('#mBat').appendChild(M.batter.el);
   $('#zr').style.opacity=0;setTimeout(()=>{if(M.on&&M.tk===tk)matchFlow(tk)},560);
 };
@@ -1176,41 +1378,44 @@ function popText(text,cls,sub=''){const pop=$('#mPop');if(!pop)return;pop.classN
 const hidePop=()=>{const pop=$('#mPop');if(pop){pop.getAnimations().forEach(a=>a.cancel());A(pop,[{opacity:1},{opacity:0}],{duration:220})}};
 function setScore(){const s=$('#mScore');if(!s)return;s.textContent=M.score;A(s,[{transform:'scale(1.8)'},{transform:'scale(1)'}],{duration:260,easing:'ease-out'});$('#mBar').style.width=Math.min(100,M.score/M.target*100)+'%'}
 async function matchFlow(tk){
-  const intro=$('#mIntro');intro.innerHTML=`<div class="ib"><b class="ol">PLAY BALL!</b><small class="ol">VS ${M.opp.n}　5球勝負</small></div>`;intro.classList.add('on');SFX.cheer(1.2);SFX.ok();
+  const intro=$('#mIntro');intro.innerHTML=`<div class="ib"><b class="ol">PLAY BALL!</b><small class="ol">${M.label}　VS ${M.opp.n}　${M.max}球勝負</small></div>`;intro.classList.add('on');SFX.cheer(1.2);SFX.ok();
   await sleepRaw(1500);if(!mAlive(tk))return;intro.classList.remove('on');
   for(let i=0;i<M.max;i++){if(!mAlive(tk))return;await pitchOnce(i,tk);if(!mAlive(tk))return}
   await matchEnd(tk);
 }
-function pickPitch(i){if(i===0)return'fast';const r=Math.random();return r<.4?'fast':r<.7?'curve':'gunya'}
+function pickPitch(i){if(M.tut||i===0)return'fast';const r=Math.random();return r<.4?'fast':r<.7?'curve':'gunya'}
 async function pitchOnce(i,tk){
-  M.state='windup';M.swung=false;M.judged=false;const type=pickPitch(i);M.pitch={type,t0:0,rel:null};M.pitcher.setPose('throw');M.batter.setPose('ready');
+  M.state='windup';M.swung=false;M.judged=false;const type=pickPitch(i);M.pitch={type,t0:0,rel:null,dur:M.tut?1.7:PTYPE[type].dur,t1:0,t2:0};SFX.count(i);M.pitcher.setPose('throw');M.batter.setPose('ready');
   const pt=$('#mPtype');pt.textContent=PTYPE[type].n;pt.classList.add('on');await sleepRaw((THROW_W+.09)*1000);if(!mAlive(tk))return;
   const h=M.pitcher.handAbs(1);M.pitch.rel={x:PIT.left+h.x*PIT.s,y:PIT.top+h.y*PIT.s};M.pitch.t0=performance.now();M.state='flight';SFX.pitch();
   const b=$('#mBall'),bs=$('#mBs');b.style.display='block';bs.style.display='block';$('#zr').style.opacity=.95;
   await new Promise(res=>{M.resolve=res});if(!mAlive(tk))return;
-  $$('#mDots i')[i]&&$$('#mDots i')[i].classList.add('on');pt.classList.remove('on');M.pitcher.setPose('idle');b.style.display='none';bs.style.display='none';$('#zr').style.opacity=0;hidePop();
+  $$('#mDots i')[i]&&$$('#mDots i')[i].classList.add('on');SFX.count(i+2);pt.classList.remove('on');M.pitcher.setPose('idle');b.style.display='none';bs.style.display='none';$('#zr').style.opacity=0;hidePop();
 }
 $('#s-match').addEventListener('pointerdown',e=>{if(e.target.closest('.mtap'))onSwing()});
 function onSwing(){
   if(!M.on||M.state==='over')return;if(M.state==='windup'){const h=$('#mHint');if(h&&!M.hintOff){A(h,[{transform:'scale(1.2)'},{transform:'scale(1)'}],{duration:200})}return}
   if(M.state!=='flight'||M.swung)return;
-  M.swung=true;M.hintOff=true;const h=$('#mHint');if(h)h.style.display='none';M.batter.setPose('swing');SFX.swing();M.contactAt=performance.now()+SWING_D*.7*1000;
+  M.swung=true;M.hintOff=true;const h=$('#mHint');if(h)h.style.display='none';const co=$('#coach');if(co)co.style.display='none';M.batter.setPose('swing');SFX.swing();M.contactAt=performance.now()+SWING_D*.7*1000;
 }
+const winW=()=>{const b=M.bonus;return M.tut?[220,300,380,520]:[50+b*.5,100+b*.8,165+b,250+b]};
 function judge(){
-  M.judged=true;const e=M.contactAt-(M.pitch.t0+PTYPE[M.pitch.type].dur*1000),a=Math.abs(e),b=M.bonus,W=[50+b*.5,100+b*.8,165+b,250+b];
+  M.judged=true;const e=M.contactAt-(M.pitch.t0+M.pitch.dur*1000),a=Math.abs(e),W=winW();
   const k=a<=W[0]?'hr':a<=W[1]?'two':a<=W[2]?'hit':a<=W[3]?'foul':'miss';resolveResult(k,e,a<=W[0]);
 }
 function matchUpdate(dt,now){
   if(!M.on||now<M.freezeUntil)return;
   if(M.state==='flight'){
-    const pit=M.pitch,T=PTYPE[pit.type],u=(now-pit.t0)/1000/T.dur,p=T.p(u),off=u<=1?T.off(p):0;
+    const pit=M.pitch,T=PTYPE[pit.type],u=(now-pit.t0)/1000/pit.dur,p=T.p(u),off=u<=1?T.off(p):0;
     const x=lerp(pit.rel.x,ZX,p),y=lerp(pit.rel.y,ZY,p)+off,s=.55+.6*clamp(p,0,1.35);
     const b=$('#mBall'),bs=$('#mBs'),zr=$('#zr');if(!b)return;
     b.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${s.toFixed(3)}) rotate(${(u*720).toFixed(0)}deg)`;
     const gy=lerp(612,652,clamp(p,0,1.3));bs.style.transform=`translate(${x.toFixed(1)}px,${gy.toFixed(1)}px) scale(${(s*1.1).toFixed(3)},${(s*.9).toFixed(3)})`;
-    const dm=2*(34+150*(1-clamp(p,0,1))),perf=(50+M.bonus*.5)/1000/T.dur,hot=Math.abs(u-1)<perf;
+    const dm=2*(34+150*(1-clamp(p,0,1))),perf=winW()[0]/1000/pit.dur,hot=Math.abs(u-1)<perf;
     zr.style.cssText=`width:${dm}px;height:${dm}px;left:${-dm/2}px;top:${-dm/2}px;opacity:${u>1.08?0:.95};border-color:${hot?'#ffd23f':'#fff'};box-shadow:0 0 ${hot?34:20}px ${hot?'#ffd23f':'#fff'}`;
     if(Math.random()<.7&&u<1.1)sparks(1,{x,y,power:30,col:'#ffffff',size:9,life:.28,star:false,grav:0});
+    if(!pit.t1&&u>=.55){pit.t1=1;SFX.tick()}if(!pit.t2&&u>=.78){pit.t2=1;SFX.tick()}
+    if(M.tut&&!M.swung&&u>=1.08)onSwing();                       // first at-bat: the batter swings for you if you're late
     if(M.swung&&!M.judged&&now>=M.contactAt)judge();
     else if(!M.swung&&u>1.32)resolveResult('look',0,false);
   }
@@ -1232,19 +1437,35 @@ async function resolveResult(kind,err,perfect){
     ball.style.transform=`translate(${ZX}px,${ZY}px) scale(1.1)`;$('#mBs').style.display='none';$('#zr').style.opacity=0;M.freezeUntil=performance.now()+60;SFX.hit('n');sparks(12,{x:ZX,y:ZY,power:500,col:'#fff',size:12});
     popText('ファウル','bad',dir);await sleepRaw(70);fly([[ZX,ZY,1.1],[640,330,.9],[520,300,.8],[420,480,.72]],1000);await sleepRaw(1300)}
   else{
-    SFX.whiff();$('#zr').style.opacity=0;if(kind==='miss'){const T=PTYPE[M.pitch.type],u=(performance.now()-M.pitch.t0)/1000/T.dur,p0=T.p(u),p1=p0+.4,pp=q=>[lerp(M.pitch.rel.x,ZX,q),lerp(M.pitch.rel.y,ZY,q)+(q<=1?T.off(q):0),.55+.6*clamp(q,0,1.35)];fly([pp(p0),pp(p1)],380);popText('空振り!','bad',dir);setTimeout(()=>M.batter.setPose('sad'),250)}else{popText('見逃し!','bad','');M.batter.setPose('sad')}
+    SFX.whiff();$('#zr').style.opacity=0;if(kind==='miss'){const T=PTYPE[M.pitch.type],u=(performance.now()-M.pitch.t0)/1000/M.pitch.dur,p0=T.p(u),p1=p0+.4,pp=q=>[lerp(M.pitch.rel.x,ZX,q),lerp(M.pitch.rel.y,ZY,q)+(q<=1?T.off(q):0),.55+.6*clamp(q,0,1.35)];fly([pp(p0),pp(p1)],380);popText('空振り!','bad',dir);setTimeout(()=>M.batter.setPose('sad'),250)}else{popText('見逃し!','bad','');M.batter.setPose('sad')}
     M.pitcher.setPose('cheer');await sleepRaw(kind==='miss'?750:300);if(!al())return;ball.style.display='none';$('#mBs').style.display='none';await sleepRaw(500)}
   if(!al())return;
   if(add){M.score+=add;setScore()}
   M.batter.setPose('ready');M.resolve&&M.resolve();
 }
+async function tourBanner(t,sub,tk){const intro=$('#mIntro');intro.innerHTML=`<div class="ib" style="animation-duration:2.8s"><b class="ol">${t}</b><small class="ol">${sub}</small></div>`;intro.classList.add('on');
+  SFX.fanfare(5);SFX.cheer(2.4);confetti(140,{rain:true});confetti(80,{x:640,y:340,power:1300,spread:Math.PI*1.3,angle:-Math.PI/2});await sleepRaw(2900);intro.classList.remove('on')}
+function finishTutorial(skipped){
+  if(S.tutDone&&S.firstReward)return;S.tutDone=true;S.guide=true;let first=false;if(!S.firstReward){S.firstReward=true;S.gems+=1500;S.coins+=500;S.lastLogin=todayStr();first=true}
+  save();M.on=false;M.tk++;
+  go('home',()=>{if(first)setTimeout(()=>{modal({title:skipped?'ホームが かいほう!':'はじめての ほうしゅう!',html:`<div class="reward"><div>${IC.gem}<b class="ol">+1,500</b></div><div>${IC.coin}<b class="ol">+500</b></div></div><p style="margin-top:12px">ガチャで 選手を スカウトしよう!<br><small style="color:#cbbcff">(10連 1回ぶんの スカウト資金です)</small></p>`,
+      buttons:[{t:'うけとる',c:'gold',shine:1,fn:()=>{refreshHUD();SFX.coin();confetti(60,{x:640,y:300,power:700,spread:Math.PI*.9,angle:-Math.PI/2})}}]});SFX.fanfare(3)},800)})}
 async function matchEnd(tk){
-  M.state='over';const win=M.score>=M.target;S.plays++;const margin=Math.max(0,M.score-M.target);
-  const gems=win?250+margin*40:30,coins=win?400+M.score*40:100+M.score*20,exp=win?60:20;if(win)S.wins++;S.gems+=gems;S.coins+=coins;addExp(exp);save();
+  M.state='over';const win=M.score>=M.target||M.tut;S.plays++;
+  if(M.tut){popText('WIN!','hr',`${M.score} - ${M.target}`);SFX.win();SFX.cheer(2);confetti(160,{rain:true});M.batter.setPose('cheer');M.pitcher.setPose('sad');
+    await sleepRaw(1900);if(!mAlive(tk))return;
+    modal({title:'はつしょうり!',html:`<div class="ol ol4" style="font-size:40px">${esc(S.name)} の はつ打席!</div><p style="margin-top:12px">ホームが かいほうされたよ!</p>`,buttons:[{t:'ホームへ',c:'gold',shine:1,fn:()=>finishTutorial(false)}]});M.on=false;SFX.coin();return}
+  const tn=tourNext(),mult=S.tour.stage?1.5:1,margin=Math.max(0,M.score-M.target);let ev='none';if(win){S.wins++;ev=tourWin()}
+  let gems=win?Math.round((250+margin*40)*mult):30,coins=Math.round((win?400+M.score*40:100+M.score*20)*mult),exp=win?60:20;if(ev==='champion'){gems+=1500;coins+=1000;exp+=100}
+  S.gems+=gems;S.coins+=coins;addExp(exp);save();
   popText(win?'WIN!':'LOSE',win?'hr':'bad',`${M.score} - ${M.target}`);if(win){SFX.win();SFX.cheer(2);confetti(160,{rain:true});confetti(80,{x:640,y:300,power:1200,spread:Math.PI*1.2,angle:-Math.PI/2});M.batter.setPose('cheer');M.pitcher.setPose('sad')}else{SFX.lose();M.batter.setPose('sad');M.pitcher.setPose('cheer')}
   await sleepRaw(1900);if(!mAlive(tk))return;
-  modal({title:win?'しょうり!':'ざんねん…',html:`<div class="ol ol4" style="font-size:44px">${M.score} - ${M.target}点</div><div class="reward"><div>${IC.gem}<b class="ol">+${gems}</b></div><div>${IC.coin}<b class="ol">+${coins}</b></div></div><p style="margin-top:12px;font-size:22px;color:#cbbcff">${win?'ガチャで あたらしい選手を むかえよう!':'ミート補正の高い選手ほど タイミングが ゆるくなるよ'}</p>`,
-    buttons:[{t:'ホームへ',c:'violet',fn:()=>go('home')},{t:'もう一度',c:'gold',shine:1,fn:()=>go('match')}]});
+  if(ev==='koshien'){await tourBanner('甲子園 出場決定!','あと3勝で 全国制覇!');if(!mAlive(tk))return}
+  if(ev==='champion'){await tourBanner('全国制覇!!',`第${S.tour.gen-1}世代 おつかれさま!`);if(!mAlive(tk))return}
+  const nt=tourNext(),line=ev==='round'?`${tn.stage} ${tn.round} とっぱ!<br>次は ${nt.stage} ${nt.round}(${nt.restKoshien?`甲子園まで あと${nt.restKoshien}勝`:`全国制覇まで あと${nt.restTitle}勝`})`:
+    ev==='koshien'?'甲子園に 出場! 次は 甲子園 1回戦':ev==='champion'?`<b style="color:#ffd23f">世代交代!</b> 第${S.tour.gen}世代の はじまり<br><small style="color:#cbbcff">ミート補正 +${genBonus()}ms ・ あいてが すこし つよくなるよ</small>`:`${tn.stage} ${tn.round} は まけ… もう一度 ちょうせん!`;
+  modal({title:ev==='champion'?'全国制覇!':win?'しょうり!':'ざんねん…',html:`<div class="ol ol4" style="font-size:44px">${M.score} - ${M.target}点</div><div class="reward"><div>${IC.gem}<b class="ol">+${gems}</b></div><div>${IC.coin}<b class="ol">+${coins}</b></div></div><p style="margin-top:12px;font-size:22px;color:#e8e0ff;line-height:1.5">${line}</p>`,
+    buttons:[{t:'ホームへ',c:'violet',fn:()=>go('home')},{t:ev==='champion'?'次の大会へ':'もう一度',c:'gold',shine:1,fn:()=>go('match')}]});
   M.on=false;SFX.coin();
 }
 
@@ -1252,21 +1473,31 @@ async function matchEnd(tk){
    input / main loop / boot
    ===================================================================== */
 function toStage(cx,cy){const W=innerWidth,H=innerHeight,portrait=H>W&&matchMedia('(pointer:coarse)').matches;let x=cx-W/2,y=cy-H/2;if(portrait){const nx=y,ny=-x;x=nx;y=ny}return[x/SCALE+640,y/SCALE+360]}
-stage.addEventListener('pointerdown',e=>{AU.init();if(cur!=='match'&&!e.target.closest('#reveal')){const[x,y]=toStage(e.clientX,e.clientY);sparks(5,{x,y,power:260,cols:['#fff','#ffe36a','#ff8cc8'],size:11,life:.5,grav:120})}},{passive:true});
+stage.addEventListener('pointerdown',e=>{AU.init();syncBgm();if(cur!=='match'&&!e.target.closest('#reveal')){const[x,y]=toStage(e.clientX,e.clientY);sparks(5,{x,y,power:260,cols:['#fff','#ffe36a','#ff8cc8'],size:11,life:.5,grav:120})}},{passive:true});
 stage.addEventListener('click',e=>{
   const mb=e.target.closest('[data-mb]');
   if(mb){const m=$('#modal'),b=m._b&&m._b[+mb.dataset.mb];closeModal();SFX.tap();if(b&&b.fn)b.fn();return}
   const t=e.target.closest('[data-act]');if(!t)return;AU.init();
   switch(t.dataset.act){
-    case'start':SFX.ok();go('home');break;
+    case'start':SFX.ok();go(!S.name?'name':!S.tutDone?'match':'home');break;
     case'tab':if(cur===t.dataset.to)return;SFX.tap();go(t.dataset.to);break;
-    case'back':SFX.back();go('home');break;
+    case'back':SFX.back();go((cur==='settings'||cur==='news')?(PREV&&PREV!=='match'?PREV:'home'):'home');break;
     case'match':SFX.ok();go('match');break;
     case'pull':SFX.ok();doPull(+t.dataset.n);break;
     case'rates':SFX.tap();openRates();break;
     case'preview':closeModal();SFX.ok();previewRarity(+t.dataset.r);break;
     case'freegems':SFX.tap();openFreeGems();break;
-    case'settings':SFX.tap();openSettings();break;
+    case'settings':if(cur!=='settings'){SFX.tap();go('settings')}break;
+    case'news':if(cur!=='news'){SFX.tap();go('news')}break;
+    case'newsitem':SFX.tap();newsSel=t.dataset.id;SCREENS.news();break;
+    case'vol':S[t.dataset.k]=+t.dataset.v;save();AU.apply();SFX.tap();SCREENS.settings();break;
+    case'volstep':S[t.dataset.k]=clamp(Math.round((S[t.dataset.k]+ +t.dataset.d)*10)/10,0,1);save();AU.apply();SFX.tap();SCREENS.settings();break;
+    case'tog':S[t.dataset.k]=!S[t.dataset.k];save();AU.apply();SFX.toggle(S[t.dataset.k]);if(t.dataset.k==='vibe'&&S.vibe)vib(40);SCREENS.settings();break;
+    case'reset':SFX.tap();confirmReset();break;
+    case'namerand':SFX.tap();$('#nameIn').value=pick(NAMES);break;
+    case'nameok':submitName();break;
+    case'tutskip':SFX.ok();finishTutorial(true);break;
+    case'guideoff':SFX.back();S.guide=false;save();{const g=$('.guide');if(g)g.remove()}break;
     case'toast':SFX.back();toast(t.dataset.msg);break;
     case'char':SFX.tap();charDetail(t.dataset.id);break;
     case'hpoke':{const pc=$('.hchar .pc');if(pc&&pc._g){const r=t.getBoundingClientRect();pc._g.poke((e.clientX-(r.left+r.width/2))/r.width*2);
@@ -1274,10 +1505,12 @@ stage.addEventListener('click',e=>{
     case'rv-skip':SFX.tap();finishNow();break;
     case'rv-close':SFX.back();closeReveal();break;
     case'rv-again':SFX.ok();if(RV.preview)playReveal(RV.results,{preview:true});else doPull(RV.n);break;
-    case'mexit':SFX.back();modal({title:'試合をやめる?',html:'ここでやめると ほうしゅうは もらえません。',buttons:[{t:'つづける',c:'violet'},{t:'やめる',c:'pink',fn:()=>go('home')}]});break;
+    case'mexit':SFX.back();modal({title:'試合をやめる?',html:'ここでやめると ほうしゅうは もらえません。',buttons:[{t:'つづける',c:'violet'},{t:'やめる',c:'pink',fn:()=>go(S.tutDone?'home':'title')}]});break;
   }
 });
-addEventListener('keydown',e=>{if(e.code==='Space'&&cur==='match'){e.preventDefault();onSwing()}});
+addEventListener('keydown',e=>{if(e.code==='Space'&&cur==='match'){e.preventDefault();onSwing()}if(e.key==='Enter'&&cur==='name'){submitName()}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){save();AU.suspend()}else AU.resume()});
+addEventListener('pagehide',save);
 document.addEventListener('contextmenu',e=>e.preventDefault());
 
 let last=performance.now(),tsec=0,evAcc=0;
@@ -1286,11 +1519,11 @@ function loop(now){
   const gdt=(M.on&&now<M.freezeUntil)?0:dt;
   for(const g of LIVE)g.update(gdt,tsec);
   matchUpdate(dt,now);fxStep(dt);
-  evAcc+=dt;if(evAcc>=1){evAcc=0;const el=$('#evT');if(el)el.textContent=evText()}
+  evAcc+=dt;if(evAcc>=1){evAcc=0;$$('.evT').forEach(x=>x.textContent=evText())}
   requestAnimationFrame(loop);
 }
 fit();showScreen('title');requestAnimationFrame(loop);
-window.__GB={get S(){return S},go,playReveal,previewRarity,doPull,SCREENS,M,RV,openRates,charDetail,confetti,firework,rollRarity,pullOne,pityLeft};
+window.__GB={get S(){return S},go,playReveal,previewRarity,doPull,SCREENS,M,RV,openRates,charDetail,confetti,firework,rollRarity,pullOne,pityLeft,tourWin,AU,finishTutorial};
 })();
 </script>
 </body>
