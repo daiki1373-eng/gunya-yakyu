@@ -51,6 +51,7 @@ public class BattingStage : MonoBehaviour
         BuildField();
         BuildFenceAndStands();
         BuildZone();
+        BuildReticle();
         BuildBall();
         BuildFielders();
     }
@@ -281,6 +282,45 @@ public class BattingStage : MonoBehaviour
             BattingSprites.Make("GridH" + i, zone.transform, white, grid, OrderZone + 1,
                 new Vector3(0f, fy, 0f), Vector3.zero, new Vector3(hw * 2f, t * 0.7f, 1f));
         }
+    }
+
+    // ------------------------------------------------------------
+    // 投球の照準(守るとき、ゾーン面に出す輪と十字)
+    // ------------------------------------------------------------
+    private Transform _reticle;
+    private SpriteRenderer[] _retParts;
+
+    private void BuildReticle()
+    {
+        var go = new GameObject("Reticle");
+        go.transform.SetParent(Root, false);
+        _reticle = go.transform;
+        var parts = new System.Collections.Generic.List<SpriteRenderer>();
+        Color c = Color.white;
+        parts.Add(BattingSprites.Make("Ring", _reticle, BattingSprites.Ring, c, OrderZone + 3,
+            Vector3.zero, Vector3.zero, Vector3.one * 0.30f));
+        parts.Add(BattingSprites.Make("Dot", _reticle, SpriteFactory.Circle, c, OrderZone + 3,
+            Vector3.zero, Vector3.zero, Vector3.one * 0.04f));
+        float t = 0.02f, L = 0.11f, off = 0.22f;
+        parts.Add(BattingSprites.Make("TickL", _reticle, SpriteFactory.White, c, OrderZone + 3,
+            new Vector3(-off, 0f, 0f), Vector3.zero, new Vector3(L, t, 1f)));
+        parts.Add(BattingSprites.Make("TickR", _reticle, SpriteFactory.White, c, OrderZone + 3,
+            new Vector3(off, 0f, 0f), Vector3.zero, new Vector3(L, t, 1f)));
+        parts.Add(BattingSprites.Make("TickU", _reticle, SpriteFactory.White, c, OrderZone + 3,
+            new Vector3(0f, off, 0f), Vector3.zero, new Vector3(t, L, 1f)));
+        parts.Add(BattingSprites.Make("TickD", _reticle, SpriteFactory.White, c, OrderZone + 3,
+            new Vector3(0f, -off, 0f), Vector3.zero, new Vector3(t, L, 1f)));
+        _retParts = parts.ToArray();
+        _reticle.gameObject.SetActive(false);
+    }
+
+    public void SetReticle(Vector2 pos, bool visible, Color col)
+    {
+        if (_reticle == null) return;
+        _reticle.gameObject.SetActive(visible);
+        if (!visible) return;
+        _reticle.position = new Vector3(pos.x, pos.y, -0.06f);
+        for (int i = 0; i < _retParts.Length; i++) _retParts[i].color = col;
     }
 
     // ------------------------------------------------------------

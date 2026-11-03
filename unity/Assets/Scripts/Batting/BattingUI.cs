@@ -9,6 +9,15 @@ public class BattingUI
 {
     private Text _count, _batter, _speed, _rank, _result, _quirk, _banner;
     private Image[] _bases = new Image[4];
+    private Text _swingLabel;
+    // 投球UI
+    private Image[] _pitchBtn = new Image[5];
+    private Text[] _pitchTxt = new Text[5];
+    private bool[] _pitchAvail = new bool[5];
+    private int _pitchSel;
+    private RectTransform _meterRoot, _meterMarker;
+    private Image _meterGood, _meterPerfect;
+    private const float MeterW = 440f;
     private RectTransform _swingRect;
     private Image _swingImg;
     private Font _font;
@@ -112,15 +121,124 @@ public class BattingUI
             new Vector2(200f, 100f), 30, TextAnchor.MiddleCenter, Color.white);
         label.rectTransform.pivot = new Vector2(0.5f, 0.5f);
         label.text = "SWING";
+        _swingLabel = label;
         label.fontStyle = FontStyle.Bold;
 
+        BuildPitchPanel(canvasGo.transform);
         ClearCenter();
         SetSpeed(null);
     }
 
-    public void SetCount(int inning, int balls, int strikes, int outs, int runs)
+    public void SetCount(int inning, bool top, int balls, int strikes, int outs, int runs, int oppRuns)
     {
-        _count.text = inning + "回  B " + balls + "  S " + strikes + "  O " + outs + "  得点 " + runs;
+        _count.text = inning + "回" + (top ? "表" : "裏") + "  B " + balls + "  S " + strikes + "  O " + outs
+                    + "   自 " + runs + " - " + oppRuns + " 相";
+    }
+
+    public void SetBatterLabel(string text) { _batter.text = text; }
+
+    public void SetSwingLabel(string text) { if (_swingLabel != null) _swingLabel.text = text; }
+
+    public void ShowTiming(string text, Color c)
+    {
+        _rank.text = text;
+        _rank.color = c;
+    }
+
+    // ---- 投球UI(球種ボタン・タイミングメーター) ----
+    private void BuildPitchPanel(Transform canvas)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            var img = NewImage(canvas, "PitchBtn" + i, new Color(0f, 0f, 0f, 0.45f));
+            var r = img.rectTransform;
+            r.anchorMin = r.anchorMax = new Vector2(0f, 0.5f);
+            r.pivot = new Vector2(0f, 0.5f);
+            r.sizeDelta = new Vector2(190f, 40f);
+            r.anchoredPosition = new Vector2(14f, 70f - i * 46f);
+            var t = NewText(r, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190f, 40f),
+                20, TextAnchor.MiddleCenter, Color.white);
+            t.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            t.text = (i + 1) + "  " + PitchRepertoire.All[i].Name;
+            _pitchBtn[i] = img;
+            _pitchTxt[i] = t;
+            img.gameObject.SetActive(false);
+        }
+
+        var root = NewImage(canvas, "Meter", new Color(0f, 0f, 0f, 0.55f));
+        _meterRoot = root.rectTransform;
+        _meterRoot.anchorMin = _meterRoot.anchorMax = new Vector2(0.5f, 0f);
+        _meterRoot.pivot = new Vector2(0.5f, 0.5f);
+        _meterRoot.sizeDelta = new Vector2(MeterW, 22f);
+        _meterRoot.anchoredPosition = new Vector2(0f, 80f);
+        // 良い帯(緑)と完璧の帯(黄)。位置は SetMeterZones で決める
+        _meterGood = NewImage(_meterRoot, "Good", new Color(0.35f, 0.85f, 0.4f, 0.75f));
+        _meterPerfect = NewImage(_meterRoot, "Perfect", new Color(1f, 0.88f, 0.2f, 0.95f));
+        var mk = NewImage(_meterRoot, "Marker", Color.white);
+        _meterMarker = mk.rectTransform;
+        _meterMarker.anchorMin = _meterMarker.anchorMax = new Vector2(0f, 0.5f);
+        _meterMarker.pivot = new Vector2(0.5f, 0.5f);
+        _meterMarker.sizeDelta = new Vector2(6f, 36f);
+        _meterRoot.gameObject.SetActive(false);
+    }
+
+    // sweetU=ベストの位置(0..1)、goodHalf/perfectHalf=その左右の幅(0..1換算)
+    public void SetMeterZones(float sweetU, float goodHalf, float perfectHalf)
+    {
+        PlaceBand(_meterGood.rectTransform, sweetU, goodHalf);
+        PlaceBand(_meterPerfect.rectTransform, sweetU, perfectHalf);
+    }
+
+    private static void PlaceBand(RectTransform r, float u, float half)
+    {
+        float lo = Mathf.Clamp01(u - half), hi = Mathf.Clamp01(u + half);
+        r.anchorMin = new Vector2(lo, 0f);
+        r.anchorMax = new Vector2(hi, 1f);
+        r.offsetMin = Vector2.zero;
+        r.offsetMax = Vector2.zero;
+    }
+
+    public void ShowMeter(bool on)
+    {
+        if (_meterRoot != null) _meterRoot.gameObject.SetActive(on);
+        if (on) SetMeter(0f);
+    }
+
+    public void SetMeter(float u)
+    {
+        if (_meterMarker == null) return;
+        _meterMarker.anchoredPosition = new Vector2(Mathf.Clamp01(u) * MeterW, 0f);
+    }
+
+    // available[i]=その球種を投げられるか
+    public void ShowPitchPanel(bool on, bool[] available, int selected)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            _pitchAvail[i] = available != null && available[i];
+            _pitchBtn[i].gameObject.SetActive(on && _pitchAvail[i]);
+        }
+        SelectPitch(selected);
+    }
+
+    public void SelectPitch(int k)
+    {
+        _pitchSel = k;
+        for (int i = 0; i < 5; i++)
+        {
+            _pitchBtn[i].color = i == k ? new Color(1f, 0.6f, 0.15f, 0.85f) : new Color(0f, 0f, 0f, 0.45f);
+        }
+    }
+
+    // 画面座標がどの球種ボタンの上か(なければ -1)
+    public int PitchButtonAt(Vector2 screenPos)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            if (!_pitchBtn[i].gameObject.activeSelf) continue;
+            if (RectTransformUtility.RectangleContainsScreenPoint(_pitchBtn[i].rectTransform, screenPos, null)) return i;
+        }
+        return -1;
     }
 
     public void SetBases(bool[] b)

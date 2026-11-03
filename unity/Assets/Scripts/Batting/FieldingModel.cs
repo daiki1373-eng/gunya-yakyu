@@ -60,8 +60,8 @@ public static class FieldingModel
         new Fielder { Name = "RF", Pos = new Vector2(34f, 68f),   Speed = 7.6f },
     };
 
-    public const float React = 0.50f;       // 打球への反応時間
-    public const float Reach = 0.7f;        // グラブの届く距離
+    public const float React = 0.52f;       // 打球への反応時間
+    public const float Reach = 0.62f;       // グラブの届く距離
     public const float RunEfficiency = 0.80f; // 最短経路で走れない分の効率
     public const float CatchHeight = 2.6f;  // 捕れる最大の高さ
     public const float ThrowSpeed = 32f;    // 送球速度 m/s

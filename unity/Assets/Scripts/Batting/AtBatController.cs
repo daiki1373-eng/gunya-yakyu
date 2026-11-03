@@ -35,6 +35,18 @@ public class AtBatController : MonoBehaviour
     private int _last1 = -1, _last2 = -1;   // 直前2球の球種(配球AI用)
     public static readonly List<string> GameLog = new List<string>();
     public static bool ShowPitchName = true;
+    // ---- 投球(守り)側の状態 ----
+    private int _selKind;                           // 選んでいる球種
+    private readonly bool[] _avail = new bool[5];   // 投げられる球種
+    private bool _reticleOn;
+    private Color _reticleCol = Color.white;
+    private PitchPlan _defPlan;
+    private float _defTRelease;
+    private Vector2 _aiCursor;                      // 打者AIのスイング位置
+    private bool _defTapOk;                         // 守りで、タップを受け付けてよい間だけtrue
+    private const float SweetBeforeRelease = 0.10f; // メーターのベスト点=リリースの何秒前か
+    private int _oppIndex = -1;
+
     public static int FreezeKind = -99;   // 検証用: この球種(-1=何でも)の終盤でtimeScaleを0にして止める
 
     // 入力
@@ -98,14 +110,18 @@ public class AtBatController : MonoBehaviour
 
         if (!_cursorLocked)
         {
-            _cursorPos = Vector2.MoveTowards(_cursorPos, _cursorTarget, BattingConfig.CursorSpeed * Time.deltaTime);
+            float spd = _gs.UserBatting ? BattingConfig.CursorSpeed : 6.0f;
+            _cursorPos = Vector2.MoveTowards(_cursorPos, _cursorTarget, spd * Time.deltaTime);
         }
         if (_cursor != null) _cursor.SetPos(_cursorPos);
+        if (_stage != null && !_gs.UserBatting) _stage.SetReticle(_cursorPos, _reticleOn, _reticleCol);
         if (_ui != null) _ui.Tick();
     }
 
-    private static Vector2 ClampCursor(Vector2 p)
+    private Vector2 ClampCursor(Vector2 p)
     {
+        if (!_gs.UserBatting)
+            return new Vector2(Mathf.Clamp(p.x, -1.1f, 1.1f), Mathf.Clamp(p.y, 0.25f, 2.0f));
         float mx = BattingConfig.ZoneHalfW + BattingConfig.CursorMargin;
         float yMin = BattingConfig.ZoneBottom - BattingConfig.CursorMargin;
         float yMax = BattingConfig.ZoneTop + BattingConfig.CursorMargin;
@@ -121,7 +137,12 @@ public class AtBatController : MonoBehaviour
         if (Input.touchCount > 0)
         {
             Touch t0 = Input.GetTouch(0);
-            if (_ui.OverSwing(t0.position))
+            int tb = _ui.PitchButtonAt(t0.position);
+            if (tb >= 0)
+            {
+                if (t0.phase == TouchPhase.Began) SelectPitchKind(tb);
+            }
+            else if (_ui.OverSwing(t0.position))
             {
                 if (t0.phase == TouchPhase.Began) swing = true;
             }
@@ -141,12 +162,16 @@ public class AtBatController : MonoBehaviour
             Vector3 mp = Input.mousePosition;
             if ((mp - _lastMouse).sqrMagnitude > 4f) _keyboardMode = false;
             _lastMouse = mp;
-            if (!_keyboardMode && Input.mousePresent && !_ui.OverSwing(mp))
+            int mb = _ui.PitchButtonAt(mp);
+            if (!_keyboardMode && Input.mousePresent && !_ui.OverSwing(mp) && mb < 0)
             {
                 screen = mp;
                 havePointer = true;
             }
-            if (Input.GetMouseButtonDown(0)) swing = true;
+            if (Input.GetMouseButtonDown(0))
+            {
+                if (mb >= 0) SelectPitchKind(mb); else swing = true;
+            }
         }
 
         // キーボード
@@ -163,6 +188,10 @@ public class AtBatController : MonoBehaviour
         }
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.Return))
             swing = true;
+        for (int k = 0; k < 5; k++)
+        {
+            if (Input.GetKeyDown(KeyCode.Alpha1 + k)) SelectPitchKind(k);
+        }
 
         if (havePointer)
         {
@@ -174,11 +203,18 @@ public class AtBatController : MonoBehaviour
                 _cursorTarget = ClampCursor(new Vector2(w.x, w.y));
             }
         }
-        if (swing)
+        if (swing && (_gs.UserBatting || _defTapOk))
         {
             _swingQueued = true;
             _ui.PulseSwing();
         }
+    }
+
+    private void SelectPitchKind(int k)
+    {
+        if (_gs.UserBatting || k < 0 || k > 4 || !_avail[k]) return;
+        _selKind = k;
+        _ui.SelectPitch(k);
     }
 
     private bool ConsumeSwing()
@@ -191,24 +227,55 @@ public class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     // 打者の入れ替え
     // ------------------------------------------------------------
-    private void SetupBatter()
+    private PlayerStats OpponentBatter(int i)
     {
-        _batterIndex = (_batterIndex + 1) % 3;
-        Color uniform, accent;
-        switch (_batterIndex)
+        PlayerStats p;
+        switch (i % 3)
         {
             case 0:
-                _batterStats = SpecialCharacters.Kabutomaru();
-                uniform = new Color(0.78f, 0.22f, 0.20f); accent = new Color(0.25f, 0.15f, 0.10f);
+                p = new PlayerStats { Name = "ライバルA", Position = 5, Species = "human", BatsRight = true,
+                    Meet = 50, Power = 44, Speed = 45, Field = 40, Arm = 40 };
                 break;
             case 1:
-                _batterStats = SpecialCharacters.Wanta();
-                uniform = new Color(0.92f, 0.72f, 0.16f); accent = new Color(0.35f, 0.22f, 0.10f);
+                p = new PlayerStats { Name = "ライバルB", Position = 4, Species = "human", BatsRight = false,
+                    Meet = 60, Power = 36, Speed = 56, Field = 44, Arm = 40 };
                 break;
             default:
-                _batterStats = SpecialCharacters.HeroDefault();
-                uniform = new Color(0.20f, 0.35f, 0.80f); accent = new Color(0.92f, 0.92f, 0.95f);
+                p = new PlayerStats { Name = "ライバルC", Position = 3, Species = "human", BatsRight = true,
+                    Meet = 44, Power = 60, Speed = 36, Field = 36, Arm = 40 };
                 break;
+        }
+        SpeciesTable.Apply(p);
+        return p;
+    }
+
+    private void SetupBatter()
+    {
+        Color uniform, accent;
+        if (_gs.UserBatting)
+        {
+            _batterIndex = (_batterIndex + 1) % 3;
+            switch (_batterIndex)
+            {
+                case 0:
+                    _batterStats = SpecialCharacters.Kabutomaru();
+                    uniform = new Color(0.78f, 0.22f, 0.20f); accent = new Color(0.25f, 0.15f, 0.10f);
+                    break;
+                case 1:
+                    _batterStats = SpecialCharacters.Wanta();
+                    uniform = new Color(0.92f, 0.72f, 0.16f); accent = new Color(0.35f, 0.22f, 0.10f);
+                    break;
+                default:
+                    _batterStats = SpecialCharacters.HeroDefault();
+                    uniform = new Color(0.20f, 0.35f, 0.80f); accent = new Color(0.92f, 0.92f, 0.95f);
+                    break;
+            }
+        }
+        else
+        {
+            _oppIndex = (_oppIndex + 1) % 3;
+            _batterStats = OpponentBatter(_oppIndex);
+            uniform = new Color(0.30f, 0.55f, 0.42f); accent = new Color(0.85f, 0.85f, 0.88f);
         }
         _batSide = _batterStats.BatsRight ? -1 : 1;
 
@@ -218,8 +285,10 @@ public class AtBatController : MonoBehaviour
             _batterStats, uniform, accent, true);
 
         _cursor.Configure(HitJudge.CursorHalfW(_batterStats.Meet), HitJudge.CursorHalfH(_batterStats.Meet), _batSide);
+        _cursor.SetVisible(_gs.UserBatting);
         _cursorPos = _cursorTarget = new Vector2(0f, BattingConfig.ZoneCenterY);
-        _ui.SetBatter(_batterStats);
+        if (_gs.UserBatting) _ui.SetBatter(_batterStats);
+        else _ui.SetBatterLabel("相手 " + _batterStats.Name + "  ミート " + _batterStats.Meet + "  パワー " + _batterStats.Power);
     }
 
     // ------------------------------------------------------------
@@ -227,7 +296,7 @@ public class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     private void RefreshHud()
     {
-        _ui.SetCount(_gs.Inning, _gs.Balls, _gs.Strikes, _gs.Outs, _gs.Runs);
+        _ui.SetCount(_gs.Inning, _gs.UserBatting, _gs.Balls, _gs.Strikes, _gs.Outs, _gs.Runs, _gs.OppRuns);
         _ui.SetBases(_gs.Base);
     }
 
@@ -239,6 +308,9 @@ public class AtBatController : MonoBehaviour
         _last1 = _last2 = -1;
         _stage.ResetFielders();
         _stage.ShowRunnersOnBases(_gs.Base);
+        _ui.SetSwingLabel(_gs.UserBatting ? "SWING" : "投げる");
+        _ui.ShowPitchPanel(false, _avail, _selKind);
+        _reticleOn = false;
         RefreshHud();
         _ui.ShowResult("");
         _ui.ShowBanner("");
@@ -265,11 +337,11 @@ public class AtBatController : MonoBehaviour
             _stage.HideRunners();
             if (_gs.GameOver)
             {
-                string summary = "試合終了  " + _gs.Runs + "点";
-                _ui.ShowResult(summary);
+                string res = _gs.Runs > _gs.OppRuns ? "勝ち！" : (_gs.Runs < _gs.OppRuns ? "負け…" : "引き分け");
+                _ui.ShowResult("試合終了  " + _gs.Runs + " - " + _gs.OppRuns + "  " + res);
                 _ui.ShowBanner("珍プレー " + _gs.QuirkCount);
-                GameLog.Add("game" + _gs.GameNo + " runs=" + _gs.Runs + " quirks=" + _gs.QuirkCount + " pa=" + _gs.PlateAppearances);
-                yield return StartCoroutine(Wait(2.4f));
+                GameLog.Add("game" + _gs.GameNo + " " + _gs.Runs + "-" + _gs.OppRuns + " quirks=" + _gs.QuirkCount + " pa=" + _gs.PlateAppearances);
+                yield return StartCoroutine(Wait(2.8f));
                 _gs.NewGame();
                 _ui.ShowBanner("");
             }
@@ -445,38 +517,49 @@ public class AtBatController : MonoBehaviour
         _ui.ClearCenter();
         _ui.ClearSpeed();
         _ui.ShowBanner("");
-        _cursor.ResetColor();
+        if (_gs.UserBatting) _cursor.ResetColor();
         _cursorLocked = false;
         _stage.HideBall();
         _stage.ClearTrail();
+        _ui.ShowMeter(false);
         _batter.ResetPose();
         _pitcher.ResetPose();
 
-        PitchPlan plan = PitchAI.ChoosePitch(_pitcherStats, _batterStats, _gs.Balls, _gs.Strikes,
-            _batSide, _last1, _last2);
+        PitchPlan plan;
+        float tReleaseAt;
+        if (_gs.UserBatting)
+        {
+            plan = PitchAI.ChoosePitch(_pitcherStats, _batterStats, _gs.Balls, _gs.Strikes,
+                _batSide, _last1, _last2);
+            yield return StartCoroutine(Wait(0.45f));
+            _swingQueued = false;
+            _pitcher.DoPitchMotion();
+            tReleaseAt = Time.time + BattingConfig.WindupSeconds;
+            if (AutoPlay) StartCoroutine(AutoPilot(plan, tReleaseAt));
+        }
+        else
+        {
+            // 守り: 球種→狙い→(1回目のタップでモーション開始)→タイミングを合わせて2回目のタップ
+            yield return StartCoroutine(DefenseInput());
+            plan = _defPlan;
+            tReleaseAt = _defTRelease;
+            StartCoroutine(AIBatter(plan, tReleaseAt));
+        }
         _last2 = _last1;
         _last1 = (int)plan.Kind;
-
-        yield return StartCoroutine(Wait(0.45f));
-        _swingQueued = false;
-
-        _pitcher.DoPitchMotion();
-        float tWindStart = Time.time;
-        float tReleaseAt = tWindStart + BattingConfig.WindupSeconds;
-        if (AutoPlay) StartCoroutine(AutoPilot(plan, tReleaseAt));
 
         bool swung = false;
         float tSwing = 0f;
         Vector2 swingCursor = Vector2.zero;
 
         // 投球モーション中(ここで振ると早振り)
-        while (Time.time < tReleaseAt)
+        while (_gs.UserBatting && Time.time < tReleaseAt)
         {
             if (!swung && ConsumeSwing())
             {
                 swung = true;
                 tSwing = Time.time;
-                swingCursor = _cursorPos;
+                swingCursor = _gs.UserBatting ? _cursorPos : _aiCursor;
                 _cursorLocked = true;
                 _batter.DoSwing();
             }
@@ -505,7 +588,7 @@ public class AtBatController : MonoBehaviour
             {
                 swung = true;
                 tSwing = Time.time;
-                swingCursor = _cursorPos;
+                swingCursor = _gs.UserBatting ? _cursorPos : _aiCursor;
                 _cursorLocked = true;
                 _batter.DoSwing();
             }
@@ -545,7 +628,7 @@ public class AtBatController : MonoBehaviour
         };
         _outcome = HitJudge.Judge(ctx);
         Color rc = BattingUI.RankColor(_outcome.Rank);
-        _cursor.FlashColor(rc, 0.5f);
+        if (_gs.UserBatting) _cursor.FlashColor(rc, 0.5f);
 
         if (_outcome.Rank == HitRank.Whiff)
         {
@@ -599,6 +682,109 @@ public class AtBatController : MonoBehaviour
         yield return StartCoroutine(PlayBattedBall(traj, _play));
         _pitchEnd = (_play.Kind == PlayKind.Foul) ? PitchEnd.Foul : PitchEnd.InPlay;
         LogPitch(plan, _play.Kind.ToString() + (_play.Quirk != QuirkKind.None ? "/" + _play.Quirk : ""), timingMs, _outcome);
+    }
+
+    // ------------------------------------------------------------
+    // 守り(投球)の操作
+    // ------------------------------------------------------------
+    private IEnumerator DefenseInput()
+    {
+        for (int i = 0; i < 5; i++) _avail[i] = _pitcherStats.Brk >= PitchRepertoire.All[i].MinBrk;
+        if (!_avail[_selKind]) _selKind = 0;
+        _ui.ShowPitchPanel(true, _avail, _selKind);
+        _cursorLocked = false;
+        _reticleOn = true;
+        _reticleCol = Color.white;
+        yield return StartCoroutine(Wait(0.30f));
+        _swingQueued = false;
+        _defTapOk = true;
+
+        // 自動操作(検証用): 投手AIの球種とコースを「ユーザーの選択」として使う
+        PitchPlan ai = default(PitchPlan);
+        float tAutoStart = 0f;
+        if (AutoPlay)
+        {
+            ai = PitchAI.ChoosePitch(_pitcherStats, _batterStats, _gs.Balls, _gs.Strikes, _batSide, _last1, _last2);
+            _selKind = (int)ai.Kind;
+            _ui.SelectPitch(_selKind);
+            _cursorTarget = _cursorPos = ClampCursor(ai.Target);
+            tAutoStart = Time.time + 0.5f;
+        }
+
+        // ① 球種 ② コース: 決まったら1回目のタップ
+        bool started = false;
+        while (!started)
+        {
+            if (FreezeKind == -61 && AutoPlay && Time.time >= tAutoStart - 0.2f) { FreezeKind = -99; Time.timeScale = 0f; }
+            if (AutoPlay) { if (Time.time >= tAutoStart) started = true; }
+            else if (ConsumeSwing()) started = true;
+            yield return null;
+        }
+        _swingQueued = false;
+        PitchKind kind = (PitchKind)_selKind;
+        Vector2 aim = _cursorPos;
+        _cursorLocked = true;
+        _reticleCol = new Color(1f, 1f, 1f, 0.45f);
+        _ui.ShowPitchPanel(false, _avail, _selKind);
+        _ui.SetSpeed(PitchRepertoire.Get(kind).Name);
+
+        // ③ モーションに合わせてもう一度タップ
+        _pitcher.DoPitchMotion();
+        float t0 = Time.time;
+        float tRel = t0 + BattingConfig.WindupSeconds;
+        float tSweet = tRel - SweetBeforeRelease;
+        float sweetU = (tSweet - t0) / BattingConfig.WindupSeconds;
+        // 完璧=±25ms、良い=品質0.5(±105ms)の幅をメーターの帯にする
+        _ui.SetMeterZones(sweetU, 0.105f / BattingConfig.WindupSeconds, 0.025f / BattingConfig.WindupSeconds);
+        _ui.ShowMeter(true);
+
+        bool pressed = false;
+        float tPress = 0f;
+        float autoOff = AutoPlay ? PitchAI.Normal(0.050f) : 0f;
+        while (Time.time < tRel)
+        {
+            float u = (Time.time - t0) / BattingConfig.WindupSeconds;
+            if (FreezeKind == -60 && u > 0.7f) { FreezeKind = -99; Time.timeScale = 0f; }
+            if (!pressed)
+            {
+                _ui.SetMeter(u);
+                if (AutoPlay)
+                {
+                    if (Time.time >= tSweet + autoOff) { pressed = true; tPress = Time.time; }
+                }
+                else if (ConsumeSwing())
+                {
+                    if (Time.time - t0 > 0.12f) { pressed = true; tPress = Time.time; }   // 直後の連打は無視
+                }
+            }
+            yield return null;
+        }
+        float timingMs = pressed ? (tPress - tSweet) * 1000f : 185f;
+        float q = PitchAI.TimingQuality(timingMs);
+        string txt; Color col;
+        if (!pressed) { txt = "MISS"; col = new Color(1f, 0.38f, 0.34f); }
+        else if (q >= 0.99f) { txt = "PERFECT!"; col = new Color(1f, 0.86f, 0.18f); }
+        else if (q >= 0.5f) { txt = "GOOD"; col = new Color(0.45f, 0.95f, 0.45f); }
+        else { txt = timingMs < 0f ? "EARLY" : "LATE"; col = new Color(0.62f, 0.78f, 1f); }
+        _ui.ShowTiming(txt, col);
+        _defTapOk = false;
+        _swingQueued = false;
+        _reticleOn = false;
+        _defPlan = PitchAI.PlanFromUser(_pitcherStats, kind, aim, _batSide, timingMs);
+        _defTRelease = tRel;
+        Count("Pitch_" + kind);
+        Count(pressed ? (q >= 0.99f ? "Timing_Perfect" : (q >= 0.5f ? "Timing_Good" : "Timing_Bad")) : "Timing_None");
+    }
+
+    // 打者AI: 球が放たれたあと、スイングするなら適切な時刻に振る
+    private IEnumerator AIBatter(PitchPlan plan, float tRelease)
+    {
+        BatterDecision d = BatterAI.Decide(_batterStats, plan, _gs.Balls, _gs.Strikes);
+        if (!d.Swing) yield break;
+        float tSw = tRelease + plan.FlightTime - BattingConfig.SwingLag + d.TimingSec;
+        while (Time.time < tSw) yield return null;
+        _aiCursor = d.Cursor;
+        _swingQueued = true;
     }
 
     private IEnumerator DelayedFlop(float delay, float power)

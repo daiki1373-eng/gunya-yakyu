@@ -16,6 +16,7 @@ public struct PitchPlan
     public float LateK;
     public bool InZone;       // ストライク判定(ボールの一部でもゾーンに触れる)
     public bool Fat;          // 甘い球(ど真ん中・ぶら下がり)
+    public float Quality;     // 投げた時のタイミング品質 0..1(1=完璧。キレがあり打者が読みにくい)
 }
 
 public static class PitchAI
@@ -37,7 +38,7 @@ public static class PitchAI
         plan.FlightTime = PitchRepertoire.FlightTimeFor(plan.Kmh);
 
         // ---- コース ----
-        float pZone = 0.62f;
+        float pZone = 0.50f;
         if (balls >= 3) pZone = 0.90f;
         else if (strikes >= 2 && balls < 2) pZone = 0.38f;
 
@@ -116,6 +117,63 @@ public static class PitchAI
         plan.Break = def.Break * scale;
         if (kind == PitchKind.Slider) plan.Break.x *= -batSide * 1f; // 逃げる向きに合わせる(右打者: +x)
         return plan;
+    }
+
+    // ユーザーが投げる球: 球種・狙い・タイミングのずれ(ms。負=早い/正=遅い)から軌道を決める。
+    // タイミングが合うほど狙い通り。早いと甘く(中央寄り・曲がり小)、遅いと大きく外れる。
+    public static PitchPlan PlanFromUser(PlayerStats pitcher, PitchKind kind, Vector2 aim, int batSide, float timingMs)
+    {
+        PitchDef def = PitchRepertoire.Get(kind);
+        var plan = new PitchPlan { Kind = kind, Name = def.Name, LateK = def.LateK };
+        float fast = PitchTable.SpeedKmh(pitcher, PitchTable.All[0]) + Random.Range(-1.5f, 5f);
+        fast = Mathf.Clamp(fast, BattingConfig.KmhMin, BattingConfig.KmhMax);
+        plan.Kmh = fast * def.SpeedFactor;
+        plan.FlightTime = PitchRepertoire.FlightTimeFor(plan.Kmh);
+
+        float q = TimingQuality(timingMs);
+        plan.Quality = q;
+        float s = 1f - q;                       // 悪さ 0..1
+        bool early = timingMs < 0f;
+        float ctrlT = Mathf.InverseLerp(5f, 99f, pitcher.Ctrl);
+        float sd = Mathf.Lerp(0.07f, 0.02f, ctrlT) * (0.5f + 2.5f * s);
+        Vector2 a = aim + new Vector2(Normal(sd), Normal(sd));
+        float breakMul = 1f;
+        if (s > 0.1f)
+        {
+            if (early)
+            {
+                // 力んで早く離した: 真ん中寄りに浮いて、曲がりも甘い
+                a = Vector2.Lerp(a, new Vector2(Normal(0.1f), BattingConfig.ZoneCenterY + Normal(0.1f)), s * 0.65f);
+                breakMul = 1f - 0.7f * s;
+                plan.Fat = s > 0.45f;
+            }
+            else
+            {
+                // 遅れて抜けた/引っかけた: 大きく外れる
+                float ang = Random.value * Mathf.PI * 2f;
+                a += new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * (s * 0.80f);
+                breakMul = 1f - 0.4f * s;
+            }
+        }
+        a.x = Mathf.Clamp(a.x, -1.15f, 1.15f);
+        a.y = Mathf.Clamp(a.y, 0.1f, 2.2f);
+        plan.Target = a;
+        plan.InZone = IsStrike(a);
+        plan.Break = def.Break * PitchRepertoire.BreakScale(pitcher) * breakMul;
+        if (kind == PitchKind.Slider) plan.Break.x *= -batSide * 1f;
+        return plan;
+    }
+
+    // タイミング誤差(ms)→品質 1(完璧)〜0(大失敗)。±25msまでは満点。
+    public static float TimingQuality(float timingMs)
+    {
+        return 1f - Mathf.Clamp01((Mathf.Abs(timingMs) - 25f) / 160f);
+    }
+
+    // 標準偏差 sd の疑似正規乱数(Gaussは3つの一様乱数の平均なのでsdは約0.33)
+    public static float Normal(float sd)
+    {
+        return Gauss() * 3f * sd;
     }
 
     // 球種の選択(カウント・打者・前の球)

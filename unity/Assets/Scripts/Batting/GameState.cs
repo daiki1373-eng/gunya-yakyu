@@ -22,7 +22,9 @@ public class GameState
     public int GameNo = 1;
     public int Inning = 1;
     public int Outs;
-    public int Runs;
+    public int Runs;                         // 自チームの得点
+    public int OppRuns;                      // 相手の得点
+    public bool UserBatting = true;          // true=表(自分が打つ) / false=裏(自分が投げる)
     public int Balls, Strikes;
     public int QuirkCount;
     public int PlateAppearances;
@@ -36,7 +38,7 @@ public class GameState
     public void NewGame()
     {
         GameNo++;
-        Inning = 1; Outs = 0; Runs = 0; QuirkCount = 0; PlateAppearances = 0;
+        Inning = 1; Outs = 0; Runs = 0; OppRuns = 0; UserBatting = true; QuirkCount = 0; PlateAppearances = 0;
         ClearBases();
         ResetCount();
     }
@@ -55,13 +57,14 @@ public class GameState
         return n;
     }
 
-    // 3アウトで攻守交代(P2は自分の攻撃だけ回す)
+    // 3アウトで攻守交代。表(自分が打つ)→裏(自分が投げる)→次の回の表…
     public bool EndInningIfNeeded()
     {
         if (Outs < 3) return false;
         Outs = 0;
         ClearBases();
-        Inning++;
+        if (UserBatting) UserBatting = false;
+        else { UserBatting = true; Inning++; }
         return true;
     }
 
@@ -107,7 +110,7 @@ public class GameState
             _runs = 0;
         }
         Outs = newOuts;
-        Runs += _runs;
+        if (UserBatting) Runs += _runs; else OppRuns += _runs;
         LastRuns = _runs;
         for (int i = 0; i < 4; i++) Base[i] = _nb[i];
         return _runs;
@@ -160,7 +163,7 @@ public class GameState
             if (Base[2]) Go(2, 4);
             if (Base[1])
             {
-                if (Random.value < 0.40f) Go(1, 4); else Go(1, 3);
+                if (Random.value < 0.55f) Go(1, 4); else Go(1, 3);
             }
             Go(0, 2);
             return Finish(true);
@@ -169,11 +172,11 @@ public class GameState
         if (Base[3]) Go(3, 4);
         if (Base[2])
         {
-            if (Random.value < 0.55f) Go(2, 4); else Go(2, 3);
+            if (Random.value < 0.70f) Go(2, 4); else Go(2, 3);
         }
         if (Base[1])
         {
-            if (!_nb[3] && Random.value < 0.25f) Go(1, 3); else Go(1, 2);
+            if (!_nb[3] && Random.value < 0.40f) Go(1, 3); else Go(1, 2);
         }
         Go(0, 1);
         return Finish(true);
