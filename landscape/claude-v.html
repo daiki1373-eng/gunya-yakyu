@@ -4638,8 +4638,8 @@ function drawDefense(t){
  X.restore();mitt(-18,-31,1);X.restore();
 }
 function drawBatter(t){
- const s=V.bat;if(!s)return;const dir=s.side==='R'?1:-1,fx=dir>0?108:212,fy=167,nowT=nw();let bend=0;
- if(s.pose==='swing'){const e=nowT-s.t0;if(e>130)bend=Math.min(.55,(e-130)/260*.55)}
+ const s=V.bat;if(!s)return;const sf=stkFx(s);const dir=s.side==='R'?1:-1,fx=dir>0?108:212,fy=167,nowT=nw();let bend=0;
+ if(s.pose==='swing'){const e=nowT-s.t0;if(e>130)bend=Math.min(sf.bend,(e-130)/260*sf.bend)}
  if(s.bendT&&nowT-s.bendT<480)bend-=Math.sin((nowT-s.bendT)/480*Math.PI)*.9;
  if(s.twistT&&nowT-s.twistT<420){const u=(nowT-s.twistT)/420;bend+=Math.sin(u*22)*(1-u)*.5}
  const e=t*1000-s.t0,u=s.pose==='swing'?cl(e/150,0,1):0,spin=G&&G.fx==='spin',giant=G&&(G.arm[s.mine?'me':'you']==='giant'||G.fx==='giant');
@@ -4664,6 +4664,7 @@ function drawBatter(t){
  if(s.sp==='beetle')shape([[-2,-87],[-2,-96],[-7,-101],[-5,-103],[0,-98],[5,-103],[7,-101],[2,-96],[2,-87]],'#af7b43',OUTLINE,1);
  X.restore();let hx=19,hy=-58,ang=-66+u*245,len=49;if(s.pose==='bunt'){ang=7;hx=23;hy=-46;len=35}if(spin)ang+=u*360;if(giant)len*=2.3;
  if(spin&&s.pose==='swing')for(const d of [-28,-56])stroke([[hx,hy],[hx+Math.cos((ang+d)*rad)*len,hy+Math.sin((ang+d)*rad)*len]],'#ffe29d77',1.5);
+ if(s.pose==='swing'&&sf.trails){X.save();X.globalAlpha*=sf.alpha;for(let i=1;i<=sf.trails;i++)stroke([[hx,hy],[hx+Math.cos((ang-i*18)*rad)*len,hy+Math.sin((ang-i*18)*rad)*len]],'#ffe29d',1.5);X.restore()}
  const tx=hx+Math.cos(ang*rad)*len,ty=hy+Math.sin(ang*rad)*len;
  stroke([[hx,hy],[tx,ty]],OUTLINE,giant?8:4);stroke([[hx,hy],[tx,ty]],'#edbb69',giant?5.7:2.6);stroke([[hx,hy],[hx+(tx-hx)*.18,hy+(ty-hy)*.18]],'#735438',giant?3:2);
  stroke([[11,-56],[20,-55],[hx,hy]],OUTLINE,7);stroke([[11,-56],[20,-55],[hx,hy]],'#fff0d7',5);
@@ -4696,8 +4697,9 @@ function pitchBounds(form){
 function pitchAppearance(){
  const def=defenseTeam(),pt=def?pit(def):null,mine=def&&def===G.me;
  const fallback={poses:[{body:-7,arm:-105,leg:30},{body:-18,arm:-145,leg:65},{body:25,arm:-15,leg:9}],spin:0,windmill:0,twist:0,stretch:1,jump:0,loose:15};
- const form=typeof pitchForm!=='undefined'&&mine?pitchForm:typeof PITCH_FORMS!=='undefined'?PITCH_FORMS[pt&&pt.sp==='beetle'?4:pt&&pt.sp==='dog'?1:pt&&pt.sp==='panda'?2:0]:fallback;
- return{def,pt,form,scale:.62/Math.max(1,(form.stretch||1)*.4+(form.jump||0)*.012+.4)};
+ const base=typeof pitchForm!=='undefined'&&mine?pitchForm:typeof PITCH_FORMS!=='undefined'?PITCH_FORMS[pt&&pt.sp==='beetle'?4:pt&&pt.sp==='dog'?1:pt&&pt.sp==='panda'?2:0]:fallback;
+ const sf=stkFx(pt),form={...base};if((pt&&pt.stk||1)>=2){form.loose=Math.min(60,(form.loose||0)+sf.loose);form.spin=(form.spin||0)+sf.spin}
+ return{def,pt,form,scale:sf.scale*.62/Math.max(1,(form.stretch||1)*.4+(form.jump||0)*.012+.4)};
 }
 function drawPitcherPose(x,y,s,col,col2,sp,sd,u,poses=null,effects=null){
  const form=effects||{poses:poses||[{body:-7,arm:-105,leg:30},{body:-18,arm:-145,leg:65},{body:25,arm:-15,leg:9}],stretch:1},r=pitchRig(u,form);
@@ -4959,7 +4961,7 @@ const ps=cl(.55+(r.speed-c.arm)/150+(G.lp&&G.lp.type.sp<.85?.08:0)-(G.lp&&G.lp.k
 if(R()<ps){B[i+1]=r;B[i]=null;if(r.hero&&r.ref)r.ref.rec.sb++;flash('盗塁成功！');tel1(`${r.name}、盗塁成功！`);sndCheer(.4)}else{B[i]=null;G.outs++;flash('盗塁失敗…');tel1(`${r.name}、盗塁死！`);sndOut()}updHUD();await sleep(900)}
 async function PA(k,o){const off=G[k],def=G[o],mine=k==='me';let pt=pit(def);
 if((pt.pc||0)>lim(pt)){const old=pt.name;relieve(def);pt=pit(def);tel1(`${def.short}、ピッチャー交代。${pt.name}くん`);tel2(`${old}くん、お疲れさま！`);await sleep(1800)}
-const bt=off.lineup[G.idx[k]];G.b=0;G.s=0;updHUD();V.mode='bat';V.f=null;V.pit=null;V.dcol=def.color;V.bat={side:bt.side,col:off.color,col2:off.color2,pose:'stand',t0:0,sp:bt.sp||'human',mine:k==='me'};if(k==='you'&&G.gauge.you>=100&&!G.arm.you){G.arm.you=pick(['spin','giant']);G.gauge.you=0;fxSpecial(SPK[G.arm.you].n)}updHUD();
+const bt=off.lineup[G.idx[k]];G.b=0;G.s=0;updHUD();V.mode='bat';V.f=null;V.pit=null;V.dcol=def.color;V.bat={stk:bt.stk||1,side:bt.side,col:off.color,col2:off.color2,pose:'stand',t0:0,sp:bt.sp||'human',mine:k==='me'};if(k==='you'&&G.gauge.you>=100&&!G.arm.you){G.arm.you=pick(['spin','giant']);G.gauge.you=0;fxSpecial(SPK[G.arm.you].n)}updHUD();
 tel1(`${G.idx[k]+1}番、${PA_[bt.pos]}、${bt.name}くん。背番号${bt.num}`);tel2(situ());info(bt,pt);await sleep(1800);
 for(;;){const ev=await pitchOnce(bt,pt,off,def,mine);let end=false;
 if(ev.t==='ball'){G.b++;if(G.b>=4){end=true;const r={ab:false,mv:mvWalk(mkRun(bt))};flash('フォアボール');tel1('フォアボール！');tel2(pick(CM.BB));await sleep(500);await animateAward(r,off,def);applyRes(r,bt,pt,k);updHUD();await sleep(800)}}
@@ -5020,9 +5022,9 @@ ${gen?'':'<label>試合のイニング数<select id="inn"><option>3</option><opt
 function selSch(i){NG.sc=i;SCHOOLS.forEach((_,j)=>{const e=$('#sc'+j);if(e)e.classList.toggle('on',j===i)})}
 function ngGo(){const nm=PENDNAME!==null?PENDNAME:(($('#nm')?.value||'球児').trim().slice(0,6)),ps=+$('#ps').value,th=$('#th').value,bt=$('#bt').value,sp=$('#sp').value;PENDNAME=null;
 if(NG.gen){S.gen++;S.hero=newHero(nm,ps,th,bt,sp);S.grade=1;S.tS=SCH().st+ri(-2,5)+Math.min(S.titles,3)*2;genMates();S.ph='spring';S.slots=4;S.round=0;S.res=[]}
-else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0,coin:1000,bench:[],ord:null,pity:0,serial:0};genMates()}
+else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0,coin:1000,bench:[],ord:null,pity:0,serial:0,xp:0,ticket:0};genMates()}
 MSG='';HM='main';save();hub()}
-function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));if(S.hero&&!S.hero.sp)S.hero.sp='human';if(S.coin===undefined)S.coin=1000;if(S.bench===undefined)S.bench=[];if(S.ord===undefined)S.ord=null;if(S.pity===undefined)S.pity=0;if(S.serial===undefined)S.serial=0;HM='main';MSG='';hub()}catch(e){newGame()}}
+function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));if(S.hero&&!S.hero.sp)S.hero.sp='human';if(S.coin===undefined)S.coin=1000;if(S.bench===undefined)S.bench=[];if(S.ord===undefined)S.ord=null;if(S.pity===undefined)S.pity=0;if(S.serial===undefined)S.serial=0;if(S.xp===undefined)S.xp=0;if(S.ticket===undefined)S.ticket=0;HM='main';MSG='';hub()}catch(e){newGame()}}
 const STN=[['meet','ミート','#f55'],['power','パワー','#f90'],['speed','走力','#4c4'],['field','守備','#4ad'],['arm','肩','#aaf'],['velo','球速','#f5a'],['ctrl','制球','#5df'],['brk','変化球','#da5'],['stam','スタミナ','#ee5']];
 const PR={meet:'打撃練習',power:'筋力トレ',speed:'ダッシュ',field:'守備練習',arm:'遠投',velo:'投げ込み',ctrl:'制球練習',brk:'変化球',stam:'走り込み'};
 function hub(){titleFlow=false;bgmStop();V.mode='yard';hudOff();const h=S.hero,sc=SCH();
@@ -5031,35 +5033,45 @@ const ph=S.ph==='spring'?`${S.grade}年生・春季練習`:`${S.grade}年生・�
 if(HM==='practice')m=`<h2>練習メニュー</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:0 8px">${STN.map(([k])=>`<button class="mb" style="font-size:17px;padding:8px" onclick="doPractice('${k}')">${PR[k]}</button>`).join('')}<button class="mb" style="font-size:17px;padding:8px" onclick="doPractice('team')">チーム練習</button></div><button class="mb" onclick="HM='main';hub()">もどる</button>`;
 else if(HM==='scout')m=scout();
 else if(HM==='form')m=form();
+else if(HM==='exchange')m=exchange();
 else m=`<h2>${ph}</h2><div class="tx" style="min-height:62px;white-space:pre-line;color:#ffe9a0">${MSG||'練習で能力を伸ばそう！'}</div><div class="tx">練習できる回数：残り ${S.slots}回</div>
 <button class="mb" ${S.slots<=0||h.inj>0?'disabled':''} onclick="HM='practice';hub()">練習する</button><button class="mb" ${S.slots<=0?'disabled':''} onclick="doRest()">休養する</button>
 <button class="mb go" onclick="${S.ph==='spring'?'goTour()':'startMatch()'}">${S.ph==='spring'?'夏の大会へ進む':RL[S.round]+'へ！'}</button>
-<div style="display:flex;gap:8px"><button class="mb" onclick="HM='scout';scoutResults=[];hub()">スカウト</button><button class="mb" onclick="HM='form';hub()">編成</button><button class="mb" onclick="records()">記録</button><button class="mb" onclick="help2()">ヘルプ</button><button class="mb" onclick="title()">タイトル</button></div>`;
+<div style="display:flex;gap:8px"><button class="mb" onclick="HM='scout';scoutResults=[];hub()">スカウト</button><button class="mb" onclick="HM='form';hub()">編成</button><button class="mb" onclick="HM='exchange';hub()">交換所</button><button class="mb" onclick="records()">記録</button><button class="mb" onclick="help2()">ヘルプ</button><button class="mb" onclick="title()">タイトル</button></div>`;
 ui(`<div class="pn" style="left:20px;top:20px;width:470px;height:500px"><div class="tx" style="color:#9df">${sc.n}　${S.gen}代目</div><div style="font-size:28px;font-weight:bold;margin:2px 0 6px">${h.name}<small style="font-size:15px"> ${S.grade}年 ${PN[h.pos]}・${SPEC[h.sp||'human'].n} ${h.thr==='R'?'右':'左'}投${h.bat==='R'?'右':'左'}打</small></div>
 <div class="st"><span>疲労</span><div class="bar"><i style="width:${h.fat}%;background:${h.fat>70?'#e33':h.fat>40?'#ea3':'#3c3'}"></i></div><b>${h.fat}</b></div>${h.inj>0?`<div class="warn">ケガ：あと${h.inj}試合 離脱</div>`:''}${bars}<div class="tx">チーム力 ${Math.round(S.tS)}　${S.res.slice(-2).join('<br>')}</div></div><div class="pn" style="left:510px;top:20px;width:430px;height:500px">${m}</div>`)}
 let scoutResults=[];
 const LEGEND=[{name:'玄武パン老師',pos:1,sp:'panda'},{name:'黄金カブト王',pos:3,sp:'beetle'},{name:'疾風ワン将軍',pos:8,sp:'dog'}];
+const stkCap=[0,10,9,8,7,6,5],exchangeBase=[0,1,3,8,20,50,150];
+function stkFx(p){const d=Math.max(0,Math.min(p&&p.stk||1,stkCap[p&&p.rar]||10)-1);return{loose:3*d,spin:.15*d,scale:1+.02*d,bend:Math.min(.85,.55+.03*d),trails:d?Math.min(6,d+1):0,alpha:d?Math.min(.7,.2+.05*d):0}}
 const scoutRefund=[0,100,200,500,1000,3000,30000];
 function scoutPlayer(rar){
  let p;if(rar===6){const c=pick(LEGEND),v=()=>cl(Math.round(S.tS+28+ri(-9,9)),12,97);p={name:c.name,pos:c.pos,num:c.pos,sp:c.sp,side:R()<.8?'R':'L',thr:R()<.85?'R':'L',pc:0,meet:v(),power:v(),speed:v(),field:v(),arm:v(),velo:v(),ctrl:v(),brk:v(),stam:v()}}
  else if((rar===3||rar===5)&&R()<(rar===5?.4:.25)){p=spChar(pick(SPCH));if(rar===5){const q=mkPlayer(p.pos,S.tS+16);for(const k of ['meet','power','speed','field','arm','velo','ctrl','brk','stam'])p[k]=q[k]}}
  else{p=mkPlayer(ri(1,9),S.tS+[0,-14,-7,1,9,16][rar]);if(rar>=3&&R()<(rar===5?.5:.2))p.sp=pick(['beetle','dog','panda'])}
  p.rar=rar;return p}
-function doScout(n){if((n!==1&&n!==10)||S.coin<n*300)return;
- if(S.serial===undefined)S.serial=0;S.coin-=n*300;scoutResults=[];const draws=[];
+function doScout(n,useTicket=false){if((n!==1&&n!==10)||(useTicket?(n!==1||(S.ticket||0)<1):S.coin<n*300))return;
+ if(S.serial===undefined)S.serial=0;if(useTicket)S.ticket--;else S.coin-=n*300;scoutResults=[];const draws=[];
  for(let i=0;i<n;i++){const r=R(),rar=S.pity>=49?4:r<0.0001?6:r<0.0101?5:r<0.0401?4:r<0.1601?3:r<0.5101?2:1;S.pity=rar===4?0:S.pity+1;draws.push(rar)}
  if(n===10&&!draws.some(r=>r>=3))draws[9]=3;
- for(const rar of draws){const p=scoutPlayer(rar),dup=[...Object.values(S.mates),S.relief,...S.bench,S.hero].some(q=>q&&q.name===p.name&&q.pos===p.pos),coin=(rar<5&&dup)||S.bench.length>=20?scoutRefund[rar]:0;
- if(rar>=5){p.serial=++S.serial;p.uid='u'+p.serial}if(coin)S.coin+=coin;else S.bench.push(p);scoutResults.push({p,coin})}
+ for(const rar of draws){let p=scoutPlayer(rar),coin=0,stack=0;const same=q=>q&&q.name===p.name&&q.pos===p.pos;
+ const target=[...Object.values(S.mates),S.relief,...S.bench].find(q=>q!==S.hero&&q&&q.rar&&same(q));
+ if(target){if((target.stk||1)<stkCap[target.rar]){target.stk=(target.stk||1)+1;p=target;stack=p.stk}else coin=scoutRefund[rar]}
+ else if([...Object.values(S.mates),S.relief,S.hero].some(same)||S.bench.length>=20)coin=scoutRefund[rar];
+ else{p.stk=1;p.serial=++S.serial;p.uid='u'+p.serial;S.bench.push(p)}
+ if(coin)S.coin+=coin;scoutResults.push({p,coin,stack})}
  HM='scout';save();hub()}
-function rosterLabel(p){return `${p.rar===6?'SECRET':'★'.repeat(p.rar||0)}${p.serial!==undefined?' No.'+String(p.serial).padStart(6,'0'):''} ${p.name} ${PN[p.pos]}${p.sp?'・'+SPEC[p.sp].n:''} ミート${p.meet} パワー${p.power}${p.pos===1?' 球速'+p.velo:''}`}
-function scout(){return `<h2>スカウト</h2><div class="tx">SECRET 0.01%　★5 1%　★4 3%　★3 12%　★2 35%　★1 48.99%</div><div class="tx">コイン ${S.coin}　ベンチ ${S.bench.length}/20</div><button class="mb" ${S.coin<300?'disabled':''} onclick="doScout(1)">単発 300コイン</button><button class="mb" ${S.coin<3000?'disabled':''} onclick="doScout(10)">10連 3000コイン</button><div class="tx" style="max-height:260px;overflow:auto">${scoutResults.map(({p,coin})=>`<div>${rosterLabel(p)} ${coin?'→'+coin+'コイン':'新規'}</div>`).join('')}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
+function exchangeBench(i){if(!Number.isInteger(i)||i<0||i>=S.bench.length)return;const p=S.bench[i];if(p===S.hero||p===S.relief||Object.values(S.mates).includes(p))return;S.bench.splice(i,1);S.xp=(S.xp||0)+(exchangeBase[p.rar]||0)*(p.stk||1);save();hub()}
+function exchangeBuy(kind){const cost=kind==='ticket'?25:kind==='coin'?15:0;if(!cost||(S.xp||0)<cost)return;S.xp-=cost;if(kind==='ticket')S.ticket=(S.ticket||0)+1;else S.coin+=300;save();hub()}
+function exchange(){return `<h2>交換所</h2><div class="tx">ポイント ${S.xp||0}</div><button class="mb" ${(S.xp||0)<25?'disabled':''} onclick="exchangeBuy('ticket')">スカウトチケット 25pt</button><button class="mb" ${(S.xp||0)<15?'disabled':''} onclick="exchangeBuy('coin')">コイン300 15pt</button><div style="max-height:280px;overflow:auto">${S.bench.map((p,i)=>`<div class="tx">${rosterLabel(p)} <button onclick="exchangeBench(${i})">交換</button></div>`).join('')}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
+function rosterLabel(p){return `${p.rar===6?'SECRET':'★'.repeat(p.rar||0)}${p.serial!==undefined?' No.'+String(p.serial).padStart(6,'0'):''}${(p.stk||1)>=2?' ×'+p.stk:''} ${p.name} ${PN[p.pos]}${p.sp?'・'+SPEC[p.sp].n:''} ミート${p.meet} パワー${p.power}${p.pos===1?' 球速'+p.velo:''}`}
+function scout(){return `<h2>スカウト</h2><div class="tx">SECRET 0.01%　★5 1%　★4 3%　★3 12%　★2 35%　★1 48.99%</div><div class="tx">コイン ${S.coin}　ベンチ ${S.bench.length}/20</div><button class="mb" ${S.coin<300?'disabled':''} onclick="doScout(1)">単発 300コイン</button><button class="mb" ${S.coin<3000?'disabled':''} onclick="doScout(10)">10連 3000コイン</button><button class="mb" ${(S.ticket||0)<1?'disabled':''} onclick="doScout(1,true)">チケット単発（残り${S.ticket||0}）</button><div class="tx" style="max-height:200px;overflow:auto">${scoutResults.map(({p,coin,stack})=>`<div>${rosterLabel(p)} ${coin?'→'+coin+'コイン':stack?'重ね ×'+stack:'新規'}</div>`).join('')}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
 function moveOrder(i,d){const a=buildMine().lineup.map(p=>p.pos),j=i+d;if(i<0||i>=9||j<0||j>=9)return;[a[i],a[j]]=[a[j],a[i]];S.ord=a;save();hub()}
 function autoOrder(){S.ord=null;save();hub()}
 function swapBench(i,relief){const p=S.bench[i];if(!p)return;
  if(relief){if(p.pos!==1)return;[S.relief,S.bench[i]]=[p,S.relief]}
  else{if(p.pos===S.hero.pos||!S.mates[p.pos])return;[S.mates[p.pos],S.bench[i]]=[p,S.mates[p.pos]]}save();hub()}
-function form(){const lineup=buildMine().lineup;return `<h2>編成</h2><div style="max-height:380px;overflow:auto"><div class="tx">打順 <button onclick="autoOrder()">自動</button></div>${lineup.map((p,i)=>`<div class="tx">${i+1} ${p.name} ${PN[p.pos]} <button ${i===0?'disabled':''} onclick="moveOrder(${i},-1)">↑</button><button ${i===8?'disabled':''} onclick="moveOrder(${i},1)">↓</button></div>`).join('')}<h3>先発</h3>${Array.from({length:9},(_,i)=>{const pos=i+1,p=pos===S.hero.pos?S.hero:S.mates[pos];return `<div class="tx">${rosterLabel(p)}${pos===S.hero.pos?' 主人公・固定':''}</div>`}).join('')}<h3>控え投手</h3><div class="tx">${rosterLabel(S.relief)}</div><h3>ベンチ ${S.bench.length}/20</h3>${S.bench.map((p,i)=>`<div class="tx">${rosterLabel(p)}${p.pos!==S.hero.pos&&S.mates[p.pos]?`<button onclick="swapBench(${i},false)">先発と交代</button>`:''}${p.pos===1?`<button onclick="swapBench(${i},true)">控えと交代</button>`:''}</div>`).join('')||'<div class="tx">ベンチなし</div>'}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
+function form(){const lineup=buildMine().lineup;return `<h2>編成</h2><div style="max-height:380px;overflow:auto"><div class="tx">打順 <button onclick="autoOrder()">自動</button></div>${lineup.map((p,i)=>`<div class="tx">${i+1}${(p.stk||1)>=2?' ×'+p.stk:''} ${p.name} ${PN[p.pos]} <button ${i===0?'disabled':''} onclick="moveOrder(${i},-1)">↑</button><button ${i===8?'disabled':''} onclick="moveOrder(${i},1)">↓</button></div>`).join('')}<h3>先発</h3>${Array.from({length:9},(_,i)=>{const pos=i+1,p=pos===S.hero.pos?S.hero:S.mates[pos];return `<div class="tx">${rosterLabel(p)}${pos===S.hero.pos?' 主人公・固定':''}</div>`}).join('')}<h3>控え投手</h3><div class="tx">${rosterLabel(S.relief)}</div><h3>ベンチ ${S.bench.length}/20</h3>${S.bench.map((p,i)=>`<div class="tx">${rosterLabel(p)}${p.pos!==S.hero.pos&&S.mates[p.pos]?`<button onclick="swapBench(${i},false)">先発と交代</button>`:''}${p.pos===1?`<button onclick="swapBench(${i},true)">控えと交代</button>`:''}</div>`).join('')||'<div class="tx">ベンチなし</div>'}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
 function help2(){ui(`<div class="pn" style="left:60px;top:30px;width:840px;height:480px"><div class="tx" style="font-size:17px">疲労が高いと試合で能力が下がり、ケガの原因になります。練習の合間に「休養」を挟みましょう。ケガ中は練習できず、試合にも出られません。<br>打撃は「球が近づいてきたらボタン」。球種・コースを見て打法を使い分けよう。<br>投球はボタンの<b>タップ位置</b>がコース指定です。</div><button class="mb" style="width:200px" onclick="hub()">もどる</button></div>`)}
 function doPractice(k){const h=S.hero;if(S.slots<=0||h.inj>0)return;S.slots--;
 if(k==='team'){S.tS=Math.min(80,S.tS+.9);h.fat=cl(h.fat+7,0,100);MSG='チーム練習！ チーム力が少し上がった'}
