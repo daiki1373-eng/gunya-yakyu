@@ -322,9 +322,10 @@ public class RagdollPlayer : MonoBehaviour
         _poseHoldTimer = 0.35f;
         float f = Facing;
         // 腕は下向きに垂れているので、「前へ振る」角速度はバットと逆符号になる。
-        if (ArmFrontUpper != null) ArmFrontUpper.angularVelocity = 800f * f;
-        if (ArmFrontFore != null) ArmFrontFore.angularVelocity = 1250f * f;
-        if (Chest != null) Chest.angularVelocity = 120f * f;
+        float g = 0.6f + 0.4f * BattingConfig.GunyaLevel;
+        if (ArmFrontUpper != null) ArmFrontUpper.angularVelocity = 800f * f * g;
+        if (ArmFrontFore != null) ArmFrontFore.angularVelocity = 1250f * f * g;
+        if (Chest != null) Chest.angularVelocity = 120f * f * g;
     }
 
     public void DoSwing()
@@ -332,10 +333,22 @@ public class RagdollPlayer : MonoBehaviour
         _poseHoldTimer = 0.30f;
         float f = Facing;
         // バットは上向きに立っているので前へ倒れる向き、腕は下向きなので逆符号。
-        if (Bat != null) Bat.angularVelocity = -1500f * f;
-        if (ArmFrontFore != null) ArmFrontFore.angularVelocity = 1100f * f;
-        if (ArmFrontUpper != null) ArmFrontUpper.angularVelocity = 700f * f;
-        if (Chest != null) Chest.angularVelocity = 150f * f;
+        float g = 0.6f + 0.4f * BattingConfig.GunyaLevel;
+        if (Bat != null) Bat.angularVelocity = -1500f * f * g;
+        if (ArmFrontFore != null) ArmFrontFore.angularVelocity = 1100f * f * g;
+        if (ArmFrontUpper != null) ArmFrontUpper.angularVelocity = 700f * f * g;
+        if (Chest != null) Chest.angularVelocity = 150f * f * g;
+    }
+
+    // バット投げ: バットを手から外してポーンと飛ばす(ぐにゃ度で勢いが増す)。
+    // 打席の終わりに使う。ResetPoseでは戻らない(打者は打席ごとに作り直す)。
+    public void ThrowBat(float power)
+    {
+        if (Bat == null) return;
+        foreach (var j in Bat.GetComponents<HingeJoint2D>()) j.enabled = false;
+        float f = Facing;
+        Bat.velocity = new Vector2(-f * Random.Range(2.5f, 4.5f) * power, Random.Range(4.5f, 7f) * power);
+        Bat.angularVelocity = Random.Range(500f, 900f) * power * (Random.value < 0.5f ? -1f : 1f);
     }
 
     // 三振や大飛球のあとに、ぐにゃっと崩れる演出。

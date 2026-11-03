@@ -7,7 +7,8 @@ using UnityEngine.UI;
 // ============================================================
 public class BattingUI
 {
-    private Text _count, _batter, _speed, _rank, _result;
+    private Text _count, _batter, _speed, _rank, _result, _quirk, _banner;
+    private Image[] _bases = new Image[4];
     private RectTransform _swingRect;
     private Image _swingImg;
     private Font _font;
@@ -78,6 +79,27 @@ public class BattingUI
             new Vector2(800f, 50f), 34, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.6f));
         _result.fontStyle = FontStyle.Bold;
 
+        _quirk = NewText(canvasGo.transform, "Quirk", new Vector2(0.5f, 0.5f), new Vector2(0f, 40f),
+            new Vector2(800f, 70f), 46, TextAnchor.MiddleCenter, new Color(1f, 0.55f, 0.15f));
+        _quirk.fontStyle = FontStyle.Bold;
+        _banner = NewText(canvasGo.transform, "Banner", new Vector2(0.5f, 0.5f), new Vector2(0f, -60f),
+            new Vector2(800f, 60f), 38, TextAnchor.MiddleCenter, Color.white);
+        _banner.fontStyle = FontStyle.Bold;
+
+        // 塁ランプ(ひし形)
+        Vector2[] bp = { Vector2.zero, new Vector2(22f, 0f), new Vector2(0f, 22f), new Vector2(-22f, 0f) };
+        for (int i = 1; i <= 3; i++)
+        {
+            var img = NewImage(canvasGo.transform, "Base" + i, new Color(1f, 1f, 1f, 0.25f));
+            var r = img.rectTransform;
+            r.anchorMin = r.anchorMax = new Vector2(0f, 1f);
+            r.pivot = new Vector2(0.5f, 0.5f);
+            r.sizeDelta = new Vector2(18f, 18f);
+            r.anchoredPosition = new Vector2(70f, -88f) + bp[i];
+            r.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            _bases[i] = img;
+        }
+
         // SWINGボタン(タッチ操作用。マウスはどこをクリックしてもスイング)
         _swingImg = NewImage(canvasGo.transform, "SwingButton", new Color(1f, 0.55f, 0.15f, 0.55f));
         _swingRect = _swingImg.rectTransform;
@@ -99,6 +121,23 @@ public class BattingUI
     public void SetCount(int inning, int balls, int strikes, int outs, int runs)
     {
         _count.text = inning + "回  B " + balls + "  S " + strikes + "  O " + outs + "  得点 " + runs;
+    }
+
+    public void SetBases(bool[] b)
+    {
+        for (int i = 1; i <= 3; i++)
+        {
+            if (_bases[i] != null)
+                _bases[i].color = b[i] ? new Color(1f, 0.82f, 0.15f, 1f) : new Color(1f, 1f, 1f, 0.25f);
+        }
+    }
+
+    public void ShowQuirk(string text) { _quirk.text = text ?? ""; }
+    public void ShowBanner(string text) { _banner.text = text ?? ""; }
+
+    public void ShowPitch(string name, float kmh)
+    {
+        _speed.text = name + "  " + Mathf.RoundToInt(kmh) + " km/h";
     }
 
     public void SetBatter(PlayerStats p)
@@ -131,6 +170,7 @@ public class BattingUI
     {
         _rank.text = "";
         _result.text = "";
+        if (_quirk != null) _quirk.text = "";
     }
 
     public void ClearSpeed()

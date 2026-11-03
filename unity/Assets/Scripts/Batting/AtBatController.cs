@@ -19,7 +19,7 @@ public class AtBatController : MonoBehaviour
     public static bool Verbose = false;
     public static readonly Dictionary<string, int> Tally = new Dictionary<string, int>();
 
-    private enum PitchEnd { None, Ball, CalledStrike, SwingMiss, Foul, FoulTip, InPlay }
+    private enum PitchEnd { None, Ball, CalledStrike, SwingMiss, Foul, FoulTip, InPlay, HitByPitch }
 
     private BattingStage _stage;
     private BattingUI _ui;
@@ -29,9 +29,13 @@ public class AtBatController : MonoBehaviour
     private int _batSide = -1;   // -1=右打者(x<0側) / +1=左打者
 
     // 試合状態
+    private readonly GameState _gs = new GameState();
     private int _batterIndex = -1;
-    private int _balls, _strikes, _outs, _inning = 1, _runs;
     private int _pitchCount;
+    private int _last1 = -1, _last2 = -1;   // 直前2球の球種(配球AI用)
+    public static readonly List<string> GameLog = new List<string>();
+    public static bool ShowPitchName = true;
+    public static int FreezeKind = -99;   // 検証用: この球種(-1=何でも)の終盤でtimeScaleを0にして止める
 
     // 入力
     private Vector2 _cursorPos = new Vector2(0f, BattingConfig.ZoneCenterY);
@@ -221,13 +225,23 @@ public class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     // 打席(1人の打者)
     // ------------------------------------------------------------
+    private void RefreshHud()
+    {
+        _ui.SetCount(_gs.Inning, _gs.Balls, _gs.Strikes, _gs.Outs, _gs.Runs);
+        _ui.SetBases(_gs.Base);
+    }
+
     private IEnumerator PlayAtBat()
     {
         SetupBatter();
-        _balls = 0;
-        _strikes = 0;
-        _ui.SetCount(_inning, _balls, _strikes, _outs, _runs);
+        _gs.ResetCount();
+        _gs.PlateAppearances++;
+        _last1 = _last2 = -1;
+        _stage.ResetFielders();
+        _stage.ShowRunnersOnBases(_gs.Base);
+        RefreshHud();
         _ui.ShowResult("");
+        _ui.ShowBanner("");
         yield return StartCoroutine(Wait(0.4f));
 
         bool over = false;
@@ -235,46 +249,62 @@ public class AtBatController : MonoBehaviour
         {
             yield return StartCoroutine(PlayPitch());
             over = ApplyPitchResult();
-            _ui.SetCount(_inning, _balls, _strikes, _outs, _runs);
-            yield return StartCoroutine(Wait(over ? 1.3f : 0.75f));
-            if (_stage != null) _stage.HideBall();
-            if (_play.Fielder >= 0 || _pitchEnd == PitchEnd.InPlay)
-            {
-                _stage.SetCameraMode(CamMode.Catcher);
-                _stage.ResetFielders();
-            }
+            RefreshHud();
+            if (over) yield return StartCoroutine(AnimateMoves());
+            yield return StartCoroutine(Wait(over ? 0.8f : 0.7f));
+            _stage.HideBall();
+            _stage.SetCameraMode(CamMode.Catcher);
+            _stage.ResetFielders();
         }
 
-        if (_outs >= 3)
+        if (_gs.Outs >= 3)
         {
-            _outs = 0;
-            _inning++;
-            _ui.SetCount(_inning, _balls, _strikes, _outs, _runs);
             _ui.ShowResult("チェンジ");
-            yield return StartCoroutine(Wait(1.2f));
+            yield return StartCoroutine(Wait(1.0f));
+            _gs.EndInningIfNeeded();
+            _stage.HideRunners();
+            if (_gs.GameOver)
+            {
+                string summary = "試合終了  " + _gs.Runs + "点";
+                _ui.ShowResult(summary);
+                _ui.ShowBanner("珍プレー " + _gs.QuirkCount);
+                GameLog.Add("game" + _gs.GameNo + " runs=" + _gs.Runs + " quirks=" + _gs.QuirkCount + " pa=" + _gs.PlateAppearances);
+                yield return StartCoroutine(Wait(2.4f));
+                _gs.NewGame();
+                _ui.ShowBanner("");
+            }
+            RefreshHud();
         }
     }
 
-    // 1球ぶんの結果をカウントへ反映。打席が終わったら true。
+    // 1球ぶんの結果をカウントと走者へ反映。打席が終わったら true。
     private bool ApplyPitchResult()
     {
         bool over = false;
         string key = _pitchEnd.ToString();
+        _gs.Moves.Clear();
+        _gs.LastRuns = 0;
         switch (_pitchEnd)
         {
             case PitchEnd.Ball:
-                _balls++;
-                if (_balls >= 4) { _ui.ShowResult("フォアボール"); over = true; key = "Walk"; }
+                _gs.Balls++;
+                if (_gs.Balls >= 4) { _gs.ApplyWalk(); _ui.ShowResult("フォアボール"); over = true; key = "Walk"; }
+                break;
+            case PitchEnd.HitByPitch:
+                _gs.ApplyWalk();
+                _ui.ShowResult("デッドボール");
+                over = true;
+                key = "HitByPitch";
                 break;
             case PitchEnd.CalledStrike:
-                _strikes++;
-                if (_strikes >= 3) { _outs++; _ui.ShowResult("見逃し三振！"); over = true; key = "StrikeoutLooking"; }
+                _gs.Strikes++;
+                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("見逃し三振！"); over = true; key = "StrikeoutLooking"; }
                 break;
             case PitchEnd.SwingMiss:
-                _strikes++;
-                if (_strikes >= 3)
+                _gs.Strikes++;
+                if (_gs.Strikes >= 3)
                 {
-                    _outs++;
+                    _gs.ApplyStrikeout();
                     _ui.ShowResult("空振り三振！");
                     _batter.Flop(1.0f * BattingConfig.GunyaLevel);
                     over = true;
@@ -282,23 +312,31 @@ public class AtBatController : MonoBehaviour
                 }
                 break;
             case PitchEnd.Foul:
-                if (_strikes < 2) _strikes++;
+                if (_gs.Strikes < 2) _gs.Strikes++;
                 break;
             case PitchEnd.FoulTip:
-                _strikes++;
-                if (_strikes >= 3) { _outs++; _ui.ShowResult("ファウルチップ三振！"); over = true; key = "StrikeoutTip"; }
+                _gs.Strikes++;
+                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("ファウルチップ三振！"); over = true; key = "StrikeoutTip"; }
                 break;
             case PitchEnd.InPlay:
                 over = true;
                 key = _play.Kind.ToString();
-                if (_play.IsOut) _outs++;
-                else if (_play.Kind == PlayKind.HomeRun) _runs++;
+                if (_play.Kind == PlayKind.HomeRun) _gs.ApplyHit(4);
+                else if (_play.IsHit) _gs.ApplyHit(Mathf.Max(1, _play.Bases));
+                else _gs.ApplyOut(_play.Kind, _play.Fielder, _play.Distance);
                 break;
         }
+        if (over && _gs.LastRuns > 0) _ui.ShowBanner("+" + _gs.LastRuns + "点");
+        Count(key);
+        if (over && _gs.Moves.Count > 0) Count("Runs", _gs.LastRuns);
+        return over;
+    }
+
+    private static void Count(string key, int n = 1)
+    {
         int c;
         Tally.TryGetValue(key, out c);
-        Tally[key] = c + 1;
-        return over;
+        Tally[key] = c + n;
     }
 
     public static string TallyReport()
@@ -308,32 +346,116 @@ public class AtBatController : MonoBehaviour
         return sb.ToString();
     }
 
+    // 走者の進塁を見せる(俯瞰カメラ)
+    private IEnumerator AnimateMoves()
+    {
+        var paths = new List<List<Vector2>>();
+        var lens = new List<float>();
+        var slots = new List<int>();
+        float maxLen = 0f;
+        for (int k = 0; k < _gs.Moves.Count; k++)
+        {
+            RunnerMove m = _gs.Moves[k];
+            int target = m.To == -1 ? m.OutBase : m.To;
+            if (m.To == -1 && m.OutBase <= 0) continue;
+            if (m.To != -1 && target == m.From) continue;
+            var path = new List<Vector2>();
+            path.Add(FieldingModel.BasePos(m.From));
+            for (int i = m.From + 1; i <= target; i++) path.Add(FieldingModel.BasePos(i));
+            float len = 0f;
+            for (int i = 1; i < path.Count; i++) len += Vector2.Distance(path[i - 1], path[i]);
+            paths.Add(path); lens.Add(len); slots.Add(m.From);
+            maxLen = Mathf.Max(maxLen, len);
+            _stage.ShowRunner(m.From, true);
+            _stage.SetRunnerPos(m.From, path[0]);
+        }
+        if (paths.Count > 0)
+        {
+            _stage.SetCameraMode(CamMode.Diamond);
+            float v = Mathf.Max(22f, maxLen / 2.0f);
+            float total = maxLen / v;
+            float t = 0f;
+            while (t < total + 0.1f)
+            {
+                t += Time.deltaTime;
+                for (int i = 0; i < paths.Count; i++)
+                {
+                    float d = Mathf.Min(t * v, lens[i]);
+                    _stage.SetRunnerPos(slots[i], PointAlong(paths[i], d));
+                }
+                yield return null;
+            }
+        }
+        _stage.HideRunners();
+        _stage.ShowRunnersOnBases(_gs.Base);
+    }
+
+    private static Vector2 PointAlong(List<Vector2> path, float dist)
+    {
+        for (int i = 1; i < path.Count; i++)
+        {
+            float seg = Vector2.Distance(path[i - 1], path[i]);
+            if (dist <= seg || i == path.Count - 1)
+                return Vector2.Lerp(path[i - 1], path[i], seg < 1e-4f ? 1f : Mathf.Clamp01(dist / seg));
+            dist -= seg;
+        }
+        return path[path.Count - 1];
+    }
+
     // ------------------------------------------------------------
     // 1球
     // ------------------------------------------------------------
+    // 軌道: 変化なしの直線(リリース→aim)に、s^LateK で増える曲がり(Break)を足して Target に着く。
     private static Vector3 PitchPos(PitchPlan plan, float t)
     {
         float s = t / plan.FlightTime;
         Vector3 a = BattingConfig.ReleasePoint;
-        Vector3 b = new Vector3(plan.Target.x, plan.Target.y, 0f);
-        return Vector3.LerpUnclamped(a, b, s);
+        Vector3 aim = new Vector3(plan.Target.x - plan.Break.x, plan.Target.y - plan.Break.y, 0f);
+        Vector3 p = Vector3.LerpUnclamped(a, aim, s);
+        float k = Mathf.Pow(Mathf.Clamp01(s), plan.LateK);
+        p.x += plan.Break.x * k;
+        p.y += plan.Break.y * k;
+        return p;
+    }
+
+    private static Color TrailColor(PitchKind k)
+    {
+        switch (k)
+        {
+            case PitchKind.Curve: return new Color(0.45f, 0.70f, 1f);
+            case PitchKind.Slider: return new Color(0.50f, 0.95f, 0.55f);
+            case PitchKind.Fork: return new Color(1f, 0.62f, 0.25f);
+            case PitchKind.Changeup: return new Color(1f, 0.95f, 0.45f);
+            default: return new Color(1f, 1f, 1f);
+        }
+    }
+
+    private bool IsBodyHit(PitchPlan plan)
+    {
+        return Mathf.Sign(plan.Target.x) == _batSide && Mathf.Abs(plan.Target.x) >= 0.92f
+            && plan.Target.y > 0.4f && plan.Target.y < 1.9f;
     }
 
     private IEnumerator PlayPitch()
     {
         _pitchEnd = PitchEnd.None;
-        _play = new PlayResult { Fielder = -1 };
+        _play = new PlayResult { Fielder = -1, Fielder2 = -1 };
         _pitchCount++;
         _stage.SetCameraMode(CamMode.Catcher);
         _ui.ClearCenter();
         _ui.ClearSpeed();
+        _ui.ShowBanner("");
         _cursor.ResetColor();
         _cursorLocked = false;
         _stage.HideBall();
+        _stage.ClearTrail();
         _batter.ResetPose();
         _pitcher.ResetPose();
 
-        PitchPlan plan = PitchAI.ChoosePitch(_pitcherStats, _batterStats, _balls, _strikes);
+        PitchPlan plan = PitchAI.ChoosePitch(_pitcherStats, _batterStats, _gs.Balls, _gs.Strikes,
+            _batSide, _last1, _last2);
+        _last2 = _last1;
+        _last1 = (int)plan.Kind;
 
         yield return StartCoroutine(Wait(0.45f));
         _swingQueued = false;
@@ -363,14 +485,22 @@ public class AtBatController : MonoBehaviour
 
         float tRelease = Time.time;
         float tArrive = tRelease + plan.FlightTime;
-        _ui.ShowSpeed(plan.Kmh);
+        if (ShowPitchName) _ui.ShowPitch(plan.Name, plan.Kmh); else _ui.ShowSpeed(plan.Kmh);
         _stage.SetBall(PitchPos(plan, 0f));
+        Color trailCol = TrailColor(plan.Kind);
 
         // ボールが来る間
         while (true)
         {
             float t = Time.time - tRelease;
-            _stage.SetBall(PitchPos(plan, t));
+            Vector3 bp = PitchPos(plan, t);
+            _stage.SetBall(bp);
+            _stage.AddTrail(bp, trailCol);
+            if (FreezeKind >= -1 && (FreezeKind < 0 || FreezeKind == (int)plan.Kind) && t > plan.FlightTime * 0.85f)
+            {
+                FreezeKind = -99;
+                Time.timeScale = 0f;
+            }
             if (!swung && ConsumeSwing())
             {
                 swung = true;
@@ -387,8 +517,14 @@ public class AtBatController : MonoBehaviour
         // ---- 見逃し ----
         if (!swung)
         {
-            yield return StartCoroutine(FinishFlight(plan, tRelease));
+            yield return StartCoroutine(FinishFlight(plan, tRelease, trailCol));
             if (plan.InZone) { _pitchEnd = PitchEnd.CalledStrike; _ui.ShowResult("ストライク"); }
+            else if (IsBodyHit(plan))
+            {
+                _pitchEnd = PitchEnd.HitByPitch;
+                _ui.ShowQuirk("デッドボール！");
+                _batter.Flop(1.2f * BattingConfig.GunyaLevel);
+            }
             else { _pitchEnd = PitchEnd.Ball; _ui.ShowResult("ボール"); }
             LogPitch(plan, "take", 0f, null);
             yield break;
@@ -419,7 +555,7 @@ public class AtBatController : MonoBehaviour
             _ui.ShowResult("空振り");
             _pitchEnd = PitchEnd.SwingMiss;
             StartCoroutine(DelayedFlop(0.18f, 0.5f));
-            yield return StartCoroutine(FinishFlight(plan, tRelease));
+            yield return StartCoroutine(FinishFlight(plan, tRelease, trailCol));
             LogPitch(plan, "whiff", timingMs, _outcome);
             yield break;
         }
@@ -453,10 +589,16 @@ public class AtBatController : MonoBehaviour
 
         var traj = BattedBallPhysics.Simulate(contact, _outcome.ExitSpeed, _outcome.LaunchDeg,
             _outcome.SprayDeg, _outcome.BackspinRpm, _outcome.TiltDeg);
-        _play = FieldingModel.Resolve(traj, _batterStats.Speed);
+        float qs = _gs.QuirkAllowed ? BattingConfig.GunyaLevel : 0f;
+        _play = FieldingModel.Resolve(traj, _batterStats.Speed, qs);
+        if (_play.Quirk != QuirkKind.None)
+        {
+            _gs.QuirkCount++;
+            Count("Quirk_" + _play.Quirk);
+        }
         yield return StartCoroutine(PlayBattedBall(traj, _play));
         _pitchEnd = (_play.Kind == PlayKind.Foul) ? PitchEnd.Foul : PitchEnd.InPlay;
-        LogPitch(plan, _play.Kind.ToString(), timingMs, _outcome);
+        LogPitch(plan, _play.Kind.ToString() + (_play.Quirk != QuirkKind.None ? "/" + _play.Quirk : ""), timingMs, _outcome);
     }
 
     private IEnumerator DelayedFlop(float delay, float power)
@@ -466,7 +608,7 @@ public class AtBatController : MonoBehaviour
     }
 
     // 振らなかった/空振りしたボールを捕手の位置まで見届ける
-    private IEnumerator FinishFlight(PitchPlan plan, float tRelease)
+    private IEnumerator FinishFlight(PitchPlan plan, float tRelease, Color trailCol)
     {
         while (true)
         {
@@ -474,6 +616,7 @@ public class AtBatController : MonoBehaviour
             Vector3 p = PitchPos(plan, t);
             if (p.z <= -0.7f) break;
             _stage.SetBall(p);
+            _stage.AddTrail(p, trailCol);
             yield return null;
         }
         _stage.HideBall();
@@ -488,28 +631,58 @@ public class AtBatController : MonoBehaviour
         _stage.ResetFielders();
 
         FieldingModel.Fielder f = default(FieldingModel.Fielder);
+        FieldingModel.Fielder f2 = default(FieldingModel.Fielder);
         bool hasF = play.Fielder >= 0;
+        bool hasF2 = play.Fielder2 >= 0 && play.Quirk == QuirkKind.Collision;
         if (hasF) f = FieldingModel.Defaults[play.Fielder];
+        if (hasF2) f2 = FieldingModel.Defaults[play.Fielder2];
         Vector2 target = new Vector2(play.PlayPos.x, play.PlayPos.z);
-        bool resultShown = false;
+        bool resultShown = false, quirkShown = false, popped = false;
+
+        // バット投げ(会心の当たりのとき)
+        if (play.Kind == PlayKind.HomeRun || (_outcome.Rank == HitRank.Perfect && Random.value < 0.5f))
+            StartCoroutine(DelayedBatToss(0.15f));
+
+        // 送球(ゴロ処理)
+        float throwStart = -1f, throwDur = 0.1f;
+        Vector2 throwFrom = Vector2.zero, throwTo = Vector2.zero;
+        if (play.ThrowBase > 0)
+        {
+            throwStart = play.PlayTime + FieldingModel.ThrowTransfer;
+            throwFrom = new Vector2(play.ThrowFrom.x, play.ThrowFrom.z);
+            throwTo = FieldingModel.BasePos(play.ThrowBase);
+            if (play.Quirk == QuirkKind.BadThrow) throwTo += new Vector2(5.5f, 7f);   // ファウルゾーンへ大暴投
+            throwDur = Mathf.Max(0.15f, Vector2.Distance(throwFrom, throwTo) / FieldingModel.ThrowSpeed);
+        }
 
         float t = 0f;
         while (t < play.EndTime)
         {
             t += Time.deltaTime;
-            Vector3 p = tr.PosAt(Mathf.Min(t, tr.Duration));
+            Vector3 p;
+            if (throwStart >= 0f && t >= throwStart)
+            {
+                float u = Mathf.Clamp01((t - throwStart) / throwDur);
+                Vector2 xz = Vector2.Lerp(throwFrom, throwTo, u);
+                p = new Vector3(xz.x, 1.1f + Mathf.Sin(u * Mathf.PI) * 1.6f, xz.y);
+            }
+            else p = tr.PosAt(Mathf.Min(t, tr.Duration));
             _stage.SetBall(p);
             _stage.SetFollowTarget(p);
 
-            if (hasF)
-            {
-                float run = Mathf.Max(0f, t - FieldingModel.React) * f.Speed * FieldingModel.RunEfficiency;
-                Vector2 to = target - f.Pos;
-                float dist = to.magnitude;
-                Vector2 pos = dist < 1e-3f ? f.Pos : f.Pos + to / dist * Mathf.Min(dist, run);
-                _stage.SetFielderPos(play.Fielder, pos);
-            }
+            if (hasF) MoveFielder(play.Fielder, f, target, t);
+            if (hasF2) MoveFielder(play.Fielder2, f2, target, t);
 
+            if (!quirkShown && play.Quirk != QuirkKind.None && t >= play.QuirkTime)
+            {
+                quirkShown = true;
+                PlayQuirk(play);
+            }
+            if (!popped && play.IsOut && play.Quirk == QuirkKind.None && play.Fielder >= 2 && t >= play.PlayTime)
+            {
+                popped = true;
+                _stage.CatchPop(play.Fielder);
+            }
             if (!resultShown && t >= play.PlayTime)
             {
                 resultShown = true;
@@ -520,10 +693,54 @@ public class AtBatController : MonoBehaviour
         if (!resultShown) ShowPlayResult(play);
     }
 
+    private void MoveFielder(int index, FieldingModel.Fielder f, Vector2 target, float t)
+    {
+        float run = Mathf.Max(0f, t - FieldingModel.React) * f.Speed * FieldingModel.RunEfficiency;
+        Vector2 to = target - f.Pos;
+        float dist = to.magnitude;
+        Vector2 pos = dist < 1e-3f ? f.Pos : f.Pos + to / dist * Mathf.Min(dist, run);
+        _stage.SetFielderPos(index, pos);
+    }
+
+    private IEnumerator DelayedBatToss(float delay)
+    {
+        yield return StartCoroutine(Wait(delay));
+        if (_batter != null) _batter.ThrowBat(0.8f * BattingConfig.GunyaLevel);
+    }
+
+    private IEnumerator FreezeSoon(float realSeconds)
+    {
+        yield return new WaitForSecondsRealtime(realSeconds);
+        Time.timeScale = 0f;
+    }
+
+    private void PlayQuirk(PlayResult play)
+    {
+        _ui.ShowQuirk(FieldingModel.QuirkLabel(play.Quirk));
+        if (FreezeKind == -50) { FreezeKind = -99; StartCoroutine(FreezeSoon(0.45f)); }
+        switch (play.Quirk)
+        {
+            case QuirkKind.Collision:
+                _stage.Tumble(play.Fielder, 1.3f);
+                _stage.Tumble(play.Fielder2, 1.3f);
+                break;
+            case QuirkKind.FenceCrash:
+            case QuirkKind.Slip:
+                _stage.Tumble(play.Fielder, 1.4f);
+                break;
+            case QuirkKind.BadThrow:
+                _stage.Tumble(play.Fielder2 >= 2 ? play.Fielder2 : 2, 1.1f);
+                break;
+        }
+    }
+
     private void ShowPlayResult(PlayResult play)
     {
         string label = FieldingModel.Label(play.Kind);
-        if (play.Kind == PlayKind.HomeRun || play.IsHit)
+        if (play.Quirk == QuirkKind.BadThrow || play.Quirk == QuirkKind.Slip) label = "エラー";
+        else if (play.Quirk == QuirkKind.Collision || (play.Quirk == QuirkKind.FenceCrash && !play.IsOut))
+            label = play.Kind == PlayKind.Foul ? "ファウル" : "落球";
+        else if (play.Kind == PlayKind.HomeRun || play.IsHit)
             label += "  " + Mathf.RoundToInt(play.Distance) + "m";
         _ui.ShowResult(label);
         if (play.Kind == PlayKind.HomeRun) _pitcher.Flop(0.7f * BattingConfig.GunyaLevel);
@@ -534,12 +751,15 @@ public class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     private IEnumerator AutoPilot(PitchPlan plan, float tRelease)
     {
-        Vector2 aim = plan.Target + new Vector2(PitchAI.Gauss() * 0.33f, PitchAI.Gauss() * 0.33f);
+        // 変化球は読みにくい分、狙いが少しぶれる。チェンジアップは早振りになりやすい。
+        float noise = 0.33f + (plan.Kind == PitchKind.Fastball ? 0f : 0.07f);
+        Vector2 aim = plan.Target + new Vector2(PitchAI.Gauss() * noise, PitchAI.Gauss() * noise);
         _cursorTarget = ClampCursor(aim);
         bool swing = plan.InZone ? (Random.value < 0.92f) : (Random.value < 0.15f);
         if (!swing) yield break;
         float tArrive = tRelease + plan.FlightTime;
-        float tSw = tArrive - BattingConfig.SwingLag + PitchAI.Gauss() * 0.12f;
+        float bias = plan.Kind == PitchKind.Changeup ? -0.035f : 0f;
+        float tSw = tArrive - BattingConfig.SwingLag + bias + PitchAI.Gauss() * 0.12f;
         while (Time.time < tSw) yield return null;
         _swingQueued = true;
     }
@@ -548,8 +768,8 @@ public class AtBatController : MonoBehaviour
     {
         if (!Verbose) return;
         string r = o.HasValue ? o.Value.Rank + " e=" + o.Value.EllipseDist.ToString("F2") : "-";
-        Debug.Log("[AtBat] #" + _pitchCount + " " + _balls + "-" + _strikes + "-" + _outs
-                  + " " + _batterStats.Name + " " + plan.Kmh.ToString("F0") + "km/h target=("
+        Debug.Log("[AtBat] #" + _pitchCount + " " + _gs.Balls + "-" + _gs.Strikes + "-" + _gs.Outs
+                  + " " + _batterStats.Name + " " + plan.Name + " " + plan.Kmh.ToString("F0") + "km/h target=("
                   + plan.Target.x.ToString("F2") + "," + plan.Target.y.ToString("F2") + ") zone=" + plan.InZone
                   + " -> " + what + " dt=" + timingMs.ToString("F0") + "ms " + r);
     }

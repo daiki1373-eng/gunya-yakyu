@@ -12,7 +12,7 @@ using UnityEngine;
 //
 // カメラは2モード: Catcher(捕手後方の固定視点) / Follow(打球を追う)。
 // ============================================================
-public enum CamMode { Catcher, Follow }
+public enum CamMode { Catcher, Follow, Diamond }
 
 public class BattingStage : MonoBehaviour
 {
@@ -116,6 +116,13 @@ public class BattingStage : MonoBehaviour
                 Mathf.Infinity, dt);
             ct.rotation = Quaternion.Slerp(ct.rotation, _catcherRot, 1f - Mathf.Exp(-9f * dt));
         }
+        else if (_mode == CamMode.Diamond)
+        {
+            Vector3 dpos = new Vector3(0f, 26f, -18f);
+            ct.position = Vector3.SmoothDamp(ct.position, dpos, ref _camVel, 0.40f, Mathf.Infinity, dt);
+            Quaternion look = Quaternion.LookRotation(new Vector3(0f, 0f, 22f) - ct.position, Vector3.up);
+            ct.rotation = Quaternion.Slerp(ct.rotation, look, 1f - Mathf.Exp(-6f * dt));
+        }
         else
         {
             Vector3 b = _followTarget;
@@ -133,6 +140,7 @@ public class BattingStage : MonoBehaviour
         {
             if (_billboards[i] != null) _billboards[i].rotation = ct.rotation;
         }
+        UpdateTrail();
     }
 
     // ------------------------------------------------------------
@@ -344,29 +352,63 @@ public class BattingStage : MonoBehaviour
     }
 
     // ------------------------------------------------------------
-    // 野手(人形)。0=投手 1=捕手 は描かない(ラグドール投手がいる/捕手視点なので)。
+    // 野手・走者(人形)。0=投手 1=捕手 は描かない(ラグドール投手がいる/捕手視点なので)。
+    // 人形は root(カメラ向き) → rig(足元が軸。転倒・揺れはここを回す) → パーツ の構成。
     // ------------------------------------------------------------
-    private void BuildFielders()
+    private Transform[] _fielderRigs;
+    private bool[] _fielderBusy;
+    private Vector2[] _fielderLast;
+    private Transform[] _runners, _runnerRigs;
+    private bool[] _runnerBusy;
+    private Vector2[] _runnerLast;
+    private const float DollScale = 1.9f; // 遠くでも見えるよう誇張
+
+    private Transform MakeDoll(string name, Color uniform, Color capColor, out Transform rig)
     {
         Sprite white = SpriteFactory.White;
         Sprite circle = SpriteFactory.Circle;
+        var root = new GameObject(name).transform;
+        root.SetParent(Root, false);
+        rig = new GameObject("Rig").transform;
+        rig.SetParent(root, false);
+        const float s = DollScale;
+        BattingSprites.Make("Legs", rig, white, new Color(0.92f, 0.92f, 0.95f), 3,
+            new Vector3(0f, 0.35f * s, 0f), Vector3.zero, new Vector3(0.40f * s, 0.70f * s, 1f));
+        BattingSprites.Make("Body", rig, white, uniform, 3,
+            new Vector3(0f, 0.95f * s, 0f), Vector3.zero, new Vector3(0.50f * s, 0.55f * s, 1f));
+        BattingSprites.Make("Head", rig, circle, new Color(0.96f, 0.78f, 0.62f), 3,
+            new Vector3(0f, 1.42f * s, 0f), Vector3.zero, new Vector3(0.42f * s, 0.42f * s, 1f));
+        BattingSprites.Make("Cap", rig, white, capColor, 4,
+            new Vector3(0f, 1.58f * s, 0f), Vector3.zero, new Vector3(0.44f * s, 0.14f * s, 1f));
+        _billboards.Add(root);
+        return root;
+    }
+
+    private void BuildFielders()
+    {
         int n = FieldingModel.Defaults.Length;
         _fielders = new Transform[n];
+        _fielderRigs = new Transform[n];
+        _fielderBusy = new bool[n];
+        _fielderLast = new Vector2[n];
         for (int i = 2; i < n; i++)
         {
-            var root = new GameObject("Fielder_" + FieldingModel.Defaults[i].Name).transform;
-            root.SetParent(Root, false);
-            const float s = 1.9f; // 遠くでも見えるよう誇張
-            BattingSprites.Make("Legs", root, white, new Color(0.92f, 0.92f, 0.95f), 3,
-                new Vector3(0f, 0.35f * s, 0f), Vector3.zero, new Vector3(0.40f * s, 0.70f * s, 1f));
-            BattingSprites.Make("Body", root, white, new Color(0.25f, 0.40f, 0.82f), 3,
-                new Vector3(0f, 0.95f * s, 0f), Vector3.zero, new Vector3(0.50f * s, 0.55f * s, 1f));
-            BattingSprites.Make("Head", root, circle, new Color(0.96f, 0.78f, 0.62f), 3,
-                new Vector3(0f, 1.42f * s, 0f), Vector3.zero, new Vector3(0.42f * s, 0.42f * s, 1f));
-            BattingSprites.Make("Cap", root, white, new Color(0.15f, 0.22f, 0.5f), 4,
-                new Vector3(0f, 1.58f * s, 0f), Vector3.zero, new Vector3(0.44f * s, 0.14f * s, 1f));
-            _billboards.Add(root);
-            _fielders[i] = root;
+            Transform rig;
+            _fielders[i] = MakeDoll("Fielder_" + FieldingModel.Defaults[i].Name,
+                new Color(0.25f, 0.40f, 0.82f), new Color(0.15f, 0.22f, 0.5f), out rig);
+            _fielderRigs[i] = rig;
+        }
+        // 走者: 0=打者走者 1..3=塁上の走者(出発塁の番号)
+        _runners = new Transform[4];
+        _runnerRigs = new Transform[4];
+        _runnerBusy = new bool[4];
+        _runnerLast = new Vector2[4];
+        for (int i = 0; i < 4; i++)
+        {
+            Transform rig;
+            _runners[i] = MakeDoll("Runner_" + i, new Color(0.85f, 0.25f, 0.22f), new Color(0.55f, 0.1f, 0.1f), out rig);
+            _runnerRigs[i] = rig;
+            _runners[i].gameObject.SetActive(false);
         }
         ResetFielders();
     }
@@ -378,12 +420,173 @@ public class BattingStage : MonoBehaviour
             if (_fielders[i] == null) continue;
             Vector2 p = FieldingModel.Defaults[i].Pos;
             _fielders[i].position = new Vector3(p.x, 0f, p.y);
+            _fielderLast[i] = p;
+            _fielderBusy[i] = false;
+            _fielderRigs[i].localRotation = Quaternion.identity;
+            _fielderRigs[i].localPosition = Vector3.zero;
+            _fielderRigs[i].localScale = Vector3.one;
         }
+    }
+
+    private static void Wobble(Transform rig, Vector2 now, ref Vector2 last)
+    {
+        bool moving = (now - last).sqrMagnitude > 1e-5f;
+        last = now;
+        float a = moving ? Mathf.Sin(Time.time * 16f) * 7f * BattingConfig.GunyaLevel : 0f;
+        rig.localRotation = Quaternion.Euler(0f, 0f, a);
     }
 
     public void SetFielderPos(int index, Vector2 xz)
     {
         if (index < 0 || index >= _fielders.Length || _fielders[index] == null) return;
         _fielders[index].position = new Vector3(xz.x, 0f, xz.y);
+        if (!_fielderBusy[index]) Wobble(_fielderRigs[index], xz, ref _fielderLast[index]);
+    }
+
+    // 転倒: ぐにゃっと横倒しになって、少ししてから起き上がる
+    public void Tumble(int index, float seconds)
+    {
+        if (index < 2 || index >= _fielders.Length || _fielders[index] == null) return;
+        StartCoroutine(TumbleRoutine(_fielderRigs[index], index, true, seconds));
+    }
+
+    public void TumbleRunner(int slot, float seconds)
+    {
+        if (slot < 0 || slot >= 4) return;
+        StartCoroutine(TumbleRoutine(_runnerRigs[slot], slot, false, seconds));
+    }
+
+    private IEnumerator TumbleRoutine(Transform rig, int idx, bool fielder, float seconds)
+    {
+        if (fielder) _fielderBusy[idx] = true; else _runnerBusy[idx] = true;
+        float g = BattingConfig.GunyaLevel;
+        float dir = Random.value < 0.5f ? -1f : 1f;
+        float angle = 100f * dir * Mathf.Min(1.4f, 0.8f + 0.2f * g);
+        float down = 0.16f, hold = Mathf.Max(0.2f, seconds - 0.45f), up = 0.28f;
+        float t = 0f;
+        while (t < down)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.Clamp01(t / down);
+            rig.localRotation = Quaternion.Euler(0f, 0f, angle * u);
+            rig.localPosition = new Vector3(0f, Mathf.Sin(u * Mathf.PI) * 1.6f * g, 0f);
+            yield return null;
+        }
+        rig.localPosition = Vector3.zero;
+        t = 0f;
+        while (t < hold)
+        {
+            t += Time.deltaTime;
+            rig.localRotation = Quaternion.Euler(0f, 0f, angle + Mathf.Sin(t * 22f) * 6f * g);
+            yield return null;
+        }
+        t = 0f;
+        while (t < up)
+        {
+            t += Time.deltaTime;
+            rig.localRotation = Quaternion.Euler(0f, 0f, angle * (1f - Mathf.Clamp01(t / up)));
+            yield return null;
+        }
+        rig.localRotation = Quaternion.identity;
+        if (fielder) _fielderBusy[idx] = false; else _runnerBusy[idx] = false;
+    }
+
+    // 捕球の「むにゅっ」(縦に伸びて戻る)
+    public void CatchPop(int index)
+    {
+        if (index < 2 || index >= _fielders.Length || _fielders[index] == null) return;
+        StartCoroutine(PopRoutine(_fielderRigs[index]));
+    }
+
+    private IEnumerator PopRoutine(Transform rig)
+    {
+        float g = BattingConfig.GunyaLevel;
+        float t = 0f;
+        const float dur = 0.30f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            float u = Mathf.Clamp01(t / dur);
+            float k = Mathf.Sin(u * Mathf.PI) * 0.28f * g;
+            rig.localScale = new Vector3(1f - k * 0.5f, 1f + k, 1f);
+            yield return null;
+        }
+        rig.localScale = Vector3.one;
+    }
+
+    // ---- 走者 ----
+    public void HideRunners()
+    {
+        for (int i = 0; i < 4; i++) _runners[i].gameObject.SetActive(false);
+    }
+
+    public void ShowRunnersOnBases(bool[] bases)
+    {
+        for (int i = 1; i <= 3; i++)
+        {
+            _runners[i].gameObject.SetActive(bases[i]);
+            if (bases[i])
+            {
+                Vector2 p = FieldingModel.BasePos(i);
+                _runners[i].position = new Vector3(p.x, 0f, p.y);
+                _runnerLast[i] = p;
+                _runnerRigs[i].localRotation = Quaternion.identity;
+            }
+        }
+        _runners[0].gameObject.SetActive(false);
+    }
+
+    public void ShowRunner(int slot, bool on)
+    {
+        _runners[slot].gameObject.SetActive(on);
+        if (on) _runnerRigs[slot].localRotation = Quaternion.identity;
+    }
+
+    public void SetRunnerPos(int slot, Vector2 xz)
+    {
+        _runners[slot].position = new Vector3(xz.x, 0f, xz.y);
+        if (!_runnerBusy[slot]) Wobble(_runnerRigs[slot], xz, ref _runnerLast[slot]);
+    }
+
+    // ------------------------------------------------------------
+    // 投球の軌跡(変化球を目で追えるように、うっすら残像を残す)
+    // ------------------------------------------------------------
+    private class TrailDot { public SpriteRenderer Sr; public float Born; }
+    private readonly List<TrailDot> _trail = new List<TrailDot>();
+    private float _lastTrail;
+    private const float TrailLife = 0.55f;
+
+    public void AddTrail(Vector3 pos, Color col)
+    {
+        if (Time.time - _lastTrail < 0.022f) return;
+        _lastTrail = Time.time;
+        float dist = (pos - Cam.transform.position).magnitude;
+        float dia = Mathf.Max(BattingConfig.BallRadius * 2f * 0.7f, dist * 0.009f);
+        var sr = BattingSprites.Make("Trail", Root, SpriteFactory.Circle, col, OrderBall - 2,
+            pos, Vector3.zero, Vector3.one * dia);
+        sr.transform.rotation = Cam.transform.rotation;
+        _trail.Add(new TrailDot { Sr = sr, Born = Time.time });
+    }
+
+    public void ClearTrail()
+    {
+        for (int i = 0; i < _trail.Count; i++) if (_trail[i].Sr != null) Destroy(_trail[i].Sr.gameObject);
+        _trail.Clear();
+    }
+
+    private void UpdateTrail()
+    {
+        for (int i = _trail.Count - 1; i >= 0; i--)
+        {
+            var d = _trail[i];
+            float u = (Time.time - d.Born) / TrailLife;
+            if (u >= 1f || d.Sr == null)
+            {
+                if (d.Sr != null) Destroy(d.Sr.gameObject);
+                _trail.RemoveAt(i);
+                continue;
+            }
+            var c = d.Sr.color; c.a = (1f - u) * 0.55f; d.Sr.color = c;
+        }
     }
 }
