@@ -10,6 +10,8 @@ using UnityEngine;
 // ============================================================
 public static class Bootstrap
 {
+    public static bool UseLegacySideView = false;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Init()
     {
@@ -20,10 +22,20 @@ public static class Bootstrap
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = 60;
 
-        if (Object.FindObjectOfType<GameController>() == null)
+        // 既定は新しい打席システム(捕手後方視点・パワプロ式)。
+        // 旧・横視点の試作(GameController)に戻すには UseLegacySideView を true にする。
+        if (UseLegacySideView)
         {
-            var go = new GameObject("GameController");
-            go.AddComponent<GameController>();
+            if (Object.FindObjectOfType<GameController>() == null)
+            {
+                var go = new GameObject("GameController");
+                go.AddComponent<GameController>();
+            }
+        }
+        else if (Object.FindObjectOfType<AtBatController>() == null)
+        {
+            var go = new GameObject("AtBatController");
+            go.AddComponent<AtBatController>();
         }
     }
 }

@@ -1,0 +1,206 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+// ============================================================
+// BattingUI.cs
+// ミニマルなHUD。ラベル・数値・短い状態表示・SWINGボタンだけ(説明文なし)。
+// ============================================================
+public class BattingUI
+{
+    private Text _count, _batter, _speed, _rank, _result;
+    private RectTransform _swingRect;
+    private Image _swingImg;
+    private Font _font;
+    private float _swingPulseUntil;
+
+    public static BattingUI Build(Transform parent)
+    {
+        var ui = new BattingUI();
+        ui.BuildInternal(parent);
+        return ui;
+    }
+
+    public static Color RankColor(HitRank r)
+    {
+        switch (r)
+        {
+            case HitRank.Perfect: return new Color(1f, 0.86f, 0.18f);
+            case HitRank.Good: return new Color(0.45f, 0.95f, 0.45f);
+            case HitRank.Normal: return new Color(1f, 1f, 1f);
+            case HitRank.Weak: return new Color(0.62f, 0.78f, 1f);
+            default: return new Color(1f, 0.38f, 0.34f);
+        }
+    }
+
+    public static string RankText(HitRank r)
+    {
+        switch (r)
+        {
+            case HitRank.Perfect: return "PERFECT!";
+            case HitRank.Good: return "GOOD";
+            case HitRank.Normal: return "NORMAL";
+            case HitRank.Weak: return "WEAK";
+            default: return "MISS";
+        }
+    }
+
+    private void BuildInternal(Transform parent)
+    {
+        var canvasGo = new GameObject("BattingUI");
+        canvasGo.transform.SetParent(parent, false);
+        var canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(960f, 540f);
+        scaler.matchWidthOrHeight = 0.5f;
+        _font = GetFont();
+
+        // 上部バー
+        var bar = NewImage(canvasGo.transform, "TopBar", new Color(0f, 0f, 0f, 0.35f));
+        var brt = bar.rectTransform;
+        brt.anchorMin = new Vector2(0f, 1f);
+        brt.anchorMax = new Vector2(1f, 1f);
+        brt.pivot = new Vector2(0.5f, 1f);
+        brt.sizeDelta = new Vector2(0f, 44f);
+        brt.anchoredPosition = Vector2.zero;
+
+        _count = NewText(canvasGo.transform, "Count", new Vector2(0f, 1f), new Vector2(16f, -6f),
+            new Vector2(460f, 34f), 22, TextAnchor.MiddleLeft, Color.white);
+        _batter = NewText(canvasGo.transform, "Batter", new Vector2(1f, 1f), new Vector2(-16f, -6f),
+            new Vector2(460f, 34f), 18, TextAnchor.MiddleRight, Color.white);
+        _speed = NewText(canvasGo.transform, "Speed", new Vector2(0.5f, 1f), new Vector2(0f, -56f),
+            new Vector2(300f, 34f), 24, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.95f));
+        _rank = NewText(canvasGo.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0f, 150f),
+            new Vector2(700f, 70f), 52, TextAnchor.MiddleCenter, Color.white);
+        _rank.fontStyle = FontStyle.Bold;
+        _result = NewText(canvasGo.transform, "Result", new Vector2(0.5f, 0.5f), new Vector2(0f, 96f),
+            new Vector2(800f, 50f), 34, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.6f));
+        _result.fontStyle = FontStyle.Bold;
+
+        // SWINGボタン(タッチ操作用。マウスはどこをクリックしてもスイング)
+        _swingImg = NewImage(canvasGo.transform, "SwingButton", new Color(1f, 0.55f, 0.15f, 0.55f));
+        _swingRect = _swingImg.rectTransform;
+        _swingRect.anchorMin = new Vector2(1f, 0f);
+        _swingRect.anchorMax = new Vector2(1f, 0f);
+        _swingRect.pivot = new Vector2(1f, 0f);
+        _swingRect.sizeDelta = new Vector2(200f, 100f);
+        _swingRect.anchoredPosition = new Vector2(-24f, 24f);
+        var label = NewText(_swingRect, "Label", new Vector2(0.5f, 0.5f), Vector2.zero,
+            new Vector2(200f, 100f), 30, TextAnchor.MiddleCenter, Color.white);
+        label.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        label.text = "SWING";
+        label.fontStyle = FontStyle.Bold;
+
+        ClearCenter();
+        SetSpeed(null);
+    }
+
+    public void SetCount(int inning, int balls, int strikes, int outs, int runs)
+    {
+        _count.text = inning + "回  B " + balls + "  S " + strikes + "  O " + outs + "  得点 " + runs;
+    }
+
+    public void SetBatter(PlayerStats p)
+    {
+        _batter.text = p.Name + "  ミート " + p.Meet + "  パワー " + p.Power;
+    }
+
+    public void SetSpeed(string text)
+    {
+        _speed.text = text ?? "";
+    }
+
+    public void ShowSpeed(float kmh)
+    {
+        _speed.text = Mathf.RoundToInt(kmh) + " km/h";
+    }
+
+    public void ShowRank(HitRank r, string suffix)
+    {
+        _rank.text = RankText(r) + (string.IsNullOrEmpty(suffix) ? "" : "  " + suffix);
+        _rank.color = RankColor(r);
+    }
+
+    public void ShowResult(string text)
+    {
+        _result.text = text ?? "";
+    }
+
+    public void ClearCenter()
+    {
+        _rank.text = "";
+        _result.text = "";
+    }
+
+    public void ClearSpeed()
+    {
+        _speed.text = "";
+    }
+
+    public bool OverSwing(Vector2 screenPos)
+    {
+        return RectTransformUtility.RectangleContainsScreenPoint(_swingRect, screenPos, null);
+    }
+
+    public void PulseSwing()
+    {
+        if (_swingImg != null) _swingImg.color = new Color(1f, 0.85f, 0.3f, 0.9f);
+        _swingPulseUntil = Time.unscaledTime + 0.12f;
+    }
+
+    // ボタンの色を戻す(コントローラのUpdateから毎フレーム呼ぶ)
+    public void Tick()
+    {
+        if (_swingImg != null && Time.unscaledTime > _swingPulseUntil)
+            _swingImg.color = new Color(1f, 0.55f, 0.15f, 0.55f);
+    }
+
+    // ---- 部品 ----
+    private Image NewImage(Transform parent, string name, Color color)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var img = go.AddComponent<Image>();
+        img.sprite = SpriteFactory.White;
+        img.color = color;
+        return img;
+    }
+
+    private Text NewText(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size,
+        int fontSize, TextAnchor align, Color color)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = anchor;
+        rt.anchorMax = anchor;
+        rt.pivot = new Vector2(anchor.x, anchor.y);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = size;
+        var text = go.AddComponent<Text>();
+        text.font = _font;
+        text.fontSize = fontSize;
+        text.alignment = align;
+        text.color = color;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
+        var ol = go.AddComponent<Outline>();
+        ol.effectColor = new Color(0f, 0f, 0f, 0.85f);
+        ol.effectDistance = new Vector2(1.5f, -1.5f);
+        return text;
+    }
+
+    private static Font GetFont()
+    {
+        try
+        {
+            var f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (f != null) return f;
+        }
+        catch (System.Exception) { }
+        try { return Resources.GetBuiltinResource<Font>("Arial.ttf"); }
+        catch (System.Exception) { return null; }
+    }
+}

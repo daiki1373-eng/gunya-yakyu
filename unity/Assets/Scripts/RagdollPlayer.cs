@@ -273,7 +273,8 @@ public class RagdollPlayer : MonoBehaviour
             s.Body.angularVelocity = 0f;
             s.Body.position = s.Pos;
             s.Body.rotation = s.Rot;
-            s.Body.transform.position = new Vector3(s.Pos.x, s.Pos.y, 0f);
+            // z座標は保つ(奥行きに置いた選手が原点面へ戻らないように)
+            s.Body.transform.position = new Vector3(s.Pos.x, s.Pos.y, s.Body.transform.position.z);
             s.Body.transform.rotation = Quaternion.Euler(0f, 0f, s.Rot);
         }
     }
