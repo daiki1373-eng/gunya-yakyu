@@ -5020,9 +5020,9 @@ ${gen?'':'<label>試合のイニング数<select id="inn"><option>3</option><opt
 function selSch(i){NG.sc=i;SCHOOLS.forEach((_,j)=>{const e=$('#sc'+j);if(e)e.classList.toggle('on',j===i)})}
 function ngGo(){const nm=PENDNAME!==null?PENDNAME:(($('#nm')?.value||'球児').trim().slice(0,6)),ps=+$('#ps').value,th=$('#th').value,bt=$('#bt').value,sp=$('#sp').value;PENDNAME=null;
 if(NG.gen){S.gen++;S.hero=newHero(nm,ps,th,bt,sp);S.grade=1;S.tS=SCH().st+ri(-2,5)+Math.min(S.titles,3)*2;genMates();S.ph='spring';S.slots=4;S.round=0;S.res=[]}
-else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0,coin:1000,bench:[],ord:null,pity:0};genMates()}
+else{S={sc:NG.sc,inn:+$('#inn').value,hero:newHero(nm,ps,th,bt,sp),grade:1,gen:1,tS:SCHOOLS[NG.sc].st,ph:'spring',slots:4,round:0,res:[],hist:[],titles:0,koshien:0,coin:1000,bench:[],ord:null,pity:0,serial:0};genMates()}
 MSG='';HM='main';save();hub()}
-function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));if(S.hero&&!S.hero.sp)S.hero.sp='human';if(S.coin===undefined)S.coin=1000;if(S.bench===undefined)S.bench=[];if(S.ord===undefined)S.ord=null;if(S.pity===undefined)S.pity=0;HM='main';MSG='';hub()}catch(e){newGame()}}
+function loadGame(){try{S=JSON.parse(localStorage.getItem(KEY));if(S.hero&&!S.hero.sp)S.hero.sp='human';if(S.coin===undefined)S.coin=1000;if(S.bench===undefined)S.bench=[];if(S.ord===undefined)S.ord=null;if(S.pity===undefined)S.pity=0;if(S.serial===undefined)S.serial=0;HM='main';MSG='';hub()}catch(e){newGame()}}
 const STN=[['meet','ミート','#f55'],['power','パワー','#f90'],['speed','走力','#4c4'],['field','守備','#4ad'],['arm','肩','#aaf'],['velo','球速','#f5a'],['ctrl','制球','#5df'],['brk','変化球','#da5'],['stam','スタミナ','#ee5']];
 const PR={meet:'打撃練習',power:'筋力トレ',speed:'ダッシュ',field:'守備練習',arm:'遠投',velo:'投げ込み',ctrl:'制球練習',brk:'変化球',stam:'走り込み'};
 function hub(){titleFlow=false;bgmStop();V.mode='yard';hudOff();const h=S.hero,sc=SCH();
@@ -5038,20 +5038,22 @@ else m=`<h2>${ph}</h2><div class="tx" style="min-height:62px;white-space:pre-lin
 ui(`<div class="pn" style="left:20px;top:20px;width:470px;height:500px"><div class="tx" style="color:#9df">${sc.n}　${S.gen}代目</div><div style="font-size:28px;font-weight:bold;margin:2px 0 6px">${h.name}<small style="font-size:15px"> ${S.grade}年 ${PN[h.pos]}・${SPEC[h.sp||'human'].n} ${h.thr==='R'?'右':'左'}投${h.bat==='R'?'右':'左'}打</small></div>
 <div class="st"><span>疲労</span><div class="bar"><i style="width:${h.fat}%;background:${h.fat>70?'#e33':h.fat>40?'#ea3':'#3c3'}"></i></div><b>${h.fat}</b></div>${h.inj>0?`<div class="warn">ケガ：あと${h.inj}試合 離脱</div>`:''}${bars}<div class="tx">チーム力 ${Math.round(S.tS)}　${S.res.slice(-2).join('<br>')}</div></div><div class="pn" style="left:510px;top:20px;width:430px;height:500px">${m}</div>`)}
 let scoutResults=[];
-const scoutRefund=[0,100,200,500,1000];
+const LEGEND=[{name:'玄武パン老師',pos:1,sp:'panda'},{name:'黄金カブト王',pos:3,sp:'beetle'},{name:'疾風ワン将軍',pos:8,sp:'dog'}];
+const scoutRefund=[0,100,200,500,1000,3000,30000];
 function scoutPlayer(rar){
- let p;if(rar===3&&R()<.25)p=spChar(pick(SPCH));
- else{p=mkPlayer(ri(1,9),S.tS+[0,-14,-7,1,9][rar]);if(rar>=3&&R()<.2)p.sp=pick(['beetle','dog','panda'])}
+ let p;if(rar===6){const c=pick(LEGEND),v=()=>cl(Math.round(S.tS+28+ri(-9,9)),12,97);p={name:c.name,pos:c.pos,num:c.pos,sp:c.sp,side:R()<.8?'R':'L',thr:R()<.85?'R':'L',pc:0,meet:v(),power:v(),speed:v(),field:v(),arm:v(),velo:v(),ctrl:v(),brk:v(),stam:v()}}
+ else if((rar===3||rar===5)&&R()<(rar===5?.4:.25)){p=spChar(pick(SPCH));if(rar===5){const q=mkPlayer(p.pos,S.tS+16);for(const k of ['meet','power','speed','field','arm','velo','ctrl','brk','stam'])p[k]=q[k]}}
+ else{p=mkPlayer(ri(1,9),S.tS+[0,-14,-7,1,9,16][rar]);if(rar>=3&&R()<(rar===5?.5:.2))p.sp=pick(['beetle','dog','panda'])}
  p.rar=rar;return p}
 function doScout(n){if((n!==1&&n!==10)||S.coin<n*300)return;
- S.coin-=n*300;scoutResults=[];const draws=[];
- for(let i=0;i<n;i++){const r=R(),rar=S.pity>=49?4:r<.03?4:r<.15?3:r<.5?2:1;S.pity=rar===4?0:S.pity+1;draws.push(rar)}
+ if(S.serial===undefined)S.serial=0;S.coin-=n*300;scoutResults=[];const draws=[];
+ for(let i=0;i<n;i++){const r=R(),rar=S.pity>=49?4:r<0.0001?6:r<0.0101?5:r<0.0401?4:r<0.1601?3:r<0.5101?2:1;S.pity=rar===4?0:S.pity+1;draws.push(rar)}
  if(n===10&&!draws.some(r=>r>=3))draws[9]=3;
- for(const rar of draws){const p=scoutPlayer(rar),dup=[...Object.values(S.mates),S.relief,...S.bench,S.hero].some(q=>q&&q.name===p.name&&q.pos===p.pos),coin=dup||S.bench.length>=20?scoutRefund[rar]:0;
- if(coin)S.coin+=coin;else S.bench.push(p);scoutResults.push({p,coin})}
+ for(const rar of draws){const p=scoutPlayer(rar),dup=[...Object.values(S.mates),S.relief,...S.bench,S.hero].some(q=>q&&q.name===p.name&&q.pos===p.pos),coin=(rar<5&&dup)||S.bench.length>=20?scoutRefund[rar]:0;
+ if(rar>=5){p.serial=++S.serial;p.uid='u'+p.serial}if(coin)S.coin+=coin;else S.bench.push(p);scoutResults.push({p,coin})}
  HM='scout';save();hub()}
-function rosterLabel(p){return `${'★'.repeat(p.rar||0)} ${p.name} ${PN[p.pos]}${p.sp?'・'+SPEC[p.sp].n:''} ミート${p.meet} パワー${p.power}${p.pos===1?' 球速'+p.velo:''}`}
-function scout(){return `<h2>スカウト</h2><div class="tx">コイン ${S.coin}　ベンチ ${S.bench.length}/20</div><button class="mb" ${S.coin<300?'disabled':''} onclick="doScout(1)">単発 300コイン</button><button class="mb" ${S.coin<3000?'disabled':''} onclick="doScout(10)">10連 3000コイン</button><div class="tx" style="max-height:260px;overflow:auto">${scoutResults.map(({p,coin})=>`<div>${rosterLabel(p)} ${coin?'→'+coin+'コイン':'新規'}</div>`).join('')}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
+function rosterLabel(p){return `${p.rar===6?'SECRET':'★'.repeat(p.rar||0)}${p.serial!==undefined?' No.'+String(p.serial).padStart(6,'0'):''} ${p.name} ${PN[p.pos]}${p.sp?'・'+SPEC[p.sp].n:''} ミート${p.meet} パワー${p.power}${p.pos===1?' 球速'+p.velo:''}`}
+function scout(){return `<h2>スカウト</h2><div class="tx">SECRET 0.01%　★5 1%　★4 3%　★3 12%　★2 35%　★1 48.99%</div><div class="tx">コイン ${S.coin}　ベンチ ${S.bench.length}/20</div><button class="mb" ${S.coin<300?'disabled':''} onclick="doScout(1)">単発 300コイン</button><button class="mb" ${S.coin<3000?'disabled':''} onclick="doScout(10)">10連 3000コイン</button><div class="tx" style="max-height:260px;overflow:auto">${scoutResults.map(({p,coin})=>`<div>${rosterLabel(p)} ${coin?'→'+coin+'コイン':'新規'}</div>`).join('')}</div><button class="mb" onclick="HM='main';hub()">もどる</button>`}
 function moveOrder(i,d){const a=buildMine().lineup.map(p=>p.pos),j=i+d;if(i<0||i>=9||j<0||j>=9)return;[a[i],a[j]]=[a[j],a[i]];S.ord=a;save();hub()}
 function autoOrder(){S.ord=null;save();hub()}
 function swapBench(i,relief){const p=S.bench[i];if(!p)return;
