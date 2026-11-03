@@ -47,6 +47,16 @@ public class AtBatController : MonoBehaviour
     private const float SweetBeforeRelease = 0.10f; // メーターのベスト点=リリースの何秒前か
     private int _oppIndex = -1;
 
+    // ---- P4: 演出・リプレイ ----
+    public static bool ReplayEnabled = true;
+    private BattedBallTrajectory _lastTraj;
+    private PlayResult _lastPlay;
+    private float _lastSay = -99f;
+    private bool _replayDone;
+    private int _bestScore = -1;
+    private BattedBallTrajectory _bestTraj;
+    private PlayResult _bestPlay;
+
     public static int FreezeKind = -99;   // 検証用: この球種(-1=何でも)の終盤でtimeScaleを0にして止める
 
     // 入力
@@ -74,6 +84,7 @@ public class AtBatController : MonoBehaviour
         ground.AddComponent<BoxCollider2D>().size = new Vector2(200f, 1f);
 
         _stage = BattingStage.Create(transform);
+        GameAudio.Init(gameObject);
         _ui = BattingUI.Build(transform);
         _cursor = MeetCursor.Create(_stage.Root);
 
@@ -192,6 +203,7 @@ public class AtBatController : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.Alpha1 + k)) SelectPitchKind(k);
         }
+        if (Input.GetKeyDown(KeyCode.M)) GameAudio.Muted = !GameAudio.Muted;
 
         if (havePointer)
         {
@@ -322,6 +334,8 @@ public class AtBatController : MonoBehaviour
             yield return StartCoroutine(PlayPitch());
             over = ApplyPitchResult();
             RefreshHud();
+            if (over && ReplayEnabled && _pitchEnd == PitchEnd.InPlay && (_lastPlay.Quirk != QuirkKind.None || _lastPlay.Kind == PlayKind.HomeRun))
+                yield return StartCoroutine(PlayReplay(_lastTraj, _lastPlay, 0.5f, 11f, "● REPLAY"));
             if (over) yield return StartCoroutine(AnimateMoves());
             yield return StartCoroutine(Wait(over ? 0.8f : 0.7f));
             _stage.HideBall();
@@ -341,7 +355,14 @@ public class AtBatController : MonoBehaviour
                 _ui.ShowResult("試合終了  " + _gs.Runs + " - " + _gs.OppRuns + "  " + res);
                 _ui.ShowBanner("珍プレー " + _gs.QuirkCount);
                 GameLog.Add("game" + _gs.GameNo + " " + _gs.Runs + "-" + _gs.OppRuns + " quirks=" + _gs.QuirkCount + " pa=" + _gs.PlateAppearances);
-                yield return StartCoroutine(Wait(2.8f));
+                yield return StartCoroutine(Wait(1.6f));
+                if (ReplayEnabled && _bestScore >= 3)
+                {
+                    _ui.ShowBanner("今日の珍プレー");
+                    yield return StartCoroutine(PlayReplay(_bestTraj, _bestPlay, 0.45f, 9f, "● 今日の珍プレー"));
+                    yield return StartCoroutine(Wait(1.0f));
+                }
+                _bestScore = -1;
                 _gs.NewGame();
                 _ui.ShowBanner("");
             }
@@ -378,6 +399,7 @@ public class AtBatController : MonoBehaviour
                 {
                     _gs.ApplyStrikeout();
                     _ui.ShowResult("空振り三振！");
+                    if (Random.value < 0.5f) Say(Commentary.ForWhiffK(), new Color(1f, 0.9f, 0.4f), false);
                     _batter.Flop(1.0f * BattingConfig.GunyaLevel);
                     over = true;
                     key = "StrikeoutSwinging";
@@ -395,7 +417,12 @@ public class AtBatController : MonoBehaviour
                 key = _play.Kind.ToString();
                 if (_play.Kind == PlayKind.HomeRun) _gs.ApplyHit(4);
                 else if (_play.IsHit) _gs.ApplyHit(Mathf.Max(1, _play.Bases));
-                else _gs.ApplyOut(_play.Kind, _play.Fielder, _play.Distance);
+                else
+                {
+                    int ob = _gs.Outs;
+                    _gs.ApplyOut(_play.Kind, _play.Fielder, _play.Distance);
+                    if (_gs.Outs - ob >= 2) { key = "DoublePlay"; Say(Commentary.ForDoublePlay(), new Color(1f, 0.9f, 0.4f), true); }
+                }
                 break;
         }
         if (over && _gs.LastRuns > 0) _ui.ShowBanner("+" + _gs.LastRuns + "点");
@@ -570,6 +597,7 @@ public class AtBatController : MonoBehaviour
         float tArrive = tRelease + plan.FlightTime;
         if (ShowPitchName) _ui.ShowPitch(plan.Name, plan.Kmh); else _ui.ShowSpeed(plan.Kmh);
         _stage.SetBall(PitchPos(plan, 0f));
+        GameAudio.Play(Sfx.Whoosh, 0.35f, Mathf.Lerp(1.15f, 0.9f, (plan.Kmh - 100f) / 55f));
         Color trailCol = TrailColor(plan.Kind);
 
         // ボールが来る間
@@ -607,6 +635,9 @@ public class AtBatController : MonoBehaviour
                 _pitchEnd = PitchEnd.HitByPitch;
                 _ui.ShowQuirk("デッドボール！");
                 _batter.Flop(1.2f * BattingConfig.GunyaLevel);
+                GameAudio.Play(Sfx.Boing, 0.9f, 1.15f);
+                _stage.Shake(0.10f, 0.2f);
+                Say(Commentary.ForHitByPitch(), new Color(1f, 0.55f, 0.2f), true);
             }
             else { _pitchEnd = PitchEnd.Ball; _ui.ShowResult("ボール"); }
             LogPitch(plan, "take", 0f, null);
@@ -637,6 +668,7 @@ public class AtBatController : MonoBehaviour
             _ui.ShowRank(HitRank.Whiff, tag);
             _ui.ShowResult("空振り");
             _pitchEnd = PitchEnd.SwingMiss;
+            GameAudio.Play(Sfx.Whiff, 0.8f);
             StartCoroutine(DelayedFlop(0.18f, 0.5f));
             yield return StartCoroutine(FinishFlight(plan, tRelease, trailCol));
             LogPitch(plan, "whiff", timingMs, _outcome);
@@ -649,6 +681,14 @@ public class AtBatController : MonoBehaviour
         _stage.Flash(contact, rc, _outcome.Rank == HitRank.Perfect ? 1.1f : 0.7f);
         string rankTag = (_outcome.Rank == HitRank.Perfect) ? "" : (timingMs < -20f ? "EARLY" : (timingMs > 20f ? "LATE" : ""));
         _ui.ShowRank(_outcome.Rank, rankTag);
+        GameAudio.PlayHit(_outcome.Rank);
+        if (_outcome.Rank == HitRank.Perfect && !_outcome.FoulTip)
+        {
+            StartCoroutine(HitStop(0.065f));
+            _stage.Shake(0.10f, 0.20f);
+            GameAudio.Haptic();
+            if (Random.value < 0.6f) Say(Commentary.ForPerfect(), new Color(1f, 0.9f, 0.3f), false);
+        }
 
         if (_outcome.FoulTip)
         {
@@ -678,6 +718,15 @@ public class AtBatController : MonoBehaviour
         {
             _gs.QuirkCount++;
             Count("Quirk_" + _play.Quirk);
+        }
+        _lastTraj = traj;
+        _lastPlay = _play;
+        ConsiderHighlight(traj, _play, _outcome.Rank);
+        if (_play.Kind == PlayKind.HomeRun)
+        {
+            StartCoroutine(SlowMo(0.35f, 0.8f));
+            _stage.Shake(0.18f, 0.40f);
+            GameAudio.Haptic();
         }
         yield return StartCoroutine(PlayBattedBall(traj, _play));
         _pitchEnd = (_play.Kind == PlayKind.Foul) ? PitchEnd.Foul : PitchEnd.InPlay;
@@ -811,7 +860,7 @@ public class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     // 打球の再生(打球カメラで追う)
     // ------------------------------------------------------------
-    private IEnumerator PlayBattedBall(BattedBallTrajectory tr, PlayResult play)
+    private IEnumerator PlayBattedBall(BattedBallTrajectory tr, PlayResult play, float speed = 1f, bool replay = false)
     {
         _stage.SetCameraMode(CamMode.Follow);
         _stage.ResetFielders();
@@ -826,7 +875,7 @@ public class AtBatController : MonoBehaviour
         bool resultShown = false, quirkShown = false, popped = false;
 
         // バット投げ(会心の当たりのとき)
-        if (play.Kind == PlayKind.HomeRun || (_outcome.Rank == HitRank.Perfect && Random.value < 0.5f))
+        if (!replay && (play.Kind == PlayKind.HomeRun || (_outcome.Rank == HitRank.Perfect && Random.value < 0.5f)))
             StartCoroutine(DelayedBatToss(0.15f));
 
         // 送球(ゴロ処理)
@@ -844,7 +893,7 @@ public class AtBatController : MonoBehaviour
         float t = 0f;
         while (t < play.EndTime)
         {
-            t += Time.deltaTime;
+            t += Time.deltaTime * speed;
             Vector3 p;
             if (throwStart >= 0f && t >= throwStart)
             {
@@ -868,6 +917,7 @@ public class AtBatController : MonoBehaviour
             {
                 popped = true;
                 _stage.CatchPop(play.Fielder);
+                GameAudio.Play(Sfx.Catch, 0.8f, Random.Range(0.95f, 1.08f));
             }
             if (!resultShown && t >= play.PlayTime)
             {
@@ -894,6 +944,103 @@ public class AtBatController : MonoBehaviour
         if (_batter != null) _batter.ThrowBat(0.8f * BattingConfig.GunyaLevel);
     }
 
+    // ------------------------------------------------------------
+    // P4: 演出ヘルパー
+    // ------------------------------------------------------------
+    // 一瞬止める(実時間)。Perfectの手応え用。
+    private IEnumerator HitStop(float realSeconds)
+    {
+        float prev = Time.timeScale;
+        if (prev <= 0f) yield break;
+        Time.timeScale = 0f;
+        yield return new WaitForSecondsRealtime(realSeconds);
+        if (Time.timeScale == 0f) Time.timeScale = prev;
+    }
+
+    // 一瞬スローにして戻す(ホームラン用)。ヒットストップが終わってから始める。
+    private IEnumerator SlowMo(float scale, float realSeconds)
+    {
+        yield return new WaitForSecondsRealtime(0.09f);
+        float baseScale = Time.timeScale;
+        if (baseScale <= 0f) yield break;
+        Time.timeScale = baseScale * scale;
+        yield return new WaitForSecondsRealtime(realSeconds);
+        float t = 0f;
+        while (t < 0.25f)
+        {
+            t += Time.unscaledDeltaTime;
+            if (Time.timeScale <= 0f) yield break;
+            Time.timeScale = Mathf.Lerp(baseScale * scale, baseScale, Mathf.Clamp01(t / 0.25f));
+            yield return null;
+        }
+        Time.timeScale = baseScale;
+    }
+
+    // 実況字幕。続けて出しすぎないよう間隔を空ける(force=trueは割り込み)。
+    private void Say(string text, Color c, bool force)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        if (!force && Time.unscaledTime - _lastSay < 1.2f) return;
+        _lastSay = Time.unscaledTime;
+        _ui.ShowCommentary(text, c);
+    }
+
+    // 1試合で一番ぐにゃついたプレーを覚えておく(試合後に「今日の珍プレー」で再生)
+    private void ConsiderHighlight(BattedBallTrajectory tr, PlayResult play, HitRank rank)
+    {
+        int score = 0;
+        switch (play.Quirk)
+        {
+            case QuirkKind.Collision: score = 5; break;
+            case QuirkKind.FenceCrash: score = 5; break;
+            case QuirkKind.BadThrow: score = 4; break;
+            case QuirkKind.Slip: score = 3; break;
+        }
+        if (play.Kind == PlayKind.HomeRun) score = Mathf.Max(score, 3 + (int)(play.Distance / 60f));
+        if (score > _bestScore)
+        {
+            _bestScore = score;
+            _bestTraj = tr;
+            _bestPlay = play;
+        }
+    }
+
+    // スローリプレイ(同じ打球・同じ結果を、寄りのカメラでゆっくり)。タップでスキップ。
+    private IEnumerator PlayReplay(BattedBallTrajectory tr, PlayResult play, float speed, float dist, string label)
+    {
+        if (tr == null) yield break;
+        _ui.SetReplay(true, label);
+        _ui.ClearCenter();
+        _stage.HideBall();
+        _stage.FollowDist = dist;
+        _stage.SnapFollow(tr.PosAt(0f));
+        _replayDone = false;
+        _swingQueued = false;
+        _defTapOk = true;
+        Coroutine co = StartCoroutine(ReplayRun(tr, play, speed));
+        while (!_replayDone)
+        {
+            if (ConsumeSwing()) { StopCoroutine(co); break; }
+            yield return null;
+        }
+        _defTapOk = false;
+        _swingQueued = false;
+        _stage.FollowDist = 18f;
+        _stage.HideBall();
+        _stage.ResetFielders();
+        _ui.SetReplay(false);
+        _ui.ClearCenter();
+        _ui.ShowBanner("");
+        yield return StartCoroutine(Wait(0.3f));
+    }
+
+    private IEnumerator ReplayRun(BattedBallTrajectory tr, PlayResult play, float speed)
+    {
+        yield return StartCoroutine(PlayBattedBall(tr, play, speed, true));
+        yield return new WaitForSecondsRealtime(0.5f);
+        _replayDone = true;
+    }
+
     private IEnumerator FreezeSoon(float realSeconds)
     {
         yield return new WaitForSecondsRealtime(realSeconds);
@@ -903,6 +1050,15 @@ public class AtBatController : MonoBehaviour
     private void PlayQuirk(PlayResult play)
     {
         _ui.ShowQuirk(FieldingModel.QuirkLabel(play.Quirk));
+        Say(Commentary.ForQuirk(play.Quirk), new Color(1f, 0.55f, 0.2f), true);
+        switch (play.Quirk)
+        {
+            case QuirkKind.Collision: GameAudio.Play(Sfx.Thud, 1f); GameAudio.Play(Sfx.Boing, 0.7f, 1.1f); _stage.Shake(0.14f, 0.25f); break;
+            case QuirkKind.FenceCrash: GameAudio.Play(Sfx.Thud, 1f, 0.8f); _stage.Shake(0.20f, 0.30f); break;
+            case QuirkKind.Slip: GameAudio.Play(Sfx.Boing, 0.8f, 1.2f); break;
+            case QuirkKind.BadThrow: GameAudio.Play(Sfx.Boing, 0.7f, 0.9f); break;
+        }
+        GameAudio.Haptic();
         if (FreezeKind == -50) { FreezeKind = -99; StartCoroutine(FreezeSoon(0.45f)); }
         switch (play.Quirk)
         {
@@ -929,7 +1085,13 @@ public class AtBatController : MonoBehaviour
         else if (play.Kind == PlayKind.HomeRun || play.IsHit)
             label += "  " + Mathf.RoundToInt(play.Distance) + "m";
         _ui.ShowResult(label);
-        if (play.Kind == PlayKind.HomeRun) _pitcher.Flop(0.7f * BattingConfig.GunyaLevel);
+        if (play.Kind == PlayKind.HomeRun)
+        {
+            _pitcher.Flop(0.7f * BattingConfig.GunyaLevel);
+            GameAudio.Play(Sfx.BigCheer, 1f);
+            Say(Commentary.ForHomeRun(), new Color(1f, 0.85f, 0.2f), true);
+        }
+        else if (play.IsHit && play.Quirk == QuirkKind.None) GameAudio.Play(Sfx.Cheer, 0.6f);
     }
 
     // ------------------------------------------------------------

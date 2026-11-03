@@ -30,6 +30,8 @@ public class BattingStage : MonoBehaviour
     private SpriteRenderer _ball, _ballSeam, _shadow;
     private readonly List<Transform> _billboards = new List<Transform>();
     private Transform[] _fielders;
+    public float FollowDist = 18f;      // 打球カメラの後ろ距離(リプレイでは寄る)
+    private float _shakeAmp, _shakeUntil, _shakeDur = 0.01f;
     private CamMode _mode = CamMode.Catcher;
     private Vector3 _followTarget;
     private Vector3 _camVel;
@@ -91,6 +93,18 @@ public class BattingStage : MonoBehaviour
         _followTarget = ballPos;
     }
 
+    // リプレイ開始用: カメラを打球の始点後方へ即座に置く
+    public void SnapFollow(Vector3 ballPos)
+    {
+        _mode = CamMode.Follow;
+        _followTarget = ballPos;
+        _camVel = Vector3.zero;
+        Vector3 b = ballPos;
+        Vector3 fwd = Vector3.forward;
+        Cam.transform.position = new Vector3(b.x, 3.5f * (FollowDist / 18f), b.z - FollowDist);
+        Cam.transform.rotation = Quaternion.LookRotation(b + fwd * 4f + Vector3.up * 0.5f - Cam.transform.position, Vector3.up);
+    }
+
     public void SnapCatcherCamera()
     {
         _mode = CamMode.Catcher;
@@ -129,7 +143,7 @@ public class BattingStage : MonoBehaviour
             Vector3 b = _followTarget;
             Vector3 flat = new Vector3(b.x, 0f, b.z);
             Vector3 fwd = flat.sqrMagnitude > 4f ? flat.normalized : Vector3.forward;
-            Vector3 desired = b - fwd * 18f + Vector3.up * (3.5f + Mathf.Min(b.y, 25f) * 0.25f);
+            Vector3 desired = b - fwd * FollowDist + Vector3.up * (3.5f * (FollowDist / 18f) + Mathf.Min(b.y, 25f) * 0.25f);
             desired.y = Mathf.Max(desired.y, 2.5f);
             ct.position = Vector3.SmoothDamp(ct.position, desired, ref _camVel, 0.32f, Mathf.Infinity, dt);
             Vector3 lookAt = b + fwd * 4f + Vector3.up * 0.5f;
@@ -142,6 +156,20 @@ public class BattingStage : MonoBehaviour
             if (_billboards[i] != null) _billboards[i].rotation = ct.rotation;
         }
         UpdateTrail();
+
+        if (Time.unscaledTime < _shakeUntil)
+        {
+            float k = (_shakeUntil - Time.unscaledTime) / _shakeDur;
+            ct.position += new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, 1f), 0f) * (_shakeAmp * k);
+        }
+    }
+
+    // 画面シェイク(実時間で減衰)
+    public void Shake(float amp, float seconds)
+    {
+        _shakeAmp = amp;
+        _shakeDur = Mathf.Max(0.01f, seconds);
+        _shakeUntil = Time.unscaledTime + seconds;
     }
 
     // ------------------------------------------------------------

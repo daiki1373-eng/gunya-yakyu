@@ -9,7 +9,9 @@ public class BattingUI
 {
     private Text _count, _batter, _speed, _rank, _result, _quirk, _banner;
     private Image[] _bases = new Image[4];
-    private Text _swingLabel;
+    private Text _swingLabel, _comm, _replayTag;
+    private float _commStart = -99f;
+    private const float CommDur = 1.9f;
     // 投球UI
     private Image[] _pitchBtn = new Image[5];
     private Text[] _pitchTxt = new Text[5];
@@ -123,6 +125,17 @@ public class BattingUI
         label.text = "SWING";
         _swingLabel = label;
         label.fontStyle = FontStyle.Bold;
+
+        // 実況字幕(大きく弾むように出す)
+        _comm = NewText(canvasGo.transform, "Commentary", new Vector2(0.5f, 0.5f), new Vector2(0f, 210f),
+            new Vector2(900f, 90f), 60, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.35f));
+        _comm.fontStyle = FontStyle.Bold;
+        _comm.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        _comm.text = "";
+        _replayTag = NewText(canvasGo.transform, "ReplayTag", new Vector2(1f, 1f), new Vector2(-16f, -52f),
+            new Vector2(300f, 34f), 24, TextAnchor.MiddleRight, new Color(1f, 0.4f, 0.35f));
+        _replayTag.fontStyle = FontStyle.Bold;
+        _replayTag.text = "";
 
         BuildPitchPanel(canvasGo.transform);
         ClearCenter();
@@ -250,6 +263,19 @@ public class BattingUI
         }
     }
 
+    public void ShowCommentary(string text, Color c)
+    {
+        if (_comm == null) return;
+        _comm.text = text ?? "";
+        _comm.color = c;
+        _commStart = Time.unscaledTime;
+    }
+
+    public void SetReplay(bool on, string label = "● REPLAY")
+    {
+        if (_replayTag != null) _replayTag.text = on ? label : "";
+    }
+
     public void ShowQuirk(string text) { _quirk.text = text ?? ""; }
     public void ShowBanner(string text) { _banner.text = text ?? ""; }
 
@@ -310,6 +336,20 @@ public class BattingUI
     // ボタンの色を戻す(コントローラのUpdateから毎フレーム呼ぶ)
     public void Tick()
     {
+        if (_comm != null && _comm.text.Length > 0)
+        {
+            float u = (Time.unscaledTime - _commStart) / CommDur;
+            if (u >= 1f) _comm.text = "";
+            else
+            {
+                float pop = Mathf.Clamp01(u / 0.14f);
+                float sc = Mathf.Lerp(2.0f, 1f, 1f - (1f - pop) * (1f - pop));
+                float wob = Mathf.Sin(u * 30f) * (1f - u) * 2.5f;
+                _comm.rectTransform.localScale = Vector3.one * sc;
+                _comm.rectTransform.localRotation = Quaternion.Euler(0f, 0f, wob);
+                var c = _comm.color; c.a = Mathf.Clamp01((1f - u) / 0.25f); _comm.color = c;
+            }
+        }
         if (_swingImg != null && Time.unscaledTime > _swingPulseUntil)
             _swingImg.color = new Color(1f, 0.55f, 0.15f, 0.55f);
     }
@@ -352,6 +392,12 @@ public class BattingUI
 
     private static Font GetFont()
     {
+        try
+        {
+            var jp = Resources.Load<Font>("Fonts/NotoSansJP-Bold");
+            if (jp != null) return jp;
+        }
+        catch (System.Exception) { }
         try
         {
             var f = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
