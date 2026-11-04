@@ -68,19 +68,64 @@ public class BattingUI
         scaler.matchWidthOrHeight = 0.5f;
         _font = GetFont();
 
-        // 上部バー
-        var bar = NewImage(canvasGo.transform, "TopBar", new Color(0f, 0f, 0f, 0.35f));
-        var brt = bar.rectTransform;
-        brt.anchorMin = new Vector2(0f, 1f);
-        brt.anchorMax = new Vector2(1f, 1f);
-        brt.pivot = new Vector2(0.5f, 1f);
-        brt.sizeDelta = new Vector2(0f, 44f);
-        brt.anchoredPosition = Vector2.zero;
+        // 周辺減光(中継映像のような締まり)。入力は受けない。
+        var vig = new GameObject("Vignette");
+        vig.transform.SetParent(canvasGo.transform, false);
+        var vimg = vig.AddComponent<Image>();
+        vimg.sprite = StadiumArt.Vignette;
+        vimg.raycastTarget = false;
+        var vrt = vimg.rectTransform;
+        vrt.anchorMin = Vector2.zero;
+        vrt.anchorMax = Vector2.one;
+        vrt.offsetMin = Vector2.zero;
+        vrt.offsetMax = Vector2.zero;
 
-        _count = NewText(canvasGo.transform, "Count", new Vector2(0f, 1f), new Vector2(16f, -6f),
-            new Vector2(460f, 34f), 22, TextAnchor.MiddleLeft, Color.white);
-        _batter = NewText(canvasGo.transform, "Batter", new Vector2(1f, 1f), new Vector2(-16f, -6f),
-            new Vector2(460f, 34f), 18, TextAnchor.MiddleRight, Color.white);
+        // ---- 中継風スコア表示(左上) ----
+        var bug = NewImage(canvasGo.transform, "ScoreBug", new Color(0.03f, 0.05f, 0.12f, 0.86f));
+        var bRt = bug.rectTransform;
+        bRt.anchorMin = bRt.anchorMax = new Vector2(0f, 1f);
+        bRt.pivot = new Vector2(0f, 1f);
+        bRt.sizeDelta = new Vector2(330f, 68f);
+        bRt.anchoredPosition = new Vector2(12f, -10f);
+        var accent = NewImage(bug.transform, "Accent", new Color(1f, 0.78f, 0.15f, 1f));
+        Place(accent.rectTransform, new Vector2(0f, 0f), new Vector2(330f, 3f));
+        _teamChip[0] = Chip(bug.transform, "自", new Color(0.80f, 0.14f, 0.14f), 6f, -6f);
+        _teamChip[1] = Chip(bug.transform, "相", new Color(0.14f, 0.28f, 0.75f), 6f, -36f);
+        _scoreTxt[0] = NewText(bug.transform, "RunsA", new Vector2(0f, 1f), new Vector2(46f, -4f), new Vector2(40f, 28f), 24, TextAnchor.MiddleCenter, Color.white);
+        _scoreTxt[1] = NewText(bug.transform, "RunsB", new Vector2(0f, 1f), new Vector2(46f, -34f), new Vector2(40f, 28f), 24, TextAnchor.MiddleCenter, Color.white);
+        _scoreTxt[0].fontStyle = _scoreTxt[1].fontStyle = FontStyle.Bold;
+        var sep = NewImage(bug.transform, "Sep", new Color(1f, 1f, 1f, 0.18f));
+        Place(sep.rectTransform, new Vector2(92f, -8f), new Vector2(2f, 52f));
+        _count = NewText(bug.transform, "Inning", new Vector2(0f, 1f), new Vector2(98f, -18f),
+            new Vector2(70f, 30f), 20, TextAnchor.MiddleCenter, Color.white);
+        _count.fontStyle = FontStyle.Bold;
+        string[] bso = { "B", "S", "O" };
+        Color[] bsoCol = { new Color(0.25f, 0.95f, 0.40f), new Color(1f, 0.82f, 0.15f), new Color(1f, 0.25f, 0.2f) };
+        for (int r = 0; r < 3; r++)
+        {
+            NewText(bug.transform, "L" + bso[r], new Vector2(0f, 1f), new Vector2(176f, -4f - r * 20f), new Vector2(16f, 20f), 15, TextAnchor.MiddleCenter, Color.white);
+            int n = r == 0 ? 3 : 2;
+            _lamps[r] = new Image[n];
+            _lampOn[r] = bsoCol[r];
+            for (int k = 0; k < n; k++)
+            {
+                var d = NewImage(bug.transform, "Lamp" + r + k, new Color(1f, 1f, 1f, 0.15f));
+                d.sprite = SpriteFactory.Circle;
+                Place(d.rectTransform, new Vector2(196f + k * 17f, -7f - r * 20f), new Vector2(13f, 13f));
+                _lamps[r][k] = d;
+            }
+        }
+
+        // ---- 打者名(右上) ----
+        var plate = NewImage(canvasGo.transform, "BatterPlate", new Color(0.03f, 0.05f, 0.12f, 0.80f));
+        var pRt = plate.rectTransform;
+        pRt.anchorMin = pRt.anchorMax = new Vector2(1f, 1f);
+        pRt.pivot = new Vector2(1f, 1f);
+        pRt.sizeDelta = new Vector2(380f, 34f);
+        pRt.anchoredPosition = new Vector2(-12f, -10f);
+        _batter = NewText(plate.transform, "Batter", new Vector2(1f, 1f), new Vector2(-12f, -2f),
+            new Vector2(360f, 30f), 18, TextAnchor.MiddleRight, Color.white);
+
         _speed = NewText(canvasGo.transform, "Speed", new Vector2(0.5f, 1f), new Vector2(0f, -56f),
             new Vector2(300f, 34f), 24, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.95f));
         _rank = NewText(canvasGo.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0f, 150f),
@@ -101,12 +146,12 @@ public class BattingUI
         Vector2[] bp = { Vector2.zero, new Vector2(22f, 0f), new Vector2(0f, 22f), new Vector2(-22f, 0f) };
         for (int i = 1; i <= 3; i++)
         {
-            var img = NewImage(canvasGo.transform, "Base" + i, new Color(1f, 1f, 1f, 0.25f));
+            var img = NewImage(bug.transform, "Base" + i, new Color(1f, 1f, 1f, 0.25f));
             var r = img.rectTransform;
             r.anchorMin = r.anchorMax = new Vector2(0f, 1f);
             r.pivot = new Vector2(0.5f, 0.5f);
-            r.sizeDelta = new Vector2(18f, 18f);
-            r.anchoredPosition = new Vector2(70f, -88f) + bp[i];
+            r.sizeDelta = new Vector2(15f, 15f);
+            r.anchoredPosition = new Vector2(300f, -46f) + bp[i] * 0.85f;
             r.localRotation = Quaternion.Euler(0f, 0f, 45f);
             _bases[i] = img;
         }
@@ -142,10 +187,41 @@ public class BattingUI
         SetSpeed(null);
     }
 
+    private readonly Image[] _teamChip = new Image[2];
+    private readonly Text[] _scoreTxt = new Text[2];
+    private readonly Image[][] _lamps = new Image[3][];
+    private readonly Color[] _lampOn = new Color[3];
+
+    private static void Place(RectTransform r, Vector2 topLeft, Vector2 size)
+    {
+        r.anchorMin = r.anchorMax = new Vector2(0f, 1f);
+        r.pivot = new Vector2(0f, 1f);
+        r.sizeDelta = size;
+        r.anchoredPosition = topLeft;
+    }
+
+    private Image Chip(Transform parent, string label, Color c, float x, float y)
+    {
+        var img = NewImage(parent, "Chip" + label, c);
+        Place(img.rectTransform, new Vector2(x, y), new Vector2(34f, 26f));
+        var t = NewText(img.transform, "T", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34f, 26f), 17, TextAnchor.MiddleCenter, Color.white);
+        t.fontStyle = FontStyle.Bold;
+        t.text = label;
+        return img;
+    }
+
     public void SetCount(int inning, bool top, int balls, int strikes, int outs, int runs, int oppRuns)
     {
-        _count.text = inning + "回" + (top ? "表" : "裏") + "  B " + balls + "  S " + strikes + "  O " + outs
-                    + "   自 " + runs + " - " + oppRuns + " 相";
+        _count.text = inning + (top ? "回表" : "回裏");
+        _scoreTxt[0].text = runs.ToString();
+        _scoreTxt[1].text = oppRuns.ToString();
+        // 攻撃中のチームのチップを明るく
+        _teamChip[0].color = top ? new Color(0.90f, 0.18f, 0.18f) : new Color(0.45f, 0.12f, 0.12f);
+        _teamChip[1].color = top ? new Color(0.10f, 0.18f, 0.45f) : new Color(0.18f, 0.34f, 0.90f);
+        int[] v = { balls, strikes, outs };
+        for (int r = 0; r < 3; r++)
+            for (int k = 0; k < _lamps[r].Length; k++)
+                _lamps[r][k].color = k < v[r] ? _lampOn[r] : new Color(1f, 1f, 1f, 0.15f);
     }
 
     public void SetBatterLabel(string text) { _batter.text = text; }
@@ -390,7 +466,7 @@ public class BattingUI
         return text;
     }
 
-    private static Font GetFont()
+    public static Font GetFont()
     {
         try
         {

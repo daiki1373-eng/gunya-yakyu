@@ -17,6 +17,7 @@ public enum CamMode { Catcher, Follow, Diamond }
 public class BattingStage : MonoBehaviour
 {
     public Camera Cam { get; private set; }
+    public StadiumBuilder Stadium { get; private set; }
     public Transform Root { get; private set; }
 
     // 描画順(sortingOrder)。ラグドールは既存コードで4〜8を使う。
@@ -50,7 +51,7 @@ public class BattingStage : MonoBehaviour
     private void Build()
     {
         SetupCamera();
-        BuildField();
+        Stadium = StadiumBuilder.Build(Root);
         BuildFenceAndStands();
         BuildZone();
         BuildReticle();
@@ -76,7 +77,7 @@ public class BattingStage : MonoBehaviour
         Cam.nearClipPlane = 0.1f;
         Cam.farClipPlane = 700f;
         Cam.clearFlags = CameraClearFlags.SolidColor;
-        Cam.backgroundColor = new Color(0.55f, 0.78f, 0.95f);
+        Cam.backgroundColor = new Color(0.02f, 0.03f, 0.09f);
         _catcherRot = Quaternion.Euler(BattingConfig.CameraPitchDeg, 0f, 0f);
         Cam.transform.position = BattingConfig.CameraPos;
         Cam.transform.rotation = _catcherRot;
@@ -156,6 +157,7 @@ public class BattingStage : MonoBehaviour
             if (_billboards[i] != null) _billboards[i].rotation = ct.rotation;
         }
         UpdateTrail();
+        UpdateShadows();
 
         if (Time.unscaledTime < _shakeUntil)
         {
@@ -182,99 +184,27 @@ public class BattingStage : MonoBehaviour
             new Vector3(x, 0f, z), new Vector3(90f, 0f, roll), new Vector3(w, l, 1f));
     }
 
-    private void BuildField()
-    {
-        Sprite white = SpriteFactory.White;
-        Sprite circle = SpriteFactory.Circle;
-        Color grass = new Color(0.40f, 0.66f, 0.34f);
-        Color grassLight = new Color(0.46f, 0.72f, 0.38f);
-        Color dirt = new Color(0.68f, 0.50f, 0.34f);
-        Color dirtDark = new Color(0.62f, 0.45f, 0.30f);
-        Color line = new Color(1f, 1f, 1f, 0.95f);
-
-        Flat("Grass", white, grass, OrderGround, 0f, 150f, 700f, 330f, 0f);
-        for (int i = 0; i < 16; i++)
-        {
-            if (i % 2 == 1) continue;
-            Flat("Stripe" + i, white, new Color(grassLight.r, grassLight.g, grassLight.b, 0.55f),
-                OrderGround + 1, 0f, 6f + i * 7f, 700f, 7f, 0f);
-        }
-
-        // 内野
-        Flat("InfieldDirt", circle, dirt, OrderGround + 4, 0f, 17f, 56f, 56f, 0f);
-        Flat("InfieldGrass", white, grass, OrderGround + 5, 0f, 19.4f, 23f, 23f, 45f);
-        // ベースパス
-        Flat("PathHome1B", white, dirt, OrderGround + 6, 9.7f, 9.7f, 2.0f, 27.4f, -45f);
-        Flat("Path1B2B", white, dirt, OrderGround + 6, 9.7f, 29.1f, 2.0f, 27.4f, 45f);
-        Flat("Path2B3B", white, dirt, OrderGround + 6, -9.7f, 29.1f, 2.0f, 27.4f, -45f);
-        Flat("Path3BHome", white, dirt, OrderGround + 6, -9.7f, 9.7f, 2.0f, 27.4f, 45f);
-        Flat("HomeDirt", circle, dirt, OrderGround + 7, 0f, 0f, 18f, 18f, 0f);
-        Flat("Base1B", circle, dirt, OrderGround + 7, 19.4f, 19.4f, 5f, 5f, 0f);
-        Flat("Base2B", circle, dirt, OrderGround + 7, 0f, 38.8f, 5f, 5f, 0f);
-        Flat("Base3B", circle, dirt, OrderGround + 7, -19.4f, 19.4f, 5f, 5f, 0f);
-        Flat("Mound", circle, dirtDark, OrderGround + 8, 0f, BattingConfig.MoundZ, 5.4f, 5.4f, 0f);
-        Flat("PitchPlate", white, line, OrderGround + 9, 0f, BattingConfig.MoundZ, 0.7f, 0.16f, 0f);
-
-        // ライン
-        Flat("FoulLineR", white, line, OrderGround + 9, 38.9f, 38.9f, 0.18f, 110f, -45f);
-        Flat("FoulLineL", white, line, OrderGround + 9, -38.9f, 38.9f, 0.18f, 110f, 45f);
-        Flat("Bag1B", white, line, OrderGround + 10, 19.4f, 19.4f, 0.9f, 0.9f, 45f);
-        Flat("Bag2B", white, line, OrderGround + 10, 0f, 38.8f, 0.9f, 0.9f, 45f);
-        Flat("Bag3B", white, line, OrderGround + 10, -19.4f, 19.4f, 0.9f, 0.9f, 45f);
-        Flat("HomePlate", white, line, OrderGround + 10, 0f, 0f, 0.8f, 0.8f, 0f);
-
-        // バッターボックス(左右)
-        BoxOutline(-1.40f, 0f, line);
-        BoxOutline(1.40f, 0f, line);
-    }
-
-    private void BoxOutline(float cx, float cz, Color col)
-    {
-        Sprite white = SpriteFactory.White;
-        float w = 1.2f, l = 2.2f, t = 0.07f;
-        int o = OrderGround + 10;
-        Flat("BoxL", white, col, o, cx - w * 0.5f, cz, t, l, 0f);
-        Flat("BoxR", white, col, o, cx + w * 0.5f, cz, t, l, 0f);
-        Flat("BoxF", white, col, o, cx, cz + l * 0.5f, w, t, 0f);
-        Flat("BoxB", white, col, o, cx, cz - l * 0.5f, w, t, 0f);
-    }
-
     private void BuildFenceAndStands()
     {
+        // スタンド・照明・掲示板は StadiumBuilder が作る。ここは外野フェンスだけ。
+        Sprite fenceSp = StadiumArt.Fence;
         Sprite white = SpriteFactory.White;
-        var palette = new Color[]
-        {
-            new Color(0.95f, 0.89f, 0.77f), new Color(0.77f, 0.85f, 0.75f),
-            new Color(0.95f, 0.74f, 0.44f), new Color(0.28f, 0.39f, 0.42f),
-            new Color(0.82f, 0.55f, 0.41f)
-        };
-        Sprite crowd = SpriteFactory.Crowd(palette, 777);
-        Vector2 cb = crowd.bounds.size;
         float h = BattingConfig.FenceHeight;
-
-        for (float phi = -58f; phi <= 58f; phi += 4f)
+        for (float phi = -58f; phi <= 58.1f; phi += 2f)
         {
             float rf = BattingConfig.FenceRadius(Mathf.Min(Mathf.Abs(phi), 45f));
             float rad = phi * Mathf.Deg2Rad;
-            float segW = 2f * Mathf.PI * rf * (4f / 360f) * 1.08f;
+            float segW = 2f * Mathf.PI * rf * (2f / 360f) * 1.08f;
             Vector3 dir = new Vector3(Mathf.Sin(rad), 0f, Mathf.Cos(rad));
-            Quaternion face = Quaternion.Euler(0f, phi, 0f);
-
-            // フェンス本体(緑)と上端の黄色い線
-            var fence = BattingSprites.Make("Fence", Root, white, new Color(0.13f, 0.36f, 0.24f), OrderFence,
-                dir * rf + Vector3.up * (h * 0.5f), face.eulerAngles, new Vector3(segW, h, 1f));
-            var top = BattingSprites.Make("FenceTop", Root, white, new Color(0.98f, 0.85f, 0.25f), OrderFence + 1,
-                dir * rf + Vector3.up * h, face.eulerAngles, new Vector3(segW, 0.25f, 1f));
-
-            // 観客席(柵の後ろ)
-            float rs = rf + 9f;
-            float standH = 16f;
-            float standW = 2f * Mathf.PI * rs * (4f / 360f) * 1.08f;
-            Vector3 sdir = dir * rs + Vector3.up * (h + standH * 0.5f);
-            var stand = BattingSprites.Make("Stand", Root, crowd, Color.white, OrderStands,
-                sdir, face.eulerAngles, new Vector3(standW / cb.x, standH / cb.y, 1f));
-            var standBase = BattingSprites.Make("StandBase", Root, white, new Color(0.45f, 0.48f, 0.52f), OrderStands - 1,
-                dir * (rf + 4.5f) + Vector3.up * (h * 0.5f + 2f), face.eulerAngles, new Vector3(standW, h + 4f, 1f));
+            Vector3 face = new Vector3(0f, phi, 0f);
+            var fence = BattingSprites.Make("Fence", Root, fenceSp, Color.white, OrderFence,
+                dir * rf + Vector3.up * (h * 0.5f), face, Vector3.one);
+            fence.drawMode = SpriteDrawMode.Tiled;
+            fence.size = new Vector2(segW, h);
+            BattingSprites.Make("FenceTop", Root, white, new Color(0.98f, 0.85f, 0.25f), OrderFence + 1,
+                dir * rf + Vector3.up * h, face, new Vector3(segW, 0.22f, 1f));
+            BattingSprites.Make("FencePad", Root, white, new Color(0.04f, 0.14f, 0.10f), OrderFence + 1,
+                dir * (rf - 0.05f) + Vector3.up * (h - 0.35f), face, new Vector3(segW, 0.5f, 1f));
         }
     }
 
@@ -431,25 +361,141 @@ public class BattingStage : MonoBehaviour
     private Vector2[] _runnerLast;
     private const float DollScale = 1.9f; // 遠くでも見えるよう誇張
 
-    private Transform MakeDoll(string name, Color uniform, Color capColor, out Transform rig)
+    private int _dollCount;
+
+    private SpriteRenderer DollPart(Transform rig, string name, Color c, int order, float x, float y, float w, float h)
     {
-        Sprite white = SpriteFactory.White;
-        Sprite circle = SpriteFactory.Circle;
+        const float s = DollScale;
+        var sr = BattingSprites.Make(name, rig, CharacterArt.Part, c, order,
+            new Vector3(x * s, y * s, 0f), Vector3.zero, Vector3.one);
+        sr.drawMode = SpriteDrawMode.Sliced;
+        sr.size = new Vector2(w * s, h * s);
+        return sr;
+    }
+
+    private Transform MakeDoll(string name, Color uniform, Color capColor, out Transform rig, bool runner = false)
+    {
         var root = new GameObject(name).transform;
         root.SetParent(Root, false);
         rig = new GameObject("Rig").transform;
         rig.SetParent(root, false);
         const float s = DollScale;
-        BattingSprites.Make("Legs", rig, white, new Color(0.92f, 0.92f, 0.95f), 3,
-            new Vector3(0f, 0.35f * s, 0f), Vector3.zero, new Vector3(0.40f * s, 0.70f * s, 1f));
-        BattingSprites.Make("Body", rig, white, uniform, 3,
-            new Vector3(0f, 0.95f * s, 0f), Vector3.zero, new Vector3(0.50f * s, 0.55f * s, 1f));
-        BattingSprites.Make("Head", rig, circle, new Color(0.96f, 0.78f, 0.62f), 3,
-            new Vector3(0f, 1.42f * s, 0f), Vector3.zero, new Vector3(0.42f * s, 0.42f * s, 1f));
-        BattingSprites.Make("Cap", rig, white, capColor, 4,
-            new Vector3(0f, 1.58f * s, 0f), Vector3.zero, new Vector3(0.44f * s, 0.14f * s, 1f));
+        Color pants = new Color(0.93f, 0.93f, 0.95f);
+        Color skin = new Color(0.96f, 0.78f, 0.62f);
+        Color shoe = new Color(0.15f, 0.13f, 0.13f);
+        int v = _dollCount++;
+        // 脚(2本)・ソックス・靴
+        DollPart(rig, "LegL", pants, 2, -0.10f, 0.36f, 0.17f, 0.62f);
+        DollPart(rig, "LegR", pants, 2, 0.10f, 0.36f, 0.17f, 0.62f);
+        DollPart(rig, "SockL", capColor, 3, -0.10f, 0.16f, 0.17f, 0.22f);
+        DollPart(rig, "SockR", capColor, 3, 0.10f, 0.16f, 0.17f, 0.22f);
+        DollPart(rig, "ShoeL", shoe, 3, -0.12f, 0.04f, 0.22f, 0.09f);
+        DollPart(rig, "ShoeR", shoe, 3, 0.12f, 0.04f, 0.22f, 0.09f);
+        // 胴・ベルト・腕
+        DollPart(rig, "Body", uniform, 3, 0f, 0.93f, 0.54f, 0.58f);
+        DollPart(rig, "Belt", new Color(0.12f, 0.12f, 0.16f), 3, 0f, 0.665f, 0.50f, 0.06f);
+        DollPart(rig, "ArmL", uniform, 2, -0.32f, 0.90f, 0.14f, 0.44f);
+        DollPart(rig, "ArmR", uniform, 2, 0.32f, 0.90f, 0.14f, 0.44f);
+        BattingSprites.Make("HandL", rig, SpriteFactory.Circle, skin, 3,
+            new Vector3(-0.32f * s, 0.66f * s, 0f), Vector3.zero, new Vector3(0.13f * s, 0.13f * s, 1f));
+        if (runner)
+        {
+            BattingSprites.Make("HandR", rig, SpriteFactory.Circle, skin, 3,
+                new Vector3(0.32f * s, 0.66f * s, 0f), Vector3.zero, new Vector3(0.13f * s, 0.13f * s, 1f));
+        }
+        else
+        {
+            var g = BattingSprites.Make("Glove", rig, CharacterArt.Glove, Color.white, 4,
+                new Vector3(0.34f * s, 0.68f * s, 0f), Vector3.zero, Vector3.one);
+            Vector2 gb = CharacterArt.Glove.bounds.size;
+            g.transform.localScale = new Vector3(0.30f * s / gb.x, 0.30f * s / gb.y, 1f);
+        }
+        // 頭(帽子 or ヘルメット。向きは個体ごとに左右ばらす)
+        var headSp = CharacterArt.Head("human", skin, capColor, runner ? Headgear.Helmet : Headgear.Cap, Expr.Normal, v, 128);
+        var head = BattingSprites.Make("Head", rig, headSp, Color.white, 4,
+            new Vector3(0f, 1.42f * s, 0f), Vector3.zero, Vector3.one * (0.50f * s));
+        head.flipX = (v % 2) == 1;
+        _dollInfo[root] = new DollInfo { Variant = v, Helmet = runner };
         _billboards.Add(root);
+        AddShadow(root, 0.9f * s);
         return root;
+    }
+
+    private struct DollInfo { public int Variant; public bool Helmet; }
+    private readonly Dictionary<Transform, DollInfo> _dollInfo = new Dictionary<Transform, DollInfo>();
+
+    // 守備側・攻撃側のチームカラーで人形を塗り直す
+    public void SetTeams(Color fieldJersey, Color fieldAccent, Color runJersey, Color runAccent)
+    {
+        for (int i = 0; i < _fielders.Length; i++)
+            if (_fielders[i] != null) RecolorDoll(_fielders[i], fieldJersey, fieldAccent);
+        for (int i = 0; i < _runners.Length; i++)
+            if (_runners[i] != null) RecolorDoll(_runners[i], runJersey, runAccent);
+    }
+
+    private void RecolorDoll(Transform root, Color jersey, Color accent)
+    {
+        DollInfo info;
+        bool has = _dollInfo.TryGetValue(root, out info);
+        foreach (var sr in root.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            switch (sr.name)
+            {
+                case "Body": case "ArmL": case "ArmR": sr.color = jersey; break;
+                case "SockL": case "SockR": sr.color = accent; break;
+                case "Head":
+                    if (has)
+                        sr.sprite = CharacterArt.Head("human", new Color(0.96f, 0.78f, 0.62f), accent,
+                            info.Helmet ? Headgear.Helmet : Headgear.Cap, Expr.Normal, info.Variant, 128);
+                    break;
+            }
+        }
+    }
+
+    // ---- 足元の影(ナイター照明で数方向に薄く伸びる) --------------------
+    private class ShadowSet { public Transform Target; public Transform[] Parts; public bool UseZ; }
+    private readonly List<ShadowSet> _shadows = new List<ShadowSet>();
+    private static readonly Vector2[] ShadowDirs = { new Vector2(0f, 0f), new Vector2(0.55f, 0.35f), new Vector2(-0.55f, 0.35f), new Vector2(0.0f, -0.6f) };
+
+    public void AddShadow(Transform target, float size)
+    {
+        var set = new ShadowSet { Target = target, Parts = new Transform[ShadowDirs.Length] };
+        for (int i = 0; i < ShadowDirs.Length; i++)
+        {
+            Vector2 d = ShadowDirs[i];
+            float a = i == 0 ? 0.70f : 0.30f;
+            float len = i == 0 ? 1f : 2.2f;
+            var sr = BattingSprites.Make("Shadow", Root, CharacterArt.SoftShadow, new Color(0f, 0f, 0f, a), OrderShadow,
+                Vector3.zero, new Vector3(90f, 0f, i == 0 ? 0f : -Mathf.Atan2(d.x, d.y) * Mathf.Rad2Deg),
+                new Vector3(size * 1.0f, size * 0.62f * len, 1f));
+            set.Parts[i] = sr.transform;
+        }
+        _shadows.Add(set);
+    }
+
+    private void UpdateShadows()
+    {
+        for (int i = _shadows.Count - 1; i >= 0; i--)
+        {
+            var set = _shadows[i];
+            if (set.Target == null)
+            {
+                foreach (var p in set.Parts) if (p != null) Destroy(p.gameObject);
+                _shadows.RemoveAt(i);
+                continue;
+            }
+            bool on = set.Target.gameObject.activeInHierarchy;
+            Vector3 tp = set.Target.position;
+            for (int k = 0; k < set.Parts.Length; k++)
+            {
+                var p = set.Parts[k];
+                if (p.gameObject.activeSelf != on) p.gameObject.SetActive(on);
+                if (!on) continue;
+                Vector2 d = ShadowDirs[k];
+                float sx = p.localScale.y * 0.5f;
+                p.position = new Vector3(tp.x + d.x * sx, 0.03f + k * 0.002f, tp.z + d.y * sx);
+            }
+        }
     }
 
     private void BuildFielders()
@@ -474,7 +520,7 @@ public class BattingStage : MonoBehaviour
         for (int i = 0; i < 4; i++)
         {
             Transform rig;
-            _runners[i] = MakeDoll("Runner_" + i, new Color(0.85f, 0.25f, 0.22f), new Color(0.55f, 0.1f, 0.1f), out rig);
+            _runners[i] = MakeDoll("Runner_" + i, new Color(0.85f, 0.25f, 0.22f), new Color(0.55f, 0.1f, 0.1f), out rig, true);
             _runnerRigs[i] = rig;
             _runners[i].gameObject.SetActive(false);
         }

@@ -89,10 +89,36 @@ public class AtBatController : MonoBehaviour
         _cursor = MeetCursor.Create(_stage.Root);
 
         _pitcherStats = SpecialCharacters.Panta();
-        _pitcher = RagdollPlayer.Create(transform, "Pitcher", Vector2.zero, 1f,
-            _pitcherStats, new Color(0.16f, 0.52f, 0.55f), new Color(0.13f, 0.23f, 0.45f), false);
+        CreatePitcher(BattingConfig.OppJersey, BattingConfig.OppAccent);
+    }
+
+    // 投手は守備側のユニフォームで作り直す(能力は共通)
+    private void CreatePitcher(Color jersey, Color accent)
+    {
+        if (_pitcher != null) Destroy(_pitcher.gameObject);
+        _pitcher = RagdollPlayer.Create(transform, "Pitcher", Vector2.zero, 1f, _pitcherStats, jersey, accent, false);
         // 奥行き(マウンド)へ。ResetPoseはzを保つよう修正済み。
         _pitcher.transform.position = new Vector3(0f, 0f, BattingConfig.MoundZ);
+        _stage.AddShadow(_pitcher.Pelvis.transform, 1.6f);
+    }
+
+    private int _teamsFor = -1;
+
+    private void ApplyTeams()
+    {
+        int key = _gs.UserBatting ? 1 : 0;
+        if (_teamsFor == key) return;
+        _teamsFor = key;
+        if (_gs.UserBatting)
+        {
+            _stage.SetTeams(BattingConfig.OppJersey, BattingConfig.OppAccent, BattingConfig.UserJersey, BattingConfig.UserAccent);
+            CreatePitcher(BattingConfig.OppJersey, BattingConfig.OppAccent);
+        }
+        else
+        {
+            _stage.SetTeams(BattingConfig.UserJersey, BattingConfig.UserAccent, BattingConfig.OppJersey, BattingConfig.OppAccent);
+            CreatePitcher(BattingConfig.UserJersey, BattingConfig.UserAccent);
+        }
     }
 
     private IEnumerator Start()
@@ -271,15 +297,15 @@ public class AtBatController : MonoBehaviour
             {
                 case 0:
                     _batterStats = SpecialCharacters.Kabutomaru();
-                    uniform = new Color(0.78f, 0.22f, 0.20f); accent = new Color(0.25f, 0.15f, 0.10f);
+                    uniform = BattingConfig.UserJersey; accent = BattingConfig.UserAccent;
                     break;
                 case 1:
                     _batterStats = SpecialCharacters.Wanta();
-                    uniform = new Color(0.92f, 0.72f, 0.16f); accent = new Color(0.35f, 0.22f, 0.10f);
+                    uniform = BattingConfig.UserJersey; accent = BattingConfig.UserAccent;
                     break;
                 default:
                     _batterStats = SpecialCharacters.HeroDefault();
-                    uniform = new Color(0.20f, 0.35f, 0.80f); accent = new Color(0.92f, 0.92f, 0.95f);
+                    uniform = BattingConfig.UserJersey; accent = BattingConfig.UserAccent;
                     break;
             }
         }
@@ -287,7 +313,7 @@ public class AtBatController : MonoBehaviour
         {
             _oppIndex = (_oppIndex + 1) % 3;
             _batterStats = OpponentBatter(_oppIndex);
-            uniform = new Color(0.30f, 0.55f, 0.42f); accent = new Color(0.85f, 0.85f, 0.88f);
+            uniform = BattingConfig.OppJersey; accent = BattingConfig.OppAccent;
         }
         _batSide = _batterStats.BatsRight ? -1 : 1;
 
@@ -295,6 +321,8 @@ public class AtBatController : MonoBehaviour
         _batter = RagdollPlayer.Create(transform, "Batter",
             new Vector2(_batSide * BattingConfig.BatterX, 0f), -_batSide,
             _batterStats, uniform, accent, true);
+        _stage.AddShadow(_batter.Pelvis.transform, 1.6f);
+        _stage.Stadium.SetBoardBatter(_batterStats.Name);
 
         _cursor.Configure(HitJudge.CursorHalfW(_batterStats.Meet), HitJudge.CursorHalfH(_batterStats.Meet), _batSide);
         _cursor.SetVisible(_gs.UserBatting);
@@ -309,11 +337,13 @@ public class AtBatController : MonoBehaviour
     private void RefreshHud()
     {
         _ui.SetCount(_gs.Inning, _gs.UserBatting, _gs.Balls, _gs.Strikes, _gs.Outs, _gs.Runs, _gs.OppRuns);
+        _stage.Stadium.SetBoard(_gs.Inning, _gs.UserBatting, _gs.Balls, _gs.Strikes, _gs.Outs, _gs.Runs, _gs.OppRuns);
         _ui.SetBases(_gs.Base);
     }
 
     private IEnumerator PlayAtBat()
     {
+        ApplyTeams();
         SetupBatter();
         _gs.ResetCount();
         _gs.PlateAppearances++;
@@ -391,14 +421,14 @@ public class AtBatController : MonoBehaviour
                 break;
             case PitchEnd.CalledStrike:
                 _gs.Strikes++;
-                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("見逃し三振！"); over = true; key = "StrikeoutLooking"; }
+                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("見逃し三振！"); _pitcher.SetExpression(Expr.Happy, 1.5f); _batter.SetExpression(Expr.Surprise, 1.2f); over = true; key = "StrikeoutLooking"; }
                 break;
             case PitchEnd.SwingMiss:
                 _gs.Strikes++;
                 if (_gs.Strikes >= 3)
                 {
                     _gs.ApplyStrikeout();
-                    _ui.ShowResult("空振り三振！");
+                    _ui.ShowResult("空振り三振！"); _pitcher.SetExpression(Expr.Happy, 1.5f);
                     if (Random.value < 0.5f) Say(Commentary.ForWhiffK(), new Color(1f, 0.9f, 0.4f), false);
                     _batter.Flop(1.0f * BattingConfig.GunyaLevel);
                     over = true;
@@ -596,6 +626,7 @@ public class AtBatController : MonoBehaviour
         float tRelease = Time.time;
         float tArrive = tRelease + plan.FlightTime;
         if (ShowPitchName) _ui.ShowPitch(plan.Name, plan.Kmh); else _ui.ShowSpeed(plan.Kmh);
+        _stage.Stadium.SetBoardSpeed(plan.Kmh);
         _stage.SetBall(PitchPos(plan, 0f));
         GameAudio.Play(Sfx.Whoosh, 0.35f, Mathf.Lerp(1.15f, 0.9f, (plan.Kmh - 100f) / 55f));
         Color trailCol = TrailColor(plan.Kind);
@@ -669,6 +700,7 @@ public class AtBatController : MonoBehaviour
             _ui.ShowResult("空振り");
             _pitchEnd = PitchEnd.SwingMiss;
             GameAudio.Play(Sfx.Whiff, 0.8f);
+            _batter.SetExpression(Expr.Surprise, 0.5f);
             StartCoroutine(DelayedFlop(0.18f, 0.5f));
             yield return StartCoroutine(FinishFlight(plan, tRelease, trailCol));
             LogPitch(plan, "whiff", timingMs, _outcome);
@@ -682,6 +714,11 @@ public class AtBatController : MonoBehaviour
         string rankTag = (_outcome.Rank == HitRank.Perfect) ? "" : (timingMs < -20f ? "EARLY" : (timingMs > 20f ? "LATE" : ""));
         _ui.ShowRank(_outcome.Rank, rankTag);
         GameAudio.PlayHit(_outcome.Rank);
+        if (!_outcome.FoulTip && (_outcome.Rank == HitRank.Perfect || _outcome.Rank == HitRank.Good))
+        {
+            _batter.SetExpression(Expr.Happy, 1.6f);
+            _pitcher.SetExpression(Expr.Surprise, 1.4f);
+        }
         if (_outcome.Rank == HitRank.Perfect && !_outcome.FoulTip)
         {
             StartCoroutine(HitStop(0.065f));

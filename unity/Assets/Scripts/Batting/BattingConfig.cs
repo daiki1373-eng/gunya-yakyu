@@ -31,9 +31,10 @@ public static class BattingConfig
     public static readonly Vector3 ReleasePoint = new Vector3(0.30f, 1.85f, 13.4f);
 
     // ---- カメラ(捕手後方視点) ------------------------------------
-    public static readonly Vector3 CameraPos = new Vector3(0f, 1.55f, -4.4f);
-    public const float CameraPitchDeg = 2.0f;
-    public const float CameraFov = 38f;
+    // 中継カメラ風: 少し高く・後ろから、望遠ぎみに。ゾーンの見かけの大きさは従来とほぼ同じ。
+    public static readonly Vector3 CameraPos = new Vector3(0f, 1.85f, -6.2f);
+    public const float CameraPitchDeg = 4.5f;
+    public const float CameraFov = 28f;
 
     // ---- 球速表示と到達時間のマッピング ----------------------------
     // 表示は130〜155km/h、実際の到達時間は遊びやすい0.65〜0.45秒。
@@ -68,6 +69,13 @@ public static class BattingConfig
     public const float LaunchBase = 16f;       // 芯に当たったときの基準打出角(度)
     public const float LaunchPerDy = 30f;      // 上下ずれ1.0あたりの角度変化(度)
     public const float SprayMax = 62f;         // タイミング最大ズレでの打球方向(度)
+
+    // ---- チームカラー(自作) ------------------------------------------
+    // 自チーム=ホーム(白地に赤)、相手=ビジター(紺地)。
+    public static readonly Color UserJersey = new Color(0.95f, 0.95f, 0.96f);
+    public static readonly Color UserAccent = new Color(0.80f, 0.14f, 0.14f);
+    public static readonly Color OppJersey = new Color(0.20f, 0.28f, 0.55f);
+    public static readonly Color OppAccent = new Color(0.10f, 0.14f, 0.32f);
 
     // ---- 球場 -----------------------------------------------------
     public const float FenceLine = 95f;        // 両翼

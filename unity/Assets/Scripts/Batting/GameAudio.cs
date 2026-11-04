@@ -30,12 +30,85 @@ public static class GameAudio
             s.spatialBlend = 0f;
             _srcs[i] = s;
         }
+        StartAmbience(host);
         if (UnityEngine.Object.FindObjectOfType<AudioListener>() == null && Camera.main != null)
             Camera.main.gameObject.AddComponent<AudioListener>();
     }
 
+    // 歓声が鳴ったときに球場側(観客の立ち上がり等)へ知らせる
+    public static event Action<float> OnCheer;
+
+    // ---- 球場のざわめき(ループ) ----------------------------------------
+    private static AudioSource _amb;
+    private static float _ambSwell;
+    private const float AmbBase = 0.13f;
+
+    public static void StartAmbience(GameObject host)
+    {
+        if (_amb != null) return;
+        _amb = host.AddComponent<AudioSource>();
+        _amb.playOnAwake = false;
+        _amb.loop = true;
+        _amb.spatialBlend = 0f;
+        _amb.clip = BuildAmbience();
+        _amb.volume = AmbBase * MasterVolume;
+        _amb.Play();
+    }
+
+    // 歓声のあと、ざわめきをしばらく大きくする
+    public static void Swell(float amount) { _ambSwell = Mathf.Max(_ambSwell, amount); }
+
+    public static void TickAmbience(float dt)
+    {
+        if (_amb == null) return;
+        _ambSwell = Mathf.MoveTowards(_ambSwell, 0f, dt * 0.25f);
+        _amb.mute = Muted;
+        float target = (AmbBase + 0.22f * _ambSwell) * MasterVolume;
+        _amb.volume = Mathf.MoveTowards(_amb.volume, target, dt * 0.5f);
+    }
+
+    private static AudioClip BuildAmbience()
+    {
+        const float sec = 6f, fade = 0.6f;
+        int n = (int)(Rate * sec), nf = (int)(Rate * fade);
+        var raw = new float[n + nf];
+        var rnd = new System.Random(4242);
+        float a = 0f, b = 0f, c = 0f;
+        for (int i = 0; i < raw.Length; i++)
+        {
+            float t = i / (float)Rate;
+            float w = (float)(rnd.NextDouble() * 2.0 - 1.0);
+            a += 0.08f * (w - a);           // 低いざわめき
+            b += 0.30f * (w - b);           // 人の声の帯域っぽい成分
+            c += 0.02f * (b - c);
+            float voices = (b - c) * (0.6f + 0.4f * Mathf.Sin(2f * Mathf.PI * 0.37f * t) * Mathf.Sin(2f * Mathf.PI * 0.11f * t + 1f));
+            float clap = (rnd.NextDouble() < 0.0009) ? 0.5f : 0f;   // ときどき遠くで手拍子
+            raw[i] = a * 1.6f + voices * 1.1f + clap * w;
+        }
+        var data = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            float v = raw[i];
+            if (i < nf)
+            {
+                float k = i / (float)nf;
+                v = raw[i] * k + raw[n + i] * (1f - k);   // 継ぎ目を目立たなくする
+            }
+            data[i] = Mathf.Clamp(v, -1f, 1f);
+        }
+        var clip = AudioClip.Create("amb_crowd", n, 1, Rate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
     public static void Play(Sfx sfx, float volume = 1f, float pitch = 1f)
     {
+        if (sfx == Sfx.Cheer || sfx == Sfx.BigCheer)
+        {
+            float k = sfx == Sfx.BigCheer ? 1f : 0.55f;
+            Swell(k);
+            if (OnCheer != null) OnCheer(k);
+        }
         if (Muted || _srcs == null || _srcs[0] == null) return;
         var clip = Get(sfx);
         var s = _srcs[_next];

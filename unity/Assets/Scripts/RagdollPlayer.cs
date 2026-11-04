@@ -67,6 +67,7 @@ public class RagdollPlayer : MonoBehaviour
 
         Color skin = new Color(0.96f, 0.78f, 0.62f);
         if (stats.Species == "panda") skin = Color.white; // パンダは白頭
+        else if (stats.Species == "dog") skin = new Color(0.84f, 0.64f, 0.42f); // イヌは毛色
         Color pants = new Color(0.92f, 0.92f, 0.94f);
         Color shoe = new Color(0.25f, 0.2f, 0.2f);
         Color sleeve = uniform;
@@ -118,7 +119,14 @@ public class RagdollPlayer : MonoBehaviour
             Bat = MakePart(t, "Bat", rootPos + new Vector2(0.17f * f, 1.08f), new Vector2(0.09f, 0.92f),
                 new Color(0.72f, 0.5f, 0.28f), false, 0.35f, 8);
             Connect(Bat, ArmFrontFore, new Vector2(0f, -0.40f), new Vector2(0f, -0.18f), -170f, 170f);
+            var bsr = Bat.GetComponentInChildren<SpriteRenderer>();
+            bsr.drawMode = SpriteDrawMode.Simple;
+            bsr.sprite = CharacterArt.Bat;
+            bsr.color = Color.white;
+            Vector2 bb = CharacterArt.Bat.bounds.size;
+            bsr.transform.localScale = new Vector3(0.11f / bb.x, 0.94f / bb.y, 1f);
         }
+        AddUniformDetails(uniform, accent, isBatter, skin, legBackFore, legFrontFore, legBackUpper, legFrontUpper);
 
         _pelvisHome = rootPos + new Vector2(0f, 0.90f);
         CapturePose();
@@ -136,10 +144,21 @@ public class RagdollPlayer : MonoBehaviour
         vis.transform.SetParent(go.transform, false);
         vis.layer = RagdollLayer;
         var sr = vis.AddComponent<SpriteRenderer>();
-        sr.sprite = circle ? SpriteFactory.Circle : SpriteFactory.White;
         sr.color = color;
         sr.sortingOrder = sortingOrder;
-        vis.transform.localScale = new Vector3(size.x, size.y, 1f);
+        if (circle)
+        {
+            sr.sprite = SpriteFactory.Circle;
+            vis.transform.localScale = new Vector3(size.x, size.y, 1f);
+        }
+        else
+        {
+            // 角丸+輪郭の9スライス。scaleを使わず size で伸ばすので輪郭の太さが一定になる。
+            sr.sprite = CharacterArt.Part;
+            sr.drawMode = SpriteDrawMode.Sliced;
+            sr.size = size;
+            vis.transform.localScale = Vector3.one;
+        }
 
         var rb = go.AddComponent<Rigidbody2D>();
         rb.mass = mass;
@@ -188,65 +207,124 @@ public class RagdollPlayer : MonoBehaviour
         vis.transform.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
         vis.layer = RagdollLayer;
         var sr = vis.AddComponent<SpriteRenderer>();
-        sr.sprite = circle ? SpriteFactory.Circle : SpriteFactory.White;
         sr.color = color;
         sr.sortingOrder = sortingOrder;
-        vis.transform.localScale = new Vector3(size.x, size.y, 1f);
+        if (circle)
+        {
+            sr.sprite = SpriteFactory.Circle;
+            vis.transform.localScale = new Vector3(size.x, size.y, 1f);
+        }
+        else
+        {
+            sr.sprite = CharacterArt.Part;
+            sr.drawMode = SpriteDrawMode.Sliced;
+            sr.size = size;
+            vis.transform.localScale = Vector3.one;
+        }
+    }
+
+    private SpriteRenderer AddSprite(Rigidbody2D part, string name, Sprite sprite, Vector2 localPos, Vector2 size,
+        Color color, int sortingOrder, float rotationZ = 0f)
+    {
+        var vis = new GameObject(name);
+        vis.transform.SetParent(part.transform, false);
+        vis.transform.localPosition = new Vector3(localPos.x, localPos.y, 0f);
+        vis.transform.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
+        vis.layer = RagdollLayer;
+        var sr = vis.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.color = color;
+        sr.sortingOrder = sortingOrder;
+        Vector2 bs = sprite.bounds.size;
+        vis.transform.localScale = new Vector3(size.x / bs.x, size.y / bs.y, 1f);
+        return sr;
     }
 
     private void AddShoe(Rigidbody2D shin, Color shoeColor)
     {
         // つま先は進行方向(facing)に少し出す
-        AddVisual(shin, "Shoe", new Vector2(0.05f * Facing, -0.20f), new Vector2(0.24f, 0.09f), shoeColor, 6);
+        AddVisual(shin, "Shoe", new Vector2(0.05f * Facing, -0.20f), new Vector2(0.26f, 0.10f), shoeColor, 6);
+        AddVisual(shin, "Sole", new Vector2(0.05f * Facing, -0.245f), new Vector2(0.26f, 0.035f), new Color(0.92f, 0.92f, 0.9f), 6);
     }
 
     private void AddGlove(Rigidbody2D fore)
     {
-        AddVisual(fore, "Glove", new Vector2(0f, -0.24f), new Vector2(0.30f, 0.30f),
-            new Color(0.62f, 0.4f, 0.2f), 5, 0f, true);
+        var g = AddSprite(fore, "Glove", CharacterArt.Glove, new Vector2(0f, -0.24f), new Vector2(0.32f, 0.32f),
+            Color.white, 5);
+        g.flipX = Facing < 0f;
     }
+
+    // ---- 顔(表情つきの頭部イラスト) --------------------------------
+    private SpriteRenderer _headSr;
+    private string _species;
+    private Color _skin, _hatColor;
+    private Headgear _gear;
+    private int _variant;
+    private Expr _expr = Expr.Normal;
+    private float _exprTimer;
 
     private void AddFace(Rigidbody2D head, float f, PlayerStats stats, Color accent, bool isBatter)
     {
-        // 帽子 or ヘルメット
-        Color hatColor = accent;
-        AddVisual(head, "CapTop", new Vector2(0f, 0.24f), new Vector2(0.66f, 0.20f), hatColor, 8);
-        AddVisual(head, "CapBrim", new Vector2(0.34f * f, 0.18f), new Vector2(0.30f, 0.06f), hatColor, 8);
-        if (isBatter)
-        {
-            // ヘルメットの耳当てっぽく少し大きく
-            AddVisual(head, "HelmetSide", new Vector2(-0.05f * f, 0.05f), new Vector2(0.55f, 0.30f), hatColor, 7);
-        }
+        _headSr = head.GetComponentInChildren<SpriteRenderer>();
+        _species = string.IsNullOrEmpty(stats.Species) ? "human" : stats.Species;
+        _skin = _headSr.color;
+        _hatColor = accent;
+        _gear = isBatter ? Headgear.Helmet : Headgear.Cap;
+        _variant = string.IsNullOrEmpty(stats.Name) ? 0 : Mathf.Abs(stats.Name.GetHashCode());
+        _headSr.color = Color.white;
+        _headSr.flipX = f < 0f;
+        // 表情の絵は打席の最初にまとめて作っておく(試合中のカクつき防止。2回目以降はキャッシュ)
+        for (int e = 0; e < 5; e++) CharacterArt.Head(_species, _skin, _hatColor, _gear, (Expr)e, _variant);
+        ApplyExpression(Expr.Normal);
+    }
 
-        // 目(横向きなので1つ)。パンダは黒い目当てが代わりになる。
-        if (stats.Species == "panda")
-        {
-            AddVisual(head, "EyePatch", new Vector2(0.16f * f, 0.03f), new Vector2(0.17f, 0.22f),
-                Color.black, 8, 0f, true);
-            // 耳(黒い丸×2)
-            AddVisual(head, "EarL", new Vector2(-0.27f, 0.30f), new Vector2(0.20f, 0.20f), Color.black, 7, 0f, true);
-            AddVisual(head, "EarR", new Vector2(0.27f, 0.30f), new Vector2(0.20f, 0.20f), Color.black, 7, 0f, true);
-        }
-        else
-        {
-            AddVisual(head, "Eye", new Vector2(0.21f * f, 0.03f), new Vector2(0.06f, 0.11f),
-                new Color(0.1f, 0.1f, 0.12f), 8);
-        }
+    private void ApplyExpression(Expr e)
+    {
+        if (_headSr == null) return;
+        _expr = e;
+        _headSr.sprite = CharacterArt.Head(_species, _skin, _hatColor, _gear, e, _variant);
+    }
 
-        if (stats.Species == "beetle")
+    // 表情を一定時間だけ変える(時間が過ぎたら通常顔に戻る)
+    public void SetExpression(Expr e, float seconds)
+    {
+        ApplyExpression(e);
+        _exprTimer = seconds;
+    }
+
+    private void Update()
+    {
+        if (_exprTimer > 0f)
         {
-            // カブトムシの角(前に倒れた太い角+小さい分岐)
-            Color horn = new Color(0.3f, 0.18f, 0.1f);
-            AddVisual(head, "Horn", new Vector2(0.18f * f, 0.44f), new Vector2(0.08f, 0.55f), horn, 8, -38f * f);
-            AddVisual(head, "HornFork", new Vector2(0.36f * f, 0.60f), new Vector2(0.07f, 0.25f), horn, 8, 35f * f);
+            _exprTimer -= Time.deltaTime;
+            if (_exprTimer <= 0f && _expr != Expr.Normal) ApplyExpression(Expr.Normal);
         }
-        else if (stats.Species == "dog")
-        {
-            // イヌ耳(垂れ耳×2)
-            Color ear = new Color(0.55f, 0.38f, 0.22f);
-            AddVisual(head, "EarL", new Vector2(-0.28f, 0.22f), new Vector2(0.13f, 0.30f), ear, 7, 18f);
-            AddVisual(head, "EarR", new Vector2(0.28f, 0.22f), new Vector2(0.13f, 0.30f), ear, 7, -18f);
-        }
+    }
+
+    // 体の細部(ベルト・ソックス・手袋・胸のライン)
+    private void AddUniformDetails(Color uniform, Color accent, bool isBatter, Color skin, Rigidbody2D shinBack, Rigidbody2D shinFront,
+        Rigidbody2D thighBack, Rigidbody2D thighFront)
+    {
+        float f = Facing;
+        Color belt = new Color(0.12f, 0.12f, 0.16f);
+        AddVisual(Head, "Neck", new Vector2(0f, -0.34f), new Vector2(0.20f, 0.18f), skin, 6);
+        AddVisual(Pelvis, "Belt", new Vector2(0f, 0.085f), new Vector2(0.42f, 0.075f), belt, 6);
+        AddVisual(Pelvis, "Buckle", new Vector2(0.15f * f, 0.085f), new Vector2(0.06f, 0.06f), new Color(0.85f, 0.82f, 0.7f), 6);
+        // ストッキング(すねの下半分をチーム色に)
+        AddVisual(shinBack, "Sock", new Vector2(0f, -0.08f), new Vector2(0.135f, 0.24f), accent, 4);
+        AddVisual(shinFront, "Sock", new Vector2(0f, -0.08f), new Vector2(0.135f, 0.24f), accent, 6);
+        // ズボンの側線
+        AddVisual(thighBack, "Piping", new Vector2(0f, 0f), new Vector2(0.035f, 0.40f), accent, 4);
+        AddVisual(thighFront, "Piping", new Vector2(0f, 0f), new Vector2(0.035f, 0.40f), accent, 6);
+        // 胸の前立て・袖口のライン
+        AddVisual(Chest, "Placket", new Vector2(0.17f * f, -0.02f), new Vector2(0.035f, 0.40f), accent, 6);
+        AddVisual(Chest, "Collar", new Vector2(0.10f * f, 0.19f), new Vector2(0.22f, 0.05f), accent, 6);
+        AddVisual(ArmFrontUpper, "Cuff", new Vector2(0f, -0.14f), new Vector2(0.13f, 0.06f), accent, 6);
+        AddVisual(ArmBackUpper, "Cuff", new Vector2(0f, -0.14f), new Vector2(0.13f, 0.06f), accent, 4);
+        // 手(打者はバッティンググローブ)
+        Color hand = isBatter ? new Color(0.95f, 0.95f, 0.95f) : skin;
+        AddVisual(ArmFrontFore, "Hand", new Vector2(0f, -0.19f), new Vector2(0.13f, 0.13f), hand, 6, 0f, true);
+        if (isBatter) AddVisual(ArmBackFore, "Hand", new Vector2(0f, -0.19f), new Vector2(0.13f, 0.13f), hand, 4, 0f, true);
     }
 
     private void CapturePose()
@@ -266,6 +344,8 @@ public class RagdollPlayer : MonoBehaviour
     {
         _poseHoldTimer = 0f;
         _flopTimer = 0f;
+        _exprTimer = 0f;
+        ApplyExpression(Expr.Normal);
         for (int i = 0; i < _initialPose.Count; i++)
         {
             var s = _initialPose[i];
@@ -320,6 +400,7 @@ public class RagdollPlayer : MonoBehaviour
     public void DoPitchMotion()
     {
         _poseHoldTimer = 0.35f;
+        SetExpression(Expr.Focus, 0.7f);
         float f = Facing;
         // 腕は下向きに垂れているので、「前へ振る」角速度はバットと逆符号になる。
         float g = 0.6f + 0.4f * BattingConfig.GunyaLevel;
@@ -331,6 +412,7 @@ public class RagdollPlayer : MonoBehaviour
     public void DoSwing()
     {
         _poseHoldTimer = 0.30f;
+        if (_expr == Expr.Normal) SetExpression(Expr.Focus, 0.5f);
         float f = Facing;
         // バットは上向きに立っているので前へ倒れる向き、腕は下向きなので逆符号。
         float g = 0.6f + 0.4f * BattingConfig.GunyaLevel;
@@ -355,6 +437,7 @@ public class RagdollPlayer : MonoBehaviour
     public void Flop(float power)
     {
         _flopTimer = 0.9f;
+        SetExpression(Expr.Dizzy, 1.6f);
         for (int i = 0; i < _allParts.Count; i++)
         {
             var rb = _allParts[i];
