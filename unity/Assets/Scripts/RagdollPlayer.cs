@@ -75,6 +75,7 @@ public class RagdollPlayer : MonoBehaviour
         Color skin = new Color(0.96f, 0.78f, 0.62f);
         if (stats.Species == "panda") skin = Color.white; // パンダは白頭
         else if (stats.Species == "dog") skin = new Color(0.84f, 0.64f, 0.42f); // イヌは毛色
+        if (stats.SkinTint.a > 0f) skin = stats.SkinTint;
         Color pants = new Color(0.92f, 0.92f, 0.94f);
         Color shoe = new Color(0.25f, 0.2f, 0.2f);
         Color sleeve = uniform;

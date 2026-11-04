@@ -60,12 +60,15 @@ public static class BattingConfig
     // ---- ミートカーソル --------------------------------------------
     public const float CursorHalfWMin = 0.18f; // ミート5のとき
     public const float CursorHalfWMax = 0.34f; // ミート99のとき
-    public const float CursorAspect = 0.62f;   // 縦/横(バットは横長)
+    public const float CursorAspect = 0.70f;   // 縦/横(バットは横長)。操作性確認で 0.62→0.70
     public const float CursorSpeed = 2.6f;     // カーソルの最大移動速度(ユニット/秒)
+    // 狙いのアシスト(0=なし)。人の狙いのぶれを少しだけ補う。操作性確認の結果から入れた仮置き値。
+    public static float AimAssist = 0.45f;
+    public const float AimAssistRange = 2.4f;  // カーソル楕円の何倍の距離まで効かせるか
 
     // ---- 打球 -----------------------------------------------------
     public const float ExitBase = 14f;         // 初速の下限(m/s)
-    public const float ExitRange = 36f;        // q=1,パワー補正1.0 で上乗せされる量
+    public static float ExitRange = 40f;       // q=1,パワー補正1.0 で上乗せされる量
     public const float LaunchBase = 16f;       // 芯に当たったときの基準打出角(度)
     public const float LaunchPerDy = 30f;      // 上下ずれ1.0あたりの角度変化(度)
     public const float SprayMax = 62f;         // タイミング最大ズレでの打球方向(度)
@@ -78,8 +81,8 @@ public static class BattingConfig
     public static readonly Color OppAccent = new Color(0.10f, 0.14f, 0.32f);
 
     // ---- 球場 -----------------------------------------------------
-    public const float FenceLine = 95f;        // 両翼
-    public const float FenceCenterExtra = 20f; // 中堅は両翼+20m
+    public static float FenceLine = 92f;       // 両翼
+    public static float FenceCenterExtra = 20f; // 中堅は両翼+20m
     public const float FenceHeight = 4.0f;
 
     public static float FenceRadius(float sprayDegFromCenter)

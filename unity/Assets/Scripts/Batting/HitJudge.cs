@@ -23,6 +23,8 @@ public struct SwingContext
     public int Meet;
     public int Power;
     public int BatSide;          // -1=右打者(x<0側に立つ) / +1=左打者
+    public bool HasAimY;         // アシスト前のカーソル高さを打出角に使う(アシストで打球が平たくならないように)
+    public float AimY;
 }
 
 public struct HitOutcome
@@ -49,6 +51,20 @@ public static class HitJudge
     public static float CursorHalfH(int meet)
     {
         return CursorHalfW(meet) * BattingConfig.CursorAspect;
+    }
+
+    // 狙いの補正(アシスト): カーソルの近くを通る球へ、カーソルを少し引き寄せる。
+    // カーソル楕円で測った距離が AimAssistRange 以内なら、近いほど強く寄せる。
+    public static Vector2 Assist(Vector2 cursor, Vector2 ball, float halfW, float halfH)
+    {
+        float k = BattingConfig.AimAssist;
+        if (k <= 0f) return cursor;
+        float dx = (ball.x - cursor.x) / halfW, dy = (ball.y - cursor.y) / halfH;
+        float d = Mathf.Sqrt(dx * dx + dy * dy);
+        float range = BattingConfig.AimAssistRange;
+        if (d >= range) return cursor;
+        float f = k * (1f - d / range);
+        return Vector2.Lerp(cursor, ball, f);
     }
 
     public static float EllipseDistance(Vector2 ball, Vector2 cursor, float hw, float hh)
@@ -124,7 +140,8 @@ public static class HitJudge
         o.ExitSpeed = BattingConfig.ExitBase + BattingConfig.ExitRange * Mathf.Pow(q, 1.4f) * pf;
 
         // 打出角: ボールがカーソル中心より上ならフライ寄り、下ならゴロ寄り
-        float dyN = Mathf.Clamp((c.BallPos.y - c.CursorPos.y) / c.CursorHalfH, -1.2f, 1.2f);
+        float cy = c.HasAimY ? c.AimY : c.CursorPos.y;
+        float dyN = Mathf.Clamp((c.BallPos.y - cy) / c.CursorHalfH, -1.2f, 1.2f);
         float noise = (1f - q) * 12f;
         float launch = BattingConfig.LaunchBase + BattingConfig.LaunchPerDy * dyN
                        + Random.Range(-noise, noise);

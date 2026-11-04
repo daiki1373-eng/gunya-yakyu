@@ -30,6 +30,7 @@ public class IntroDef
     public float Cheer = 0.5f;               // 歓声の大きさ 0..1
     public Color CardColor = new Color(0.80f, 0.14f, 0.14f);
     public float Hold = 1.1f;                // ポーズ後に見せる時間(秒)
+    public int Fireworks = 0;                // 登場時に上げる花火の数
 }
 
 public static class IntroCatalog
@@ -66,6 +67,12 @@ public static class IntroCatalog
 
     public static IntroDef For(PlayerStats p, bool userTeam)
     {
+        // ガチャのキャラはレア度に応じた演出(CharaRoster)
+        if (p != null && !string.IsNullOrEmpty(p.CharaId))
+        {
+            var cd = CharaCatalog.Get(p.CharaId);
+            if (cd != null) return CharaRoster.Intro(cd);
+        }
         IntroDef d;
         if (p != null && Table.TryGetValue(p.Name, out d)) return d;
         // 未登録キャラの標準

@@ -108,19 +108,35 @@ public class AtBatController : MonoBehaviour
 
     private int _teamsFor = -1;
 
+    // ---- ガチャのキャラで組むチーム ----
+    private CharaRoster.Team _userTeam, _oppTeam;
+    private float _gameStartT;
+
+    private void BuildTeams()
+    {
+        _userTeam = CharaRoster.UserTeam();
+        _oppTeam = CharaRoster.OpponentTeam(_userTeam, Random.Range(0, 100000));
+        _batterIndex = -1;
+        _oppIndex = -1;
+        _teamsFor = -1;   // 投手を作り直す
+    }
+
     private void ApplyTeams()
     {
         int key = _gs.UserBatting ? 1 : 0;
         if (_teamsFor == key) return;
         _teamsFor = key;
         _pitcherIntroPending = true;
+        if (_userTeam == null) BuildTeams();
         if (_gs.UserBatting)
         {
+            _pitcherStats = CharaRoster.Stats(_oppTeam.Pitcher);
             _stage.SetTeams(BattingConfig.OppJersey, BattingConfig.OppAccent, BattingConfig.UserJersey, BattingConfig.UserAccent);
             CreatePitcher(BattingConfig.OppJersey, BattingConfig.OppAccent);
         }
         else
         {
+            _pitcherStats = CharaRoster.Stats(_userTeam.Pitcher);
             _stage.SetTeams(BattingConfig.UserJersey, BattingConfig.UserAccent, BattingConfig.OppJersey, BattingConfig.OppAccent);
             CreatePitcher(BattingConfig.UserJersey, BattingConfig.UserAccent);
         }
@@ -130,6 +146,8 @@ public class AtBatController : MonoBehaviour
     {
         yield return null;
         while (HoldStart) yield return null;
+        BuildTeams();   // 所持カードは試合開始時点のもので組む
+        _gameStartT = Time.time;
         _ui.ShowResult("PLAY BALL");
         RefreshHud();
         // 開幕: 球場全体を映して花火を上げる(タップで飛ばせる)
@@ -175,6 +193,9 @@ public class AtBatController : MonoBehaviour
         string key = (user ? "U:" : "O:") + _batterStats.Name;
         bool full = !_introSeen.Contains(key);
         _introSeen.Add(key);
+        // テンポ優先: フル演出は自チーム★3以上・相手★4以上の初登場だけ(他は短い版)
+        var cdef = string.IsNullOrEmpty(_batterStats.CharaId) ? null : CharaCatalog.Get(_batterStats.CharaId);
+        if (cdef != null && cdef.Rarity < (user ? Rarity.R3 : Rarity.R4)) full = false;
         _cursor.SetVisible(false);
         _stage.SetZoneVisible(false);
         _ui.ClearCenter();
@@ -206,8 +227,9 @@ public class AtBatController : MonoBehaviour
             yield return StartCoroutine(IntroWait(walkSec + 0.1f));
         }
         // 歩き終わって定位置に来たら名前とジングル
-        _ui.ShowIntroCard(title, _batterStats.Name, stats, full ? d.Copy : "", d.CardColor);
+        _ui.ShowIntroCard(title, _batterStats.Name, stats, full ? d.Copy : "", d.CardColor, Portrait(_batterStats));
         if (full && !_introSkip) GameAudio.PlayJingle(d.Jingle, d.NoteSec);
+        if (full && d.Fireworks > 0) _stage.Stadium.LaunchFireworks(d.Fireworks);
         if (full && d.Pose != IntroPose.None && !_introSkip)
         {
             _batter.DoGesture(d.Pose, d.Hold);
@@ -255,8 +277,9 @@ public class AtBatController : MonoBehaviour
             _pitcher.WalkBy(walk, walkSec);
             yield return StartCoroutine(IntroWait(walkSec + 0.1f));
         }
-        _ui.ShowIntroCard(title, _pitcherStats.Name, stats, full ? d.Copy : "", d.CardColor);
+        _ui.ShowIntroCard(title, _pitcherStats.Name, stats, full ? d.Copy : "", d.CardColor, Portrait(_pitcherStats));
         if (full && !_introSkip) GameAudio.PlayJingle(d.Jingle, d.NoteSec);
+        if (full && d.Fireworks > 0) _stage.Stadium.LaunchFireworks(d.Fireworks);
         if (full && d.Pose != IntroPose.None && !_introSkip)
         {
             _pitcher.DoGesture(d.Pose, d.Hold);
@@ -268,6 +291,11 @@ public class AtBatController : MonoBehaviour
             yield return StartCoroutine(IntroWait(full ? 0.8f : 0.5f));
         }
         yield return StartCoroutine(EndIntro(_pitcher));
+    }
+
+    private static Sprite Portrait(PlayerStats p)
+    {
+        return string.IsNullOrEmpty(p.CharaId) ? null : CharaCatalog.Thumb(p.CharaId);
     }
 
     // 演出の後片付け: 姿勢を戻してカメラを捕手視点へ
@@ -442,29 +470,17 @@ public class AtBatController : MonoBehaviour
     private void SetupBatter()
     {
         Color uniform, accent;
+        if (_userTeam == null) BuildTeams();
         if (_gs.UserBatting)
         {
-            _batterIndex = (_batterIndex + 1) % 3;
-            switch (_batterIndex)
-            {
-                case 0:
-                    _batterStats = SpecialCharacters.Kabutomaru();
-                    uniform = BattingConfig.UserJersey; accent = BattingConfig.UserAccent;
-                    break;
-                case 1:
-                    _batterStats = SpecialCharacters.Wanta();
-                    uniform = BattingConfig.UserJersey; accent = BattingConfig.UserAccent;
-                    break;
-                default:
-                    _batterStats = SpecialCharacters.HeroDefault();
-                    uniform = BattingConfig.UserJersey; accent = BattingConfig.UserAccent;
-                    break;
-            }
+            _batterIndex = (_batterIndex + 1) % _userTeam.Lineup.Count;
+            _batterStats = CharaRoster.Stats(_userTeam.Lineup[_batterIndex]);
+            uniform = BattingConfig.UserJersey; accent = BattingConfig.UserAccent;
         }
         else
         {
-            _oppIndex = (_oppIndex + 1) % 3;
-            _batterStats = OpponentBatter(_oppIndex);
+            _oppIndex = (_oppIndex + 1) % _oppTeam.Lineup.Count;
+            _batterStats = CharaRoster.Stats(_oppTeam.Lineup[_oppIndex]);
             uniform = BattingConfig.OppJersey; accent = BattingConfig.OppAccent;
         }
         _batSide = _batterStats.BatsRight ? -1 : 1;
@@ -549,7 +565,8 @@ public class AtBatController : MonoBehaviour
                 if (_gs.Runs > _gs.OppRuns) { _stage.Stadium.LaunchFireworks(10); GameAudio.Play(Sfx.BigCheer, 0.9f); }
                 _ui.ShowResult("試合終了  " + _gs.Runs + " - " + _gs.OppRuns + "  " + res);
                 _ui.ShowBanner("珍プレー " + _gs.QuirkCount);
-                GameLog.Add("game" + _gs.GameNo + " " + _gs.Runs + "-" + _gs.OppRuns + " quirks=" + _gs.QuirkCount + " pa=" + _gs.PlateAppearances);
+                GameLog.Add("game" + _gs.GameNo + " " + _gs.Runs + "-" + _gs.OppRuns + " quirks=" + _gs.QuirkCount + " pa=" + _gs.PlateAppearances + " sec=" + (Time.time - _gameStartT).ToString("F0"));
+                _gameStartT = Time.time;
                 yield return StartCoroutine(Wait(1.6f));
                 if (ReplayEnabled && _bestScore >= 3)
                 {
@@ -560,6 +577,7 @@ public class AtBatController : MonoBehaviour
                 _bestScore = -1;
                 _gs.NewGame();
                 _introSeen.Clear();
+                BuildTeams();
                 _ui.ShowBanner("");
             }
             RefreshHud();
@@ -843,10 +861,18 @@ public class AtBatController : MonoBehaviour
 
         // ---- スイング判定 ----
         float timingMs = ((tSwing + BattingConfig.SwingLag) - tArrive) * 1000f;
+        float aimY = swingCursor.y;
+        if (_gs.UserBatting)
+        {
+            // 狙いのアシスト(カーソルの見た目も寄せる)
+            swingCursor = HitJudge.Assist(swingCursor, plan.Target, HitJudge.CursorHalfW(_batterStats.Meet), HitJudge.CursorHalfH(_batterStats.Meet));
+            _cursorPos = swingCursor;
+        }
         var ctx = new SwingContext
         {
             BallPos = plan.Target,
             CursorPos = swingCursor,
+            HasAimY = _gs.UserBatting, AimY = aimY,
             CursorHalfW = HitJudge.CursorHalfW(_batterStats.Meet),
             CursorHalfH = HitJudge.CursorHalfH(_batterStats.Meet),
             TimingMs = timingMs,

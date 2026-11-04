@@ -28,6 +28,11 @@ public class PlayerStats
     public int Brk = 20;
     public int Stam = 40;
 
+    // ガチャのキャラ(Resources/Chara の画像ID)。空なら従来キャラ。
+    public string CharaId = "";
+    // 肌(頭)の色の上書き。a=0 なら種族の標準色。
+    public Color SkinTint = new Color(0f, 0f, 0f, 0f);
+
     public PlayerStats Clone()
     {
         return (PlayerStats)MemberwiseClone();

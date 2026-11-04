@@ -445,10 +445,33 @@ public class BattingUI
         _cardCopy = NewText(_card, "Copy", new Vector2(0f, 1f), new Vector2(32f, -110f), new Vector2(500f, 24f), 19, TextAnchor.MiddleLeft, new Color(1f, 0.88f, 0.35f));
         _cardSkip = NewText(_card, "Skip", new Vector2(1f, 1f), new Vector2(-12f, -8f), new Vector2(120f, 20f), 14, TextAnchor.MiddleRight, new Color(1f, 1f, 1f, 0.55f));
         _cardSkip.text = "TAP ▶";
+        // キャラ画像の札(カードの上にはみ出して立てる)
+        _cardPortraitFrame = NewImage(_card, "PortraitFrame", Color.white);
+        _cardPortraitFrame.sprite = UiKit.Frame;
+        _cardPortraitFrame.type = Image.Type.Sliced;
+        Place(_cardPortraitFrame.rectTransform, new Vector2(20f, 50f), new Vector2(116f, 174f));
+        _cardPortrait = NewImage(_cardPortraitFrame.rectTransform, "Portrait", Color.white);
+        Place(_cardPortrait.rectTransform, new Vector2(7f, -7f), new Vector2(102f, 160f));
+        _cardPortraitFrame.gameObject.SetActive(false);
     }
 
-    public void ShowIntroCard(string title, string name, string stats, string copy, Color stripe)
+    private Image _cardPortrait, _cardPortraitFrame;
+
+    public void ShowIntroCard(string title, string name, string stats, string copy, Color stripe, Sprite portrait = null)
     {
+        // キャラ画像があれば左に縦長の札で出し、文字を右へずらす
+        bool hasP = portrait != null;
+        _cardPortrait.gameObject.SetActive(hasP);
+        _cardPortraitFrame.gameObject.SetActive(hasP);
+        if (hasP)
+        {
+            _cardPortrait.sprite = portrait;
+            _cardPortraitFrame.color = stripe;
+        }
+        float x = hasP ? 150f : 32f;
+        foreach (var t in new[] { _cardTitle, _cardStats, _cardCopy })
+            t.rectTransform.anchoredPosition = new Vector2(x, t.rectTransform.anchoredPosition.y);
+        _cardName.rectTransform.anchoredPosition = new Vector2(x - 2f, _cardName.rectTransform.anchoredPosition.y);
         _cardTitle.text = title;
         _cardName.text = name;
         _cardStats.text = stats;
