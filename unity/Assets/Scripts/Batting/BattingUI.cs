@@ -157,7 +157,9 @@ public class BattingUI
         }
 
         // SWINGボタン(タッチ操作用。マウスはどこをクリックしてもスイング)
-        _swingImg = NewImage(canvasGo.transform, "SwingButton", new Color(1f, 0.55f, 0.15f, 0.55f));
+        _swingImg = NewImage(canvasGo.transform, "SwingButton", new Color(1f, 1f, 1f, 0.80f));
+        _swingImg.sprite = UiKit.ButtonRed;
+        _swingImg.type = Image.Type.Sliced;
         _swingRect = _swingImg.rectTransform;
         _swingRect.anchorMin = new Vector2(1f, 0f);
         _swingRect.anchorMax = new Vector2(1f, 0f);
@@ -406,7 +408,7 @@ public class BattingUI
 
     public void PulseSwing()
     {
-        if (_swingImg != null) _swingImg.color = new Color(1f, 0.85f, 0.3f, 0.9f);
+        if (_swingImg != null) _swingImg.color = new Color(1f, 0.9f, 0.55f, 1f);
         _swingPulseUntil = Time.unscaledTime + 0.12f;
     }
 
@@ -421,7 +423,7 @@ public class BattingUI
 
     private void BuildIntroCard(Transform canvas)
     {
-        var bg = NewImage(canvas, "IntroCard", new Color(0.03f, 0.05f, 0.12f, 0.90f));
+        var bg = NewImage(canvas, "IntroCard", new Color(0.20f, 0.02f, 0.03f, 0.92f));
         _card = bg.rectTransform;
         _card.anchorMin = _card.anchorMax = new Vector2(0f, 0f);
         _card.pivot = new Vector2(0f, 0f);
@@ -430,7 +432,12 @@ public class BattingUI
         _cardStripe = NewImage(_card, "Stripe", Color.red);
         Place(_cardStripe.rectTransform, Vector2.zero, new Vector2(14f, 140f));
         var line = NewImage(_card, "Line", new Color(1f, 0.78f, 0.15f, 1f));
-        Place(line.rectTransform, new Vector2(14f, -138f), new Vector2(546f, 2f));
+        Place(line.rectTransform, new Vector2(14f, -137f), new Vector2(546f, 3f));
+        var line2 = NewImage(_card, "LineTop", new Color(1f, 0.78f, 0.15f, 1f));
+        Place(line2.rectTransform, new Vector2(14f, 0f), new Vector2(546f, 3f));
+        var glow = NewImage(_card, "Glow", new Color(1f, 0.75f, 0.3f, 0.18f));
+        glow.sprite = StadiumArt.Glow;
+        Place(glow.rectTransform, new Vector2(-60f, 60f), new Vector2(420f, 260f));
         _cardTitle = NewText(_card, "Title", new Vector2(0f, 1f), new Vector2(32f, -8f), new Vector2(500f, 24f), 18, TextAnchor.MiddleLeft, new Color(0.8f, 0.85f, 1f));
         _cardName = NewText(_card, "Name", new Vector2(0f, 1f), new Vector2(30f, -30f), new Vector2(500f, 54f), 44, TextAnchor.MiddleLeft, Color.white);
         _cardName.fontStyle = FontStyle.Bold;
@@ -485,7 +492,7 @@ public class BattingUI
             }
         }
         if (_swingImg != null && Time.unscaledTime > _swingPulseUntil)
-            _swingImg.color = new Color(1f, 0.55f, 0.15f, 0.55f);
+            _swingImg.color = new Color(1f, 1f, 1f, 0.80f);
     }
 
     // ---- 部品 ----

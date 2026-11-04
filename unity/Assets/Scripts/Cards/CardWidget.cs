@@ -10,7 +10,7 @@ public static class CardWidget
     public class Parts
     {
         public RectTransform Root;
-        public Image Frame, Art, Shine;
+        public Image Frame, Art, Shine, StackFrame;
         public Text RarityText, NameText, CountText;
     }
 
@@ -47,7 +47,6 @@ public static class CardWidget
         else ar.sizeDelta = inner;
 
         // きらめき(★4以上。動きは呼び出し側で)
-        if (d.Rarity >= Rarity.R4)
         {
             p.Shine = UiKit.Img(mask, "Shine", UiKit.Shine, new Color(1f, 0.95f, 0.75f, owned ? 1f : 0f));
             var sr = p.Shine.rectTransform;
@@ -56,6 +55,10 @@ public static class CardWidget
             sr.localRotation = Quaternion.Euler(0f, 0f, -25f);
             sr.anchoredPosition = new Vector2(-inner.x * 1.2f, 0f);
         }
+
+        // 重ねの豪華化: 半分以上で金の縁、上限で金の縁+きらめき
+        p.StackFrame = UiKit.Img(p.Root, "StackFrame", UiKit.Frame, new Color(1f, 0.85f, 0.3f, 0f));
+        UiKit.Fill(p.StackFrame.rectTransform, -3f);
 
         float fs = size.y / 156f;   // 一覧サイズを基準にした文字の倍率
         // レア度(左上)
@@ -89,8 +92,12 @@ public static class CardWidget
     public static void SetCount(Parts p, CharaDef d, bool owned, int count)
     {
         p.Art.color = owned ? Color.white : new Color(0.22f, 0.22f, 0.26f);
-        if (p.Shine != null) p.Shine.color = new Color(1f, 0.95f, 0.75f, owned ? 1f : 0f);
         int max = CharaCatalog.StackMax(d.Rarity);
+        bool isMax = owned && count >= max;
+        bool shine = owned && (d.Rarity >= Rarity.R4 || isMax);
+        if (p.Shine != null) p.Shine.color = new Color(1f, 0.95f, 0.75f, shine ? 1f : 0f);
+        float lv = owned ? Mathf.Clamp01((count - 1f) / Mathf.Max(1f, max - 1f)) : 0f;
+        if (p.StackFrame != null) p.StackFrame.color = new Color(1f, 0.85f, 0.3f, isMax ? 1f : (lv >= 0.5f ? 0.65f : 0f));
         p.CountText.text = !owned ? "" : (count >= max ? "MAX" : "×" + count);
     }
 }

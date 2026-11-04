@@ -400,6 +400,17 @@ public class BattingStage : MonoBehaviour
         return sr;
     }
 
+    // 自チームのときだけ出す縦じま(SetTeams で切り替え)
+    private void DollStripe(Transform rig, float x, float y, float w, float h)
+    {
+        const float s = DollScale;
+        var sr = BattingSprites.Make("DollStripes", rig, CharacterArt.Pinstripe, Color.white, 3,
+            new Vector3(x * s, y * s, -0.01f), Vector3.zero, Vector3.one);
+        sr.drawMode = SpriteDrawMode.Tiled;
+        sr.size = new Vector2(w * s, h * s);
+        sr.gameObject.SetActive(false);
+    }
+
     private Transform MakeDoll(string name, Color uniform, Color capColor, out Transform rig, bool runner = false)
     {
         var root = new GameObject(name).transform;
@@ -420,6 +431,9 @@ public class BattingStage : MonoBehaviour
         DollPart(rig, "ShoeR", shoe, 3, 0.12f, 0.04f, 0.22f, 0.09f);
         // 胴・ベルト・腕
         DollPart(rig, "Body", uniform, 3, 0f, 0.93f, 0.54f, 0.58f);
+        DollStripe(rig, 0f, 0.93f, 0.48f, 0.52f);
+        DollStripe(rig, -0.10f, 0.45f, 0.13f, 0.40f);
+        DollStripe(rig, 0.10f, 0.45f, 0.13f, 0.40f);
         DollPart(rig, "Belt", new Color(0.12f, 0.12f, 0.16f), 3, 0f, 0.665f, 0.50f, 0.06f);
         DollPart(rig, "ArmL", uniform, 2, -0.32f, 0.90f, 0.14f, 0.44f);
         DollPart(rig, "ArmR", uniform, 2, 0.32f, 0.90f, 0.14f, 0.44f);
@@ -470,6 +484,7 @@ public class BattingStage : MonoBehaviour
             {
                 case "Body": case "ArmL": case "ArmR": sr.color = jersey; break;
                 case "SockL": case "SockR": sr.color = accent; break;
+                case "DollStripes": sr.gameObject.SetActive(jersey == BattingConfig.UserJersey); break;
                 case "Head":
                     if (has)
                         sr.sprite = CharacterArt.Head("human", new Color(0.96f, 0.78f, 0.62f), accent,

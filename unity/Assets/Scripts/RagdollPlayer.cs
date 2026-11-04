@@ -54,13 +54,14 @@ public class RagdollPlayer : MonoBehaviour
     // 生成
     // ------------------------------------------------------------
     public static RagdollPlayer Create(Transform parent, string name, Vector2 rootPos, float facing,
-        PlayerStats stats, Color uniform, Color accent, bool isBatter)
+        PlayerStats stats, Color uniform, Color accent, bool isBatter, bool pinstripe = false)
     {
         var go = new GameObject(name);
         go.transform.SetParent(parent, false);
         go.transform.position = new Vector3(rootPos.x, rootPos.y, 0f);
         var player = go.AddComponent<RagdollPlayer>();
         player.Build(rootPos, facing, stats, uniform, accent, isBatter);
+        if (pinstripe) player.AddPinstripes();
         return player;
     }
 
@@ -310,6 +311,32 @@ public class RagdollPlayer : MonoBehaviour
             _exprTimer -= Time.deltaTime;
             if (_exprTimer <= 0f && _expr != Expr.Normal) ApplyExpression(Expr.Normal);
         }
+    }
+
+    // 縦じまのユニフォーム(胸・腰・太もも・上腕)。キャラ画像の白地×赤じまに合わせる。
+    private void AddPinstripes()
+    {
+        StripeOn(Chest, new Vector2(0.44f, 0.40f));
+        StripeOn(Pelvis, new Vector2(0.36f, 0.20f));
+        StripeOn(LegBackUpper, new Vector2(0.13f, 0.38f));
+        StripeOn(LegFrontUpper, new Vector2(0.13f, 0.38f));
+        StripeOn(ArmFrontUpper, new Vector2(0.09f, 0.26f), 0.04f);
+        StripeOn(ArmBackUpper, new Vector2(0.09f, 0.26f), 0.04f);
+    }
+
+    private void StripeOn(Rigidbody2D part, Vector2 size, float yOff = 0f)
+    {
+        if (part == null) return;
+        var baseSr = part.GetComponentInChildren<SpriteRenderer>();
+        var vis = new GameObject("Stripes");
+        vis.transform.SetParent(part.transform, false);
+        vis.transform.localPosition = new Vector3(0f, yOff, -0.002f);
+        vis.layer = RagdollLayer;
+        var sr = vis.AddComponent<SpriteRenderer>();
+        sr.sprite = CharacterArt.Pinstripe;
+        sr.drawMode = SpriteDrawMode.Tiled;
+        sr.size = size;
+        sr.sortingOrder = baseSr != null ? baseSr.sortingOrder : 5;
     }
 
     // 体の細部(ベルト・ソックス・手袋・胸のライン)

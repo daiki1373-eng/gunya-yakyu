@@ -256,6 +256,8 @@ public class StadiumBuilder : MonoBehaviour
             Vector3 fp = dir * r1 + Vector3.up * (h0 + rise0 + 1.6f);
             float wf = 2f * Mathf.PI * r1 * (step / 360f) * 1.05f;
             Quad("Fascia", white, new Color(0.06f, 0.06f, 0.08f), OFascia, fp, new Vector3(0f, phi, 0f), new Vector2(wf, 3.4f));
+            Quad("FasciaGold", white, new Color(0.91f, 0.73f, 0.14f), OFascia + 1, fp + Vector3.up * 1.55f - dir * 0.06f, new Vector3(0f, phi, 0f), new Vector2(wf, 0.25f));
+            Quad("FasciaGold2", white, new Color(0.91f, 0.73f, 0.14f), OFascia + 1, fp - Vector3.up * 1.55f - dir * 0.06f, new Vector3(0f, phi, 0f), new Vector2(wf, 0.25f));
             if (!boardZone)
             {
                 var rib = Quad("Ribbon", white, new Color(0.9f, 0.2f, 0.2f), OFascia + 1, fp - dir * 0.05f,
@@ -458,8 +460,94 @@ public class StadiumBuilder : MonoBehaviour
     }
 
     // ---- 歓声の演出 --------------------------------------------------
+    // ---- 花火(スタンドの上から打ち上げて開く) ----------------------------
+    private class Spark { public SpriteRenderer Sr; public Vector3 Pos, Vel; public float Life, Max, Size; public bool Rocket; public Color C; public float Delay; }
+    private readonly List<Spark> _sparkLive = new List<Spark>();
+    private readonly Stack<Spark> _sparkPool = new Stack<Spark>();
+
+    private Spark GetSpark()
+    {
+        Spark s = _sparkPool.Count > 0 ? _sparkPool.Pop() : new Spark();
+        if (s.Sr == null)
+            s.Sr = Quad("Firework", StadiumArt.Glow, Color.white, OFascia + 5, Vector3.zero, Vector3.zero, Vector2.one);
+        s.Sr.enabled = true;
+        _sparkLive.Add(s);
+        return s;
+    }
+
+    // n発をばらばらの時間に打ち上げる(金・赤・白)
+    public void LaunchFireworks(int n)
+    {
+        for (int i = 0; i < n; i++)
+        {
+            float phi = Random.Range(-40f, 40f);
+            float rf = BattingConfig.FenceRadius(Mathf.Abs(phi));
+            var s = GetSpark();
+            s.Rocket = true;
+            s.Pos = Dir(phi) * (rf + 30f) + Vector3.up * 28f;
+            s.Vel = new Vector3(Random.Range(-3f, 3f), Random.Range(30f, 40f), Random.Range(-3f, 3f));
+            s.Max = s.Life = 4f;
+            s.Size = 3.2f;
+            s.Delay = i * Random.Range(0.12f, 0.30f);
+            float k = Random.value;
+            s.C = k < 0.45f ? new Color(1f, 0.82f, 0.30f) : (k < 0.8f ? new Color(1f, 0.25f, 0.18f) : new Color(1f, 0.96f, 0.9f));
+            s.Sr.enabled = false;
+        }
+    }
+
+    private void TickFireworks(float dt)
+    {
+        var cam = Camera.main;
+        for (int i = _sparkLive.Count - 1; i >= 0; i--)
+        {
+            var s = _sparkLive[i];
+            if (s.Delay > 0f) { s.Delay -= dt; continue; }
+            s.Sr.enabled = true;
+            s.Life -= dt;
+            if (s.Rocket && s.Vel.y < 4f)
+            {
+                // 開く
+                s.Life = 0f;
+                int n = 70;
+                for (int k = 0; k < n; k++)
+                {
+                    var p = GetSpark();
+                    p.Rocket = false;
+                    p.Delay = 0f;
+                    p.Pos = s.Pos;
+                    p.Vel = Random.onUnitSphere * Random.Range(20f, 28f);
+                    p.Max = p.Life = Random.Range(1.4f, 2.0f);
+                    p.Size = Random.Range(4.0f, 6.0f);
+                    p.C = Random.value < 0.25f ? Color.white : s.C;
+                }
+                GameAudio.Play(Sfx.HitGood, 0.22f, Random.Range(0.45f, 0.6f));
+            }
+            if (s.Life <= 0f)
+            {
+                s.Sr.enabled = false;
+                _sparkPool.Push(s);
+                _sparkLive.RemoveAt(i);
+                continue;
+            }
+            float drag = s.Rocket ? 0f : 1.4f;
+            s.Vel += Vector3.down * (s.Rocket ? 20f : 5f) * dt;
+            s.Vel *= Mathf.Max(0f, 1f - drag * dt);
+            s.Pos += s.Vel * dt;
+            var tr = s.Sr.transform;
+            tr.localPosition = s.Pos;
+            if (cam != null) tr.rotation = cam.transform.rotation;
+            float u = s.Life / s.Max;
+            float sz = s.Rocket ? s.Size : s.Size * Mathf.Lerp(0.4f, 1f, u);
+            tr.localScale = Vector3.one * (sz / StadiumArt.Glow.bounds.size.x);
+            var c = s.C;
+            c.a = s.Rocket ? 0.9f : Mathf.Clamp01(u * 1.5f) * (0.75f + 0.25f * Mathf.Sin(s.Life * 40f));
+            s.Sr.color = c;
+        }
+    }
+
     public void Cheer(float intensity)
     {
+        if (intensity >= 0.95f) LaunchFireworks(5);
         _cheerAmp = Mathf.Max(_cheerAmp * (Time.time < _cheerUntil ? 1f : 0f), Mathf.Clamp01(intensity));
         _cheerUntil = Time.time + Mathf.Lerp(1.6f, 4.0f, intensity);
     }
@@ -467,6 +555,7 @@ public class StadiumBuilder : MonoBehaviour
     private void Update()
     {
         GameAudio.TickAmbience(Time.unscaledDeltaTime);
+        TickFireworks(Time.deltaTime);
         float t = Time.time;
         bool cheering = t < _cheerUntil;
         float amp = cheering ? _cheerAmp * Mathf.Clamp01((_cheerUntil - t) / 1.2f) : 0f;

@@ -436,6 +436,26 @@ public static class CharacterArt
         }
     }
 
+    // ---- ピンストライプ(ユニフォームの縦じま。タイル用) ----------------------
+    private static Sprite _stripe;
+    public static Sprite Pinstripe
+    {
+        get
+        {
+            if (_stripe != null) return _stripe;
+            int n = 32;
+            var cv = new ArtCanvas(n, n);
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float a = (x == 0 || x == 1) ? 0.75f : (x == 2 ? 0.25f : 0f);
+                    cv.Px[y * n + x] = new Color(0.72f, 0.10f, 0.14f, a);
+                }
+            _stripe = cv.ToSprite(n / 0.085f, new Vector2(0.5f, 0.5f), default(Vector4), true);
+            return _stripe;
+        }
+    }
+
     // ---- 影(ぼかした楕円) --------------------------------------------
     private static Sprite _shadow;
     public static Sprite SoftShadow
