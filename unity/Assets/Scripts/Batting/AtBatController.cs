@@ -16,6 +16,9 @@ using UnityEngine;
 public class AtBatController : MonoBehaviour
 {
     public static bool AutoPlay = false;
+    // ホーム画面(AppShell)からの制御: 試合開始待ち / 入力を受け付けない
+    public static bool HoldStart = false;
+    public static bool InputBlocked = false;
     public static bool Verbose = false;
     public static readonly Dictionary<string, int> Tally = new Dictionary<string, int>();
 
@@ -125,6 +128,7 @@ public class AtBatController : MonoBehaviour
     private IEnumerator Start()
     {
         yield return null;
+        while (HoldStart) yield return null;
         _ui.ShowResult("PLAY BALL");
         yield return StartCoroutine(Wait(1.0f));
         while (true)
@@ -280,7 +284,7 @@ public class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     private void Update()
     {
-        if (!AutoPlay) HandleInput();
+        if (!AutoPlay && !InputBlocked) HandleInput();
 
         if (!_cursorLocked)
         {

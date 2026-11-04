@@ -34,6 +34,8 @@ public static class Bootstrap
         }
         else if (Object.FindObjectOfType<AtBatController>() == null)
         {
+            // ホーム / ガチャ / カード一覧の外枠(試合はホームの「試合」で始まる)
+            if (Object.FindObjectOfType<AppShell>() == null) AppShell.Create();
             var go = new GameObject("AtBatController");
             go.AddComponent<AtBatController>();
         }

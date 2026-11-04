@@ -1,0 +1,375 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+// ============================================================
+// AppShell.cs
+// アプリの外枠: ホーム / 試合 / ガチャ / カード一覧・拡大。
+// 試合はホームの「試合」で始まり、試合中は左上の「≡」でホームへ(試合は一時停止)。
+// 演出は金×赤(放射光・花火・紙吹雪)。画面の文字はラベル・数値・操作のみ。
+// ============================================================
+public partial class AppShell : MonoBehaviour
+{
+    public static AppShell Instance { get; private set; }
+    public static bool MenuOpen { get; private set; }
+
+    private RectTransform _root, _home, _cards, _gacha, _detail, _show;
+    private UiFx _fx;
+    private GameObject _menuBtn;
+    private Text _playLabel, _homeOwned, _cardsTitle, _gachaInfo;
+    private RectTransform _homeRays, _gachaRays;
+    private bool _gameStarted;
+    private float _savedScale = 1f, _nextFirework;
+    private readonly List<KeyValuePair<CharaDef, CardWidget.Parts>> _cells = new List<KeyValuePair<CharaDef, CardWidget.Parts>>();
+
+    public static AppShell Create()
+    {
+        var go = new GameObject("AppShell");
+        DontDestroyOnLoad(go);
+        return go.AddComponent<AppShell>();
+    }
+
+    private void Awake()
+    {
+        Instance = this;
+        AtBatController.HoldStart = true;
+        AtBatController.InputBlocked = true;
+        GameAudio.Init(gameObject);
+        Build();
+        ShowHome();
+    }
+
+    // ------------------------------------------------------------
+    // 画面の組み立て
+    // ------------------------------------------------------------
+    private void Build()
+    {
+        if (FindObjectOfType<EventSystem>() == null)
+        {
+            var es = new GameObject("EventSystem");
+            es.AddComponent<EventSystem>();
+            es.AddComponent<StandaloneInputModule>();
+            DontDestroyOnLoad(es);
+        }
+        var canvasGo = new GameObject("AppCanvas");
+        canvasGo.transform.SetParent(transform, false);
+        var canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 50;
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(960f, 540f);
+        scaler.matchWidthOrHeight = 0.5f;
+        canvasGo.AddComponent<GraphicRaycaster>();
+        _root = (RectTransform)canvasGo.transform;
+
+        BuildHome();
+        BuildCards();
+        BuildGacha();
+        _detail = UiKit.Fill(UiKit.Rect(_root, "Detail"));
+        _show = UiKit.Fill(UiKit.Rect(_root, "GachaShow"));
+        _fx = UiFx.Create(_root);
+
+        // 試合中のメニューボタン(左上のスコア表示の下)
+        var mb = UiKit.Btn(_root, "MenuButton", "≡", new Vector2(52f, 40f), false, OpenMenu, 24);
+        UiKit.Place(mb.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(12f, -84f), new Vector2(52f, 40f));
+        _menuBtn = mb.gameObject;
+        _menuBtn.SetActive(false);
+    }
+
+    private RectTransform MakeScreen(string name, float bgDark)
+    {
+        var r = UiKit.Fill(UiKit.Rect(_root, name));
+        var bg = UiKit.Img(r, "Bg", UiKit.BgRadial, new Color(bgDark, bgDark, bgDark, 1f), true);
+        UiKit.Fill(bg.rectTransform);
+        return r;
+    }
+
+    private RectTransform AddRays(RectTransform parent, Color c, float size, Vector2 pos)
+    {
+        var rays = UiKit.Img(parent, "Rays", UiKit.Rays, c);
+        UiKit.Place(rays.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), pos, new Vector2(size, size));
+        rays.transform.SetSiblingIndex(1);
+        return rays.rectTransform;
+    }
+
+    private void TopBar(RectTransform screen, string title, out Text titleText)
+    {
+        var bar = UiKit.Img(screen, "TopBar", SpriteFactory.White, new Color(0.10f, 0.02f, 0.02f, 0.85f));
+        UiKit.Place(bar.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(2000f, 60f));
+        var line = UiKit.Img(screen, "TopLine", SpriteFactory.White, UiKit.Gold);
+        UiKit.Place(line.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(2000f, 3f));
+        var back = UiKit.Btn(screen, "Back", "←", new Vector2(64f, 44f), false, ShowHome, 26);
+        UiKit.Place(back.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(12f, -8f), new Vector2(64f, 44f));
+        titleText = UiKit.Txt(screen, "Title", title, 30, UiKit.GoldLight, TextAnchor.MiddleLeft);
+        UiKit.Place(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(92f, -8f), new Vector2(600f, 44f));
+    }
+
+    // ---- ホーム ----
+    private void BuildHome()
+    {
+        _home = MakeScreen("Home", 1f);
+        _homeRays = AddRays(_home, new Color(1f, 0.85f, 0.4f, 0.45f), 1500f, new Vector2(-170f, 0f));
+
+        // キービジュアル(★5カードを傾けて置く)
+        var kv = CharaCatalog.Get("heroine");
+        var card = CardWidget.Build(_home, kv, new Vector2(250f, 375f), true, true, 1);
+        card.Root.anchorMin = card.Root.anchorMax = new Vector2(0.5f, 0.5f);
+        card.Root.anchoredPosition = new Vector2(-200f, -8f);
+        card.Root.localRotation = Quaternion.Euler(0f, 0f, 6f);
+        card.CountText.text = "";
+        card.Frame.raycastTarget = false;
+
+        var t1 = UiKit.Txt(_home, "Logo1", "ぐにゃぐにゃ", 54, UiKit.GoldLight, TextAnchor.MiddleCenter);
+        UiKit.Place(t1.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, 178f), new Vector2(520f, 70f));
+        var t2 = UiKit.Txt(_home, "Logo2", "ベースボール", 62, Color.white, TextAnchor.MiddleCenter);
+        UiKit.Place(t2.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, 112f), new Vector2(560f, 80f));
+        foreach (var t in new[] { t1, t2 })
+        {
+            var sh = t.gameObject.AddComponent<Shadow>();
+            sh.effectColor = new Color(0.45f, 0f, 0f, 0.9f);
+            sh.effectDistance = new Vector2(3f, -4f);
+        }
+
+        var play = UiKit.Btn(_home, "Play", "試合", new Vector2(300f, 70f), true, StartGame, 32);
+        UiKit.Place(play.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, 10f), new Vector2(300f, 70f));
+        _playLabel = play.GetComponentInChildren<Text>();
+        var gacha = UiKit.Btn(_home, "Gacha", "ガチャ", new Vector2(300f, 62f), true, ShowGacha, 28);
+        UiKit.Place(gacha.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, -74f), new Vector2(300f, 62f));
+        var cards = UiKit.Btn(_home, "Cards", "カード", new Vector2(300f, 62f), false, ShowCards, 28);
+        UiKit.Place(cards.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, -150f), new Vector2(300f, 62f));
+        _homeOwned = UiKit.Txt(_home, "Owned", "", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
+        UiKit.Place(_homeOwned.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, -206f), new Vector2(300f, 30f));
+    }
+
+    // ---- カード一覧 ----
+    private void BuildCards()
+    {
+        _cards = MakeScreen("Cards", 0.42f);
+        TopBar(_cards, "カード", out _cardsTitle);
+
+        var view = UiKit.Rect(_cards, "Viewport");
+        view.anchorMin = Vector2.zero; view.anchorMax = Vector2.one;
+        view.offsetMin = new Vector2(16f, 8f); view.offsetMax = new Vector2(-16f, -70f);
+        view.gameObject.AddComponent<RectMask2D>();
+        var hit = view.gameObject.AddComponent<Image>();
+        hit.color = new Color(0f, 0f, 0f, 0f);
+        var content = UiKit.Rect(view, "Content");
+        content.anchorMin = new Vector2(0f, 1f); content.anchorMax = new Vector2(1f, 1f);
+        content.pivot = new Vector2(0.5f, 1f);
+        content.anchoredPosition = Vector2.zero;
+        content.sizeDelta = Vector2.zero;
+        var grid = content.gameObject.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(104f, 156f);
+        grid.spacing = new Vector2(10f, 12f);
+        grid.padding = new RectOffset(4, 4, 8, 16);
+        grid.childAlignment = TextAnchor.UpperCenter;
+        var fit = content.gameObject.AddComponent<ContentSizeFitter>();
+        fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        var sr = view.gameObject.AddComponent<ScrollRect>();
+        sr.content = content;
+        sr.viewport = view;
+        sr.horizontal = false;
+        sr.movementType = ScrollRect.MovementType.Elastic;
+        sr.scrollSensitivity = 30f;
+
+        foreach (var d in CharaCatalog.All)
+        {
+            var def = d;
+            var p = CardWidget.Build(content, d, grid.cellSize, false, Collection.Owned(d.Id), Collection.Count(d.Id));
+            var b = p.Root.gameObject.AddComponent<Button>();
+            b.transition = Selectable.Transition.None;
+            b.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.5f, 1.3f); ShowDetail(def); });
+            _cells.Add(new KeyValuePair<CharaDef, CardWidget.Parts>(d, p));
+        }
+    }
+
+    private void RefreshCards()
+    {
+        foreach (var kv in _cells)
+            CardWidget.SetCount(kv.Value, kv.Key, Collection.Owned(kv.Key.Id), Collection.Count(kv.Key.Id));
+        int owned = Collection.OwnedKinds();
+        _cardsTitle.text = "カード   " + owned + " / " + CharaCatalog.All.Count;
+        _homeOwned.text = "カード " + owned + " / " + CharaCatalog.All.Count;
+    }
+
+    // ---- カード拡大 ----
+    private void ShowDetail(CharaDef d)
+    {
+        ClearChildren(_detail);
+        _detail.gameObject.SetActive(true);
+        var dim = UiKit.Img(_detail, "Dim", SpriteFactory.White, new Color(0f, 0f, 0f, 0.82f), true);
+        UiKit.Fill(dim.rectTransform);
+        var close = dim.gameObject.AddComponent<Button>();
+        close.transition = Selectable.Transition.None;
+        close.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.5f, 1.1f); _detail.gameObject.SetActive(false); });
+        var rays = UiKit.Img(_detail, "Rays", UiKit.Rays, RevealColor(d.Rarity) * new Color(1f, 1f, 1f, 0.5f));
+        UiKit.Place(rays.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-150f, 0f), new Vector2(900f, 900f));
+        bool owned = Collection.Owned(d.Id);
+        int cnt = Collection.Count(d.Id);
+        var p = CardWidget.Build(_detail, d, new Vector2(290f, 435f), true, owned, cnt);
+        p.Root.anchorMin = p.Root.anchorMax = new Vector2(0.5f, 0.5f);
+        p.Root.anchoredPosition = new Vector2(-150f, 0f);
+        p.Frame.raycastTarget = false;
+        StartCoroutine(PopIn(p.Root, 0.25f));
+
+        var r = UiKit.Txt(_detail, "Rarity", CharaCatalog.Label(d.Rarity), 40, d.Rarity == Rarity.Secret ? new Color(1f, 0.6f, 0.95f) : UiKit.GoldLight, TextAnchor.MiddleLeft);
+        UiKit.Place(r.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 120f), new Vector2(400f, 56f));
+        var n = UiKit.Txt(_detail, "Name", d.Name, 38, Color.white, TextAnchor.MiddleLeft);
+        UiKit.Place(n.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 60f), new Vector2(420f, 56f));
+        int max = CharaCatalog.StackMax(d.Rarity);
+        var s = UiKit.Txt(_detail, "Stack", owned ? "重ね " + cnt + " / " + max : "未所持", 26, owned ? UiKit.GoldLight : new Color(0.7f, 0.7f, 0.75f), TextAnchor.MiddleLeft);
+        UiKit.Place(s.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 4f), new Vector2(420f, 40f));
+        // 重ねの段階を丸で表示
+        for (int i = 0; i < max; i++)
+        {
+            var dot = UiKit.Img(_detail, "Pip" + i, SpriteFactory.Circle, i < cnt ? UiKit.Gold : new Color(1f, 1f, 1f, 0.18f));
+            UiKit.Place(dot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(42f + i * 26f, -40f), new Vector2(18f, 18f));
+        }
+    }
+
+    // ---- ガチャ画面 ----
+    private void BuildGacha()
+    {
+        _gacha = MakeScreen("Gacha", 1f);
+        _gachaRays = AddRays(_gacha, new Color(1f, 0.85f, 0.35f, 0.55f), 1500f, new Vector2(0f, 30f));
+        Text title;
+        TopBar(_gacha, "ガチャ", out title);
+        // 中央の光る球
+        var glow = UiKit.Img(_gacha, "Glow", StadiumArt.Glow, new Color(1f, 0.9f, 0.5f, 0.9f));
+        UiKit.Place(glow.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(320f, 320f));
+        var ball = UiKit.Img(_gacha, "Ball", SpriteFactory.Circle, Color.white);
+        UiKit.Place(ball.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(130f, 130f));
+        var seam1 = UiKit.Img(ball.transform, "Seam", BattingSprites.Ring, new Color(0.85f, 0.1f, 0.1f));
+        UiKit.Place(seam1.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-70f, 0f), new Vector2(120f, 120f));
+        var seam2 = UiKit.Img(ball.transform, "Seam2", BattingSprites.Ring, new Color(0.85f, 0.1f, 0.1f));
+        UiKit.Place(seam2.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(70f, 0f), new Vector2(120f, 120f));
+        ball.gameObject.AddComponent<RectMask2D>();
+
+        _gachaInfo = UiKit.Txt(_gacha, "Info", "", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
+        UiKit.Place(_gachaInfo.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -110f), new Vector2(600f, 30f));
+        var one = UiKit.Btn(_gacha, "Pull1", "1回", new Vector2(220f, 70f), false, () => Pull(1), 30);
+        UiKit.Place(one.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-130f, -180f), new Vector2(220f, 70f));
+        var ten = UiKit.Btn(_gacha, "Pull10", "10連", new Vector2(220f, 70f), true, () => Pull(10), 30);
+        UiKit.Place(ten.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(130f, -180f), new Vector2(220f, 70f));
+    }
+
+    private void RefreshGacha()
+    {
+        int left = Gacha.PityLimit - Collection.PityCount;
+        _gachaInfo.text = "★4以上確定まで あと " + left;
+    }
+
+    // ------------------------------------------------------------
+    // 画面切り替え
+    // ------------------------------------------------------------
+    private void Only(RectTransform r)
+    {
+        _home.gameObject.SetActive(r == _home);
+        _cards.gameObject.SetActive(r == _cards);
+        _gacha.gameObject.SetActive(r == _gacha);
+        _detail.gameObject.SetActive(false);
+        _show.gameObject.SetActive(false);
+        _fx.Clear();
+    }
+
+    public void ShowHome()
+    {
+        Only(_home);
+        RefreshCards();
+        _playLabel.text = _gameStarted ? "試合に戻る" : "試合";
+        _menuBtn.SetActive(false);
+        MenuOpen = true;
+        AtBatController.InputBlocked = true;
+    }
+
+    public void ShowCards() { Only(_cards); RefreshCards(); }
+    public void ShowGacha() { Only(_gacha); RefreshGacha(); }
+
+    public void StartGame()
+    {
+        Only(null);
+        MenuOpen = false;
+        _menuBtn.SetActive(true);
+        Time.timeScale = _gameStarted ? _savedScale : 1f;
+        _gameStarted = true;
+        AtBatController.HoldStart = false;
+        StartCoroutine(UnblockNextFrame());
+    }
+
+    private IEnumerator UnblockNextFrame()
+    {
+        yield return null;   // ボタンを押したクリックがスイングにならないように1フレーム待つ
+        yield return null;
+        AtBatController.InputBlocked = false;
+    }
+
+    public void OpenMenu()
+    {
+        _savedScale = Time.timeScale > 0f ? Time.timeScale : 1f;
+        Time.timeScale = 0f;
+        ShowHome();
+    }
+
+    private static void ClearChildren(RectTransform r)
+    {
+        for (int i = r.childCount - 1; i >= 0; i--) Destroy(r.GetChild(i).gameObject);
+    }
+
+    // ------------------------------------------------------------
+    // 毎フレームの飾り(放射光の回転・カードのきらめき・ホームの花火)
+    // ------------------------------------------------------------
+    private void Update()
+    {
+        float t = Time.unscaledTime;
+        if (_homeRays != null) _homeRays.localRotation = Quaternion.Euler(0f, 0f, t * 6f);
+        if (_gachaRays != null) _gachaRays.localRotation = Quaternion.Euler(0f, 0f, -t * 8f);
+        if (_cards.gameObject.activeSelf)
+        {
+            for (int i = 0; i < _cells.Count; i++)
+            {
+                var p = _cells[i].Value;
+                if (p.Shine == null) continue;
+                float u = Mathf.Repeat(t * 0.45f + i * 0.13f, 1.6f);
+                float w = p.Root.sizeDelta.x;
+                p.Shine.rectTransform.anchoredPosition = new Vector2(Mathf.Lerp(-w * 1.2f, w * 1.2f, u), 0f);
+            }
+        }
+        if (_home.gameObject.activeSelf && t > _nextFirework)
+        {
+            _nextFirework = t + UnityEngine.Random.Range(1.4f, 2.6f);
+            Color c = UnityEngine.Random.value < 0.5f ? UiKit.Gold : new Color(1f, 0.3f, 0.2f);
+            _fx.Firework(new Vector2(UnityEngine.Random.Range(-420f, 420f), -300f), UnityEngine.Random.Range(330f, 470f), c);
+        }
+    }
+
+    private IEnumerator PopIn(RectTransform r, float dur)
+    {
+        float t = 0f;
+        while (t < dur)
+        {
+            t += Time.unscaledDeltaTime;
+            float u = Mathf.Clamp01(t / dur);
+            float s = 1f + 0.12f * Mathf.Sin(u * Mathf.PI) ;
+            r.localScale = new Vector3(Mathf.Lerp(0.6f, 1f, u) * s, Mathf.Lerp(0.6f, 1f, u) * s, 1f);
+            yield return null;
+        }
+        r.localScale = Vector3.one;
+    }
+
+    public static Color RevealColor(Rarity r)
+    {
+        switch (r)
+        {
+            case Rarity.R1: return new Color(0.85f, 0.88f, 0.95f);
+            case Rarity.R2: return new Color(1f, 0.75f, 0.45f);
+            case Rarity.R3: return new Color(0.45f, 0.70f, 1f);
+            case Rarity.R4: return new Color(1f, 0.82f, 0.25f);
+            case Rarity.R5: return new Color(1f, 0.25f, 0.18f);
+            default: return new Color(1f, 0.55f, 0.95f);
+        }
+    }
+}
