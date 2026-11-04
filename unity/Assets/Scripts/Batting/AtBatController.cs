@@ -109,6 +109,7 @@ public class AtBatController : MonoBehaviour
         int key = _gs.UserBatting ? 1 : 0;
         if (_teamsFor == key) return;
         _teamsFor = key;
+        _pitcherIntroPending = true;
         if (_gs.UserBatting)
         {
             _stage.SetTeams(BattingConfig.OppJersey, BattingConfig.OppAccent, BattingConfig.UserJersey, BattingConfig.UserAccent);
@@ -130,6 +131,142 @@ public class AtBatController : MonoBehaviour
         {
             yield return StartCoroutine(PlayAtBat());
         }
+    }
+
+    // ------------------------------------------------------------
+    // 登場演出(打者が打席に入る / 投手がマウンドに立つ)
+    // キャラごとの違いは IntroCatalog(CharacterIntro.cs)の設定で決まる。
+    // 1試合で初めての登場はフル演出、2回目以降は短い版。タップでスキップ。
+    // ------------------------------------------------------------
+    public static bool IntroEnabled = true;
+    private readonly HashSet<string> _introSeen = new HashSet<string>();
+    private bool _pitcherIntroPending = true;
+    private bool _skipQueued, _introSkip;
+
+    private IEnumerator IntroWait(float seconds)
+    {
+        float t = 0f;
+        while (t < seconds && !_introSkip)
+        {
+            if (_skipQueued) { _skipQueued = false; _introSkip = true; break; }
+            t += Time.deltaTime;
+            yield return null;
+        }
+    }
+
+    private IEnumerator BatterIntro()
+    {
+        bool user = _gs.UserBatting;
+        var d = IntroCatalog.For(_batterStats, user);
+        string key = (user ? "U:" : "O:") + _batterStats.Name;
+        bool full = !_introSeen.Contains(key);
+        _introSeen.Add(key);
+        _cursor.SetVisible(false);
+        _stage.SetZoneVisible(false);
+        _ui.ClearCenter();
+        _ui.SetSpeed(null);
+
+        float f = -_batSide;   // 打者の向き(+1=右向き)
+        Vector3 bpos = new Vector3(_batSide * BattingConfig.BatterX, 0f, 0f);
+        float walk = full ? d.WalkFrom : Mathf.Min(1.2f, d.WalkFrom);
+        float walkSec = full ? 1.1f : 0.6f;
+        _batter.StandAssist = true;
+        if (walk > 0f) _batter.Teleport(new Vector2(-f * walk, 0f));
+
+        // 選手を画面の右寄り、名前カードを左下に置く構図
+        Vector3 look = bpos + new Vector3(-0.8f, 1.05f, 0f);
+        Vector3 cam = bpos + new Vector3(f * 1.7f, 1.5f, -5.4f);
+        Vector3 back = new Vector3(-f * walk * 0.6f, 0f, 0f);
+        if (full && (d.Pose == IntroPose.Jump || d.Pose == IntroPose.Spin)) { cam += new Vector3(0f, 0.5f, -1.6f); look += new Vector3(0f, 0.5f, 0f); }
+        _stage.SetShot(cam + back, look + back, 0.3f, true);
+        _stage.SetShot(cam, look, 0.55f, false);
+        _batter.SetExpression(d.Face, 30f);
+
+        string title = user ? (_batterIndex + 1) + "番  " + IntroCatalog.PositionName(_batterStats.Position)
+                            : "相手  " + IntroCatalog.PositionName(_batterStats.Position);
+        string stats = "ミート " + _batterStats.Meet + "   パワー " + _batterStats.Power + "   走力 " + _batterStats.Speed;
+        GameAudio.Play(Sfx.Cheer, full ? d.Cheer : d.Cheer * 0.5f);
+        if (walk > 0f)
+        {
+            _batter.WalkBy(f * walk, walkSec);
+            yield return StartCoroutine(IntroWait(walkSec + 0.1f));
+        }
+        // 歩き終わって定位置に来たら名前とジングル
+        _ui.ShowIntroCard(title, _batterStats.Name, stats, full ? d.Copy : "", d.CardColor);
+        if (full && !_introSkip) GameAudio.PlayJingle(d.Jingle, d.NoteSec);
+        if (full && d.Pose != IntroPose.None && !_introSkip)
+        {
+            _batter.DoGesture(d.Pose, d.Hold);
+            if (FreezeKind == -70) { yield return new WaitForSeconds(0.55f); Time.timeScale = 0f; }   // 確認用
+            yield return StartCoroutine(IntroWait(d.Hold + 0.35f));
+        }
+        else
+        {
+            yield return StartCoroutine(IntroWait(full ? 0.7f : 0.45f));
+        }
+        yield return StartCoroutine(EndIntro(_batter));
+        _cursor.SetVisible(user);
+    }
+
+    private IEnumerator PitcherIntro()
+    {
+        bool userPitching = !_gs.UserBatting;
+        var d = IntroCatalog.For(_pitcherStats, userPitching);
+        string key = (userPitching ? "UP:" : "OP:") + _pitcherStats.Name;
+        bool full = !_introSeen.Contains(key);
+        _introSeen.Add(key);
+        _cursor.SetVisible(false);
+        _stage.SetZoneVisible(false);
+        _ui.ClearCenter();
+        _ui.SetSpeed(null);
+
+        Vector3 ppos = new Vector3(0f, 0f, BattingConfig.MoundZ);
+        float walk = full ? d.WalkFrom : 1.2f;
+        float walkSec = full ? 1.2f : 0.6f;
+        _pitcher.StandAssist = true;
+        if (walk > 0f) _pitcher.Teleport(new Vector2(-walk, 0f));
+        Vector3 look = ppos + new Vector3(-0.9f, 1.05f, 0f);
+        Vector3 cam = ppos + new Vector3(1.8f, 1.6f, -5.6f);
+        Vector3 back = new Vector3(-walk * 0.6f, 0f, 0f);
+        if (full && (d.Pose == IntroPose.Jump || d.Pose == IntroPose.Spin)) { cam += new Vector3(0f, 0.6f, -1.8f); look += new Vector3(0f, 0.6f, 0f); }
+        _stage.SetShot(cam + back + new Vector3(0f, 1.2f, -2f), look + back, 0.3f, true);
+        _stage.SetShot(cam, look, 0.7f, false);
+        _pitcher.SetExpression(d.Face, 30f);
+
+        string title = (userPitching ? "自チーム" : "相手") + "  " + IntroCatalog.PositionName(1);
+        string stats = "球速 " + _pitcherStats.Velo + "   制球 " + _pitcherStats.Ctrl + "   変化 " + _pitcherStats.Brk;
+        GameAudio.Play(Sfx.Cheer, full ? d.Cheer : d.Cheer * 0.5f);
+        if (walk > 0f)
+        {
+            _pitcher.WalkBy(walk, walkSec);
+            yield return StartCoroutine(IntroWait(walkSec + 0.1f));
+        }
+        _ui.ShowIntroCard(title, _pitcherStats.Name, stats, full ? d.Copy : "", d.CardColor);
+        if (full && !_introSkip) GameAudio.PlayJingle(d.Jingle, d.NoteSec);
+        if (full && d.Pose != IntroPose.None && !_introSkip)
+        {
+            _pitcher.DoGesture(d.Pose, d.Hold);
+            if (FreezeKind == -71) { yield return new WaitForSeconds(0.45f); Time.timeScale = 0f; }   // 確認用
+            yield return StartCoroutine(IntroWait(d.Hold + 0.5f));
+        }
+        else
+        {
+            yield return StartCoroutine(IntroWait(full ? 0.8f : 0.5f));
+        }
+        yield return StartCoroutine(EndIntro(_pitcher));
+    }
+
+    // 演出の後片付け: 姿勢を戻してカメラを捕手視点へ
+    private IEnumerator EndIntro(RagdollPlayer who)
+    {
+        _ui.HideIntroCard();
+        if (who != null) who.ResetPose();
+        _stage.SetCameraMode(CamMode.Catcher);
+        _stage.SetZoneVisible(true);
+        float t = 0f;
+        while (t < 0.6f && !_stage.CatcherCameraSettled()) { t += Time.deltaTime; yield return null; }
+        _swingQueued = false;
+        _skipQueued = false;
     }
 
     private IEnumerator Wait(float seconds)
@@ -241,6 +378,7 @@ public class AtBatController : MonoBehaviour
                 _cursorTarget = ClampCursor(new Vector2(w.x, w.y));
             }
         }
+        if (swing) _skipQueued = true;   // 登場演出のスキップ用
         if (swing && (_gs.UserBatting || _defTapOk))
         {
             _swingQueued = true;
@@ -356,6 +494,18 @@ public class AtBatController : MonoBehaviour
         RefreshHud();
         _ui.ShowResult("");
         _ui.ShowBanner("");
+        if (IntroEnabled)
+        {
+            _introSkip = false;
+            _skipQueued = false;
+            if (_pitcherIntroPending)
+            {
+                _pitcherIntroPending = false;
+                yield return StartCoroutine(PitcherIntro());
+            }
+            _introSkip = false;
+            yield return StartCoroutine(BatterIntro());
+        }
         yield return StartCoroutine(Wait(0.4f));
 
         bool over = false;
@@ -394,6 +544,7 @@ public class AtBatController : MonoBehaviour
                 }
                 _bestScore = -1;
                 _gs.NewGame();
+                _introSeen.Clear();
                 _ui.ShowBanner("");
             }
             RefreshHud();

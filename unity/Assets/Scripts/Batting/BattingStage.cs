@@ -12,7 +12,7 @@ using UnityEngine;
 //
 // カメラは2モード: Catcher(捕手後方の固定視点) / Follow(打球を追う)。
 // ============================================================
-public enum CamMode { Catcher, Follow, Diamond }
+public enum CamMode { Catcher, Follow, Diamond, Shot }
 
 public class BattingStage : MonoBehaviour
 {
@@ -106,6 +106,26 @@ public class BattingStage : MonoBehaviour
         Cam.transform.rotation = Quaternion.LookRotation(b + fwd * 4f + Vector3.up * 0.5f - Cam.transform.position, Vector3.up);
     }
 
+    private GameObject _zoneRoot;
+    public void SetZoneVisible(bool on) { if (_zoneRoot != null) _zoneRoot.SetActive(on); }
+
+    // 演出用の寄りカメラ。snap=true なら即座にその位置へ。
+    private Vector3 _shotPos, _shotLook;
+    private float _shotSmooth = 0.5f;
+    public void SetShot(Vector3 pos, Vector3 look, float smooth, bool snap)
+    {
+        _mode = CamMode.Shot;
+        _shotPos = pos;
+        _shotLook = look;
+        _shotSmooth = Mathf.Max(0.05f, smooth);
+        if (snap)
+        {
+            _camVel = Vector3.zero;
+            Cam.transform.position = pos;
+            Cam.transform.rotation = Quaternion.LookRotation(look - pos, Vector3.up);
+        }
+    }
+
     public void SnapCatcherCamera()
     {
         _mode = CamMode.Catcher;
@@ -131,6 +151,12 @@ public class BattingStage : MonoBehaviour
             ct.position = Vector3.SmoothDamp(ct.position, BattingConfig.CameraPos, ref _camVel, 0.30f,
                 Mathf.Infinity, dt);
             ct.rotation = Quaternion.Slerp(ct.rotation, _catcherRot, 1f - Mathf.Exp(-9f * dt));
+        }
+        else if (_mode == CamMode.Shot)
+        {
+            ct.position = Vector3.SmoothDamp(ct.position, _shotPos, ref _camVel, _shotSmooth, Mathf.Infinity, dt);
+            Quaternion look = Quaternion.LookRotation(_shotLook - ct.position, Vector3.up);
+            ct.rotation = Quaternion.Slerp(ct.rotation, look, 1f - Mathf.Exp(-8f * dt));
         }
         else if (_mode == CamMode.Diamond)
         {
@@ -217,6 +243,7 @@ public class BattingStage : MonoBehaviour
         float hw = BattingConfig.ZoneHalfW, hh = BattingConfig.ZoneHalfH, cy = BattingConfig.ZoneCenterY;
         float t = 0.014f;
         var zone = new GameObject("Zone");
+        _zoneRoot = zone;
         zone.transform.SetParent(Root, false);
         Color frame = new Color(1f, 1f, 1f, 0.95f);
         Color grid = new Color(1f, 1f, 1f, 0.22f);

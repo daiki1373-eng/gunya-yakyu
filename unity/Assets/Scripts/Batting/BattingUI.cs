@@ -182,6 +182,7 @@ public class BattingUI
         _replayTag.fontStyle = FontStyle.Bold;
         _replayTag.text = "";
 
+        BuildIntroCard(canvasGo.transform);
         BuildPitchPanel(canvasGo.transform);
         ClearCenter();
         SetSpeed(null);
@@ -410,8 +411,65 @@ public class BattingUI
     }
 
     // ボタンの色を戻す(コントローラのUpdateから毎フレーム呼ぶ)
+    // ---- 登場カード(左下から滑り込む名前の札) ----
+    private RectTransform _card;
+    private Image _cardStripe;
+    private Text _cardTitle, _cardName, _cardStats, _cardCopy, _cardSkip;
+    private bool _cardOn;
+    private float _cardT;
+    private const float CardX = 24f, CardHidden = -640f;
+
+    private void BuildIntroCard(Transform canvas)
+    {
+        var bg = NewImage(canvas, "IntroCard", new Color(0.03f, 0.05f, 0.12f, 0.90f));
+        _card = bg.rectTransform;
+        _card.anchorMin = _card.anchorMax = new Vector2(0f, 0f);
+        _card.pivot = new Vector2(0f, 0f);
+        _card.sizeDelta = new Vector2(560f, 140f);
+        _card.anchoredPosition = new Vector2(CardHidden, 130f);
+        _cardStripe = NewImage(_card, "Stripe", Color.red);
+        Place(_cardStripe.rectTransform, Vector2.zero, new Vector2(14f, 140f));
+        var line = NewImage(_card, "Line", new Color(1f, 0.78f, 0.15f, 1f));
+        Place(line.rectTransform, new Vector2(14f, -138f), new Vector2(546f, 2f));
+        _cardTitle = NewText(_card, "Title", new Vector2(0f, 1f), new Vector2(32f, -8f), new Vector2(500f, 24f), 18, TextAnchor.MiddleLeft, new Color(0.8f, 0.85f, 1f));
+        _cardName = NewText(_card, "Name", new Vector2(0f, 1f), new Vector2(30f, -30f), new Vector2(500f, 54f), 44, TextAnchor.MiddleLeft, Color.white);
+        _cardName.fontStyle = FontStyle.Bold;
+        _cardStats = NewText(_card, "Stats", new Vector2(0f, 1f), new Vector2(32f, -86f), new Vector2(500f, 22f), 18, TextAnchor.MiddleLeft, Color.white);
+        _cardCopy = NewText(_card, "Copy", new Vector2(0f, 1f), new Vector2(32f, -110f), new Vector2(500f, 24f), 19, TextAnchor.MiddleLeft, new Color(1f, 0.88f, 0.35f));
+        _cardSkip = NewText(_card, "Skip", new Vector2(1f, 1f), new Vector2(-12f, -8f), new Vector2(120f, 20f), 14, TextAnchor.MiddleRight, new Color(1f, 1f, 1f, 0.55f));
+        _cardSkip.text = "TAP ▶";
+    }
+
+    public void ShowIntroCard(string title, string name, string stats, string copy, Color stripe)
+    {
+        _cardTitle.text = title;
+        _cardName.text = name;
+        _cardStats.text = stats;
+        _cardCopy.text = copy;
+        _cardStripe.color = stripe;
+        _cardOn = true;
+        _cardT = Time.unscaledTime;
+    }
+
+    public void HideIntroCard()
+    {
+        if (!_cardOn) return;
+        _cardOn = false;
+        _cardT = Time.unscaledTime;
+    }
+
+    private void TickCard()
+    {
+        if (_card == null) return;
+        float u = Mathf.Clamp01((Time.unscaledTime - _cardT) / 0.28f);
+        float e = 1f - (1f - u) * (1f - u);
+        float x = _cardOn ? Mathf.Lerp(CardHidden, CardX, e) : Mathf.Lerp(CardX, CardHidden, e);
+        _card.anchoredPosition = new Vector2(x, 130f);
+    }
+
     public void Tick()
     {
+        TickCard();
         if (_comm != null && _comm.text.Length > 0)
         {
             float u = (Time.unscaledTime - _commStart) / CommDur;

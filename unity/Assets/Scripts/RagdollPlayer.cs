@@ -27,6 +27,12 @@ public class RagdollPlayer : MonoBehaviour
     public Rigidbody2D ArmBackUpper { get; private set; }
     public Rigidbody2D ArmBackFore { get; private set; }
     public Rigidbody2D Bat { get; private set; } // 打者のみ
+    public Rigidbody2D LegBackUpper { get; private set; }
+    public Rigidbody2D LegFrontUpper { get; private set; }
+    public Rigidbody2D LegBackFore { get; private set; }
+    public Rigidbody2D LegFrontFore { get; private set; }
+    // 登場演出中だけ「立っている」補助を入れる(脚をまっすぐ・腰を持ち上げる)
+    public bool StandAssist;
 
     public float Facing { get; private set; } // +1: 右向き, -1: 左向き
     public PlayerStats Stats { get; private set; }
@@ -40,7 +46,7 @@ public class RagdollPlayer : MonoBehaviour
 
     private readonly List<PartState> _initialPose = new List<PartState>();
     private readonly List<Rigidbody2D> _allParts = new List<Rigidbody2D>();
-    private Vector2 _pelvisHome;
+    private Vector2 _pelvisHome, _pelvisHomeInit;
     private float _poseHoldTimer;
     private float _flopTimer;
 
@@ -81,6 +87,10 @@ public class RagdollPlayer : MonoBehaviour
         AddShoe(legBackFore, shoe);
         AddShoe(legFrontFore, shoe);
 
+        LegBackUpper = legBackUpper;
+        LegFrontUpper = legFrontUpper;
+        LegBackFore = legBackFore;
+        LegFrontFore = legFrontFore;
         Pelvis = MakePart(t, "Pelvis", rootPos + new Vector2(0f, 0.90f), new Vector2(0.40f, 0.24f), pants, false, 1.4f, 5);
         Chest = MakePart(t, "Chest", rootPos + new Vector2(0f, 1.22f), new Vector2(0.48f, 0.44f), torso, false, 1.6f, 5);
         Head = MakePart(t, "Head", rootPos + new Vector2(0f, 1.86f), new Vector2(0.74f, 0.74f), skin, true, 0.8f, 7);
@@ -129,6 +139,7 @@ public class RagdollPlayer : MonoBehaviour
         AddUniformDetails(uniform, accent, isBatter, skin, legBackFore, legFrontFore, legBackUpper, legFrontUpper);
 
         _pelvisHome = rootPos + new Vector2(0f, 0.90f);
+        _pelvisHomeInit = _pelvisHome;
         CapturePose();
     }
 
@@ -345,6 +356,10 @@ public class RagdollPlayer : MonoBehaviour
         _poseHoldTimer = 0f;
         _flopTimer = 0f;
         _exprTimer = 0f;
+        _holds.Clear();
+        _walking = false;
+        StandAssist = false;
+        _pelvisHome = _pelvisHomeInit;
         ApplyExpression(Expr.Normal);
         for (int i = 0; i < _initialPose.Count; i++)
         {
@@ -361,6 +376,9 @@ public class RagdollPlayer : MonoBehaviour
 
     private void FixedUpdate()
     {
+        TickWalk(Time.fixedDeltaTime);
+        ApplyHolds();
+        if (StandAssist && _flopTimer <= 0f) ApplyStand();
         if (_flopTimer > 0f)
         {
             _flopTimer -= Time.fixedDeltaTime;
@@ -446,6 +464,173 @@ public class RagdollPlayer : MonoBehaviour
         if (Pelvis != null)
         {
             Pelvis.velocity = new Vector2(Random.Range(-0.8f, 0.8f), 2.2f * power);
+        }
+    }
+
+    // ------------------------------------------------------------
+    // 登場演出: 歩いて入る / ポーズ
+    // ------------------------------------------------------------
+    private struct Hold { public Rigidbody2D Rb; public float Target; public float Until; public bool Wave; }
+    private readonly List<Hold> _holds = new List<Hold>();
+    private bool _walking;
+    private float _walkDx, _walkDone, _walkT, _walkDur, _stepTimer;
+    private int _stepSide;
+
+    public bool IsWalking { get { return _walking; } }
+
+    // 体ごと平行移動(物理の状態はそのまま)
+    public void Teleport(Vector2 delta)
+    {
+        for (int i = 0; i < _allParts.Count; i++)
+        {
+            var rb = _allParts[i];
+            rb.position += delta;
+            rb.transform.position += new Vector3(delta.x, delta.y, 0f);
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+        _pelvisHome += delta;
+    }
+
+    // 今いる位置から dx だけ歩く(足をばたつかせながら)
+    public void WalkBy(float dx, float seconds)
+    {
+        _walking = true;
+        _walkDx = dx;
+        _walkDone = 0f;
+        _walkT = 0f;
+        _walkDur = Mathf.Max(0.1f, seconds);
+        _stepTimer = 0f;
+    }
+
+    private void TickWalk(float dt)
+    {
+        if (!_walking) return;
+        _walkT += dt;
+        float u = Mathf.Clamp01(_walkT / _walkDur);
+        float eased = u * u * (3f - 2f * u);
+        float desired = _walkDx * eased;
+        float step = desired - _walkDone;
+        _walkDone = desired;
+        var d = new Vector2(step, 0f);
+        for (int i = 0; i < _allParts.Count; i++)
+        {
+            var rb = _allParts[i];
+            rb.position += d;
+        }
+        _pelvisHome += d;
+        // 足踏み(左右交互に脚を振る。ぐにゃ度で大げさに)
+        _stepTimer -= dt;
+        if (_stepTimer <= 0f && u < 0.95f)
+        {
+            _stepTimer = 0.20f;
+            _stepSide = 1 - _stepSide;
+            float g = 0.6f + 0.4f * BattingConfig.GunyaLevel;
+            float dir = Mathf.Sign(_walkDx);
+            var leg = _stepSide == 0 ? LegFrontUpper : LegBackUpper;
+            if (leg != null) leg.angularVelocity = 260f * dir * g;
+            if (Pelvis != null) Pelvis.velocity = new Vector2(Pelvis.velocity.x, 1.1f * g);
+            if (ArmFrontUpper != null) ArmFrontUpper.angularVelocity = -180f * dir * g * (_stepSide == 0 ? 1f : -1f);
+        }
+        if (u >= 1f) _walking = false;
+    }
+
+    private void AddHold(Rigidbody2D rb, float target, float seconds, bool wave = false)
+    {
+        if (rb == null) return;
+        _holds.Add(new Hold { Rb = rb, Target = target, Until = Time.time + seconds, Wave = wave });
+    }
+
+    private void ApplyHolds()
+    {
+        for (int i = _holds.Count - 1; i >= 0; i--)
+        {
+            var h = _holds[i];
+            if (h.Rb == null || Time.time > h.Until) { _holds.RemoveAt(i); continue; }
+            float target = h.Target;
+            if (h.Wave) target += Mathf.Sin(Time.time * 12f) * 40f * Facing;
+            float err = Mathf.DeltaAngle(h.Rb.rotation, target) * Mathf.Deg2Rad;
+            float av = h.Rb.angularVelocity * Mathf.Deg2Rad;
+            float alpha = 300f * err - 30f * av;
+            h.Rb.AddTorque(h.Rb.inertia * alpha);
+        }
+    }
+
+    private float _massTotal = -1f;
+
+    private void ApplyStand()
+    {
+        KeepAngle(LegBackUpper, 0f, 200f, 25f);
+        KeepAngle(LegFrontUpper, 0f, 200f, 25f);
+        KeepAngle(LegBackFore, 0f, 200f, 25f);
+        KeepAngle(LegFrontFore, 0f, 200f, 25f);
+        if (_poseHoldTimer <= 0f) KeepAngle(Chest, 0f, 120f, 20f);
+        if (Pelvis == null) return;
+        if (_massTotal < 0f) { _massTotal = 0f; foreach (var rb in _allParts) _massTotal += rb.mass; }
+        float dy = _pelvisHome.y - Pelvis.position.y;
+        if (dy > 0f)
+        {
+            float a = Mathf.Clamp(60f * dy - 8f * Pelvis.velocity.y, 0f, 40f);
+            Pelvis.AddForce(new Vector2(0f, _massTotal * a));
+        }
+    }
+
+    private static void KeepAngle(Rigidbody2D rb, float target, float k, float d)
+    {
+        if (rb == null) return;
+        float err = Mathf.DeltaAngle(rb.rotation, target) * Mathf.Deg2Rad;
+        float av = rb.angularVelocity * Mathf.Deg2Rad;
+        rb.AddTorque(rb.inertia * (k * err - d * av));
+    }
+
+    // 登場のポーズ。seconds はポーズを保つ時間。
+    public void DoGesture(IntroPose pose, float seconds)
+    {
+        float f = Facing;
+        float g = 0.6f + 0.4f * BattingConfig.GunyaLevel;
+        switch (pose)
+        {
+            case IntroPose.BatPoint:
+                AddHold(ArmFrontUpper, 150f * f, seconds);
+                AddHold(ArmFrontFore, 155f * f, seconds);
+                AddHold(Bat, -25f * f, seconds);
+                break;
+            case IntroPose.Flex:
+                AddHold(ArmFrontUpper, 165f * f, seconds);
+                AddHold(ArmBackUpper, 165f * f, seconds);
+                AddHold(ArmFrontFore, 120f * f, seconds);
+                AddHold(ArmBackFore, 120f * f, seconds);
+                break;
+            case IntroPose.Bow:
+                _poseHoldTimer = seconds;
+                AddHold(Chest, -38f * f, seconds);
+                AddHold(Head, -48f * f, seconds);
+                break;
+            case IntroPose.Wave:
+                AddHold(ArmFrontUpper, 150f * f, seconds);
+                AddHold(ArmFrontFore, 130f * f, seconds, true);
+                break;
+            case IntroPose.Jump:
+                for (int i = 0; i < _allParts.Count; i++)
+                    _allParts[i].velocity = new Vector2(0f, 3.4f * g);
+                AddHold(ArmFrontUpper, 170f * f, seconds);
+                AddHold(ArmBackUpper, 170f * f, seconds);
+                break;
+            case IntroPose.Spin:
+            {
+                // 宙返り: 腰まわりに剛体回転を与えて飛ばす(着地はぐにゃ任せ)
+                _flopTimer = Mathf.Max(_flopTimer, seconds);
+                float w = -7.0f * f * g;   // rad/s(進行方向へ前転)
+                Vector2 c = Pelvis != null ? Pelvis.position : (Vector2)transform.position;
+                for (int i = 0; i < _allParts.Count; i++)
+                {
+                    var rb = _allParts[i];
+                    Vector2 r = rb.position - c;
+                    rb.velocity = new Vector2(0f, 4.4f * g) + w * new Vector2(-r.y, r.x);
+                    rb.angularVelocity = w * Mathf.Rad2Deg;
+                }
+                break;
+            }
         }
     }
 }

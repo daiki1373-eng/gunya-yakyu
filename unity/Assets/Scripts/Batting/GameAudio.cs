@@ -117,6 +117,60 @@ public static class GameAudio
         s.PlayOneShot(clip, volume * MasterVolume);
     }
 
+    // ---- 登場ジングル(自作の短いフレーズを矩形波+三角波で合成) ----------------
+    private static readonly Dictionary<string, AudioClip> Jingles = new Dictionary<string, AudioClip>();
+
+    public static void PlayJingle(int[] notes, float noteSec, float volume = 0.55f)
+    {
+        if (notes == null || notes.Length == 0) return;
+        string key = string.Join(",", Array.ConvertAll(notes, x => x.ToString())) + "@" + noteSec.ToString("F3");
+        AudioClip clip;
+        if (!Jingles.TryGetValue(key, out clip) || clip == null)
+        {
+            clip = BuildJingle(notes, noteSec);
+            Jingles[key] = clip;
+        }
+        if (Muted || _srcs == null || _srcs[0] == null) return;
+        var s = _srcs[_next];
+        _next = (_next + 1) % _srcs.Length;
+        s.pitch = 1f;
+        s.PlayOneShot(clip, volume * MasterVolume);
+    }
+
+    public static float JingleLength(int[] notes, float noteSec)
+    {
+        return notes == null ? 0f : notes.Length * noteSec + 0.35f;
+    }
+
+    private static AudioClip BuildJingle(int[] notes, float noteSec)
+    {
+        float total = notes.Length * noteSec + 0.35f;
+        int n = (int)(Rate * total);
+        var data = new float[n];
+        for (int k = 0; k < notes.Length; k++)
+        {
+            if (notes[k] <= -90) continue;
+            float freq = 523.25f * Mathf.Pow(2f, notes[k] / 12f);
+            bool last = k == notes.Length - 1;
+            float len = last ? noteSec + 0.32f : noteSec * 0.92f;
+            int i0 = (int)(Rate * k * noteSec), i1 = Mathf.Min(n, i0 + (int)(Rate * len));
+            for (int i = i0; i < i1; i++)
+            {
+                float t = (i - i0) / (float)Rate;
+                float ph = freq * t;
+                float sq = (ph - Mathf.Floor(ph)) < 0.5f ? 1f : -1f;
+                float tri = 1f - 4f * Mathf.Abs((ph + 0.25f) - Mathf.Floor(ph + 0.75f));
+                float env = Mathf.Clamp01(t / 0.008f) * Mathf.Exp(-t * (last ? 3.5f : 7f));
+                float vib = last ? 1f + 0.004f * Mathf.Sin(2f * Mathf.PI * 6f * t) : 1f;
+                data[i] += (0.20f * sq + 0.35f * tri + 0.15f * Mathf.Sin(2f * Mathf.PI * freq * 2f * vib * t)) * env;
+            }
+        }
+        for (int i = 0; i < n; i++) data[i] = Mathf.Clamp(data[i], -1f, 1f) * Mathf.Clamp01((n - i) / (Rate * 0.02f));
+        var clip = AudioClip.Create("jingle", n, 1, Rate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
     public static void PlayHit(HitRank r)
     {
         switch (r)
