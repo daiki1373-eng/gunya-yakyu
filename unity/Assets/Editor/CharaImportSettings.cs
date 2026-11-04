@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEngine;
 
 // ============================================================
 // CharaImportSettings.cs (Editor専用)
@@ -22,5 +23,19 @@ public class CharaImportSettings : AssetPostprocessor
         ti.compressionQuality = 60;
         ti.maxTextureSize = p.Contains("/Thumb/") ? 512 : 2048;
         ti.spritePixelsPerUnit = 100f;
+        // 試合で使う切り抜き(Cut=立ち姿 / Head=頭)。透明あり・遠くでもちらつかないようミップマップあり
+        bool cut = p.Contains("/Cut/"), head = p.Contains("/Head/");
+        if (cut || head)
+        {
+            ti.alphaIsTransparency = true;
+            ti.mipmapEnabled = true;
+            ti.maxTextureSize = cut ? 1024 : 256;
+            ti.npotScale = TextureImporterNPOTScale.ToNearest;   // 2の累乗にして圧縮を効かせる(端末のメモリ節約)
+            var st = new TextureImporterSettings();
+            ti.ReadTextureSettings(st);
+            st.spriteAlignment = cut ? (int)SpriteAlignment.BottomCenter : (int)SpriteAlignment.Center;
+            st.spriteMeshType = SpriteMeshType.FullRect;
+            ti.SetTextureSettings(st);
+        }
     }
 }

@@ -457,12 +457,49 @@ public class BattingStage : MonoBehaviour
             new Vector3(0f, 1.42f * s, 0f), Vector3.zero, Vector3.one * (0.50f * s));
         head.flipX = (v % 2) == 1;
         _dollInfo[root] = new DollInfo { Variant = v, Helmet = runner };
+        // キャラの立ち姿(切り抜き画像)。SetDollSkin で差し替える。ふだんは非表示
+        var stand = BattingSprites.Make("Standee", rig, SpriteFactory.White, Color.white, 4,
+            Vector3.zero, Vector3.zero, Vector3.one);
+        stand.enabled = false;
+        _standees[root] = stand;
         _billboards.Add(root);
         AddShadow(root, 0.9f * s);
         return root;
     }
 
     private struct DollInfo { public int Variant; public bool Helmet; }
+    private readonly Dictionary<Transform, SpriteRenderer> _standees = new Dictionary<Transform, SpriteRenderer>();
+    public const float StandeeHeight = 3.3f;   // 遠くでも見えるよう実寸より大きめ(人形と同じ考え方)
+
+    // 人形をキャラの立ち姿に差し替える(null で元の人形に戻す)
+    private void SetDollSkin(Transform root, Sprite cut)
+    {
+        if (root == null) return;
+        SpriteRenderer stand;
+        if (!_standees.TryGetValue(root, out stand)) return;
+        bool on = cut != null;
+        foreach (var sr in root.GetComponentsInChildren<SpriteRenderer>(true))
+            if (sr != stand) sr.enabled = !on;
+        stand.enabled = on;
+        if (!on) return;
+        stand.sprite = cut;
+        Vector2 b = cut.bounds.size;
+        float k = Mathf.Min(StandeeHeight / b.y, StandeeHeight * 0.95f / b.x);
+        stand.transform.localScale = new Vector3(k, k, 1f);
+        stand.transform.localPosition = Vector3.zero;
+    }
+
+    public void SetFielderSkin(int index, Sprite cut)
+    {
+        if (index < 0 || index >= _fielders.Length) return;
+        SetDollSkin(_fielders[index], cut);
+    }
+
+    public void SetRunnerSkin(int slot, Sprite cut)
+    {
+        if (slot < 0 || slot >= _runners.Length) return;
+        SetDollSkin(_runners[slot], cut);
+    }
     private readonly Dictionary<Transform, DollInfo> _dollInfo = new Dictionary<Transform, DollInfo>();
 
     // 守備側・攻撃側のチームカラーで人形を塗り直す

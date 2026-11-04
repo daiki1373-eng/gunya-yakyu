@@ -147,6 +147,28 @@ public static class CharaCatalog
         return s;
     }
 
+    // 試合用: 背景を抜いた立ち姿(足元が原点) / 頭(円形に切り抜き)
+    private static readonly Dictionary<string, Sprite> Cuts = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<string, Sprite> Heads = new Dictionary<string, Sprite>();
+
+    public static Sprite Cut(string id)
+    {
+        Sprite s;
+        if (Cuts.TryGetValue(id, out s) && s != null) return s;
+        s = Resources.Load<Sprite>("Chara/Cut/" + id);
+        Cuts[id] = s;
+        return s;
+    }
+
+    public static Sprite Head(string id)
+    {
+        Sprite s;
+        if (Heads.TryGetValue(id, out s) && s != null) return s;
+        s = Resources.Load<Sprite>("Chara/Head/" + id);
+        Heads[id] = s;
+        return s;
+    }
+
     public static Sprite Full(string id)
     {
         return Resources.Load<Sprite>("Chara/Full/" + id);

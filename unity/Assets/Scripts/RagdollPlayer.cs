@@ -286,14 +286,38 @@ public class RagdollPlayer : MonoBehaviour
         _variant = string.IsNullOrEmpty(stats.Name) ? 0 : Mathf.Abs(stats.Name.GetHashCode());
         _headSr.color = Color.white;
         _headSr.flipX = f < 0f;
+        // ガチャのキャラは本物の顔(切り抜き画像)を頭にする。表情の差し替えはしない
+        if (!string.IsNullOrEmpty(stats.CharaId))
+        {
+            var real = CharaCatalog.Head(stats.CharaId);
+            if (real != null)
+            {
+                _realHead = true;
+                _headSr.sprite = real;
+                _headSr.flipX = false;
+                float d = head.GetComponent<CircleCollider2D>().radius * 2f * 1.45f;
+                Vector2 bs = real.bounds.size;
+                _headSr.transform.localScale = new Vector3(d / bs.x, d / bs.y, 1f);
+                return;
+            }
+        }
         // 表情の絵は打席の最初にまとめて作っておく(試合中のカクつき防止。2回目以降はキャッシュ)
         for (int e = 0; e < 5; e++) CharacterArt.Head(_species, _skin, _hatColor, _gear, (Expr)e, _variant);
         ApplyExpression(Expr.Normal);
     }
 
+    private bool _realHead;
+
     private void ApplyExpression(Expr e)
     {
         if (_headSr == null) return;
+        if (_realHead)
+        {
+            // 本物の顔は差し替えず、驚き・喜びは頭をぽんと弾ませる
+            _expr = e;
+            if (e == Expr.Surprise || e == Expr.Happy) _headPop = 0.25f;
+            return;
+        }
         _expr = e;
         _headSr.sprite = CharacterArt.Head(_species, _skin, _hatColor, _gear, e, _variant);
     }
@@ -303,6 +327,22 @@ public class RagdollPlayer : MonoBehaviour
     {
         ApplyExpression(e);
         _exprTimer = seconds;
+    }
+
+    private float _headPop;
+    private Vector3 _headBaseScale;
+
+    private void LateUpdate()
+    {
+        if (!_realHead || _headSr == null) return;
+        if (_headBaseScale == Vector3.zero) _headBaseScale = _headSr.transform.localScale;
+        if (_headPop > 0f)
+        {
+            _headPop -= Time.deltaTime;
+            float u = Mathf.Clamp01(_headPop / 0.25f);
+            _headSr.transform.localScale = _headBaseScale * (1f + 0.18f * Mathf.Sin(u * Mathf.PI));
+        }
+        else _headSr.transform.localScale = _headBaseScale;
     }
 
     private void Update()

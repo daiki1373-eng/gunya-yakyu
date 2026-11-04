@@ -112,6 +112,39 @@ public class AtBatController : MonoBehaviour
     private CharaRoster.Team _userTeam, _oppTeam;
     private float _gameStartT;
 
+    // 守っているチームの野手(一塁〜右翼の7人)をキャラの立ち姿にする。捕手は画面に出ない
+    private void SkinFielders(CharaRoster.Team team)
+    {
+        for (int i = 2; i < FieldingModel.Defaults.Length; i++)
+        {
+            int k = i - 2;
+            var d = k < team.Lineup.Count ? team.Lineup[k] : null;
+            _stage.SetFielderSkin(i, d != null ? CharaCatalog.Cut(d.Id) : null);
+        }
+    }
+
+    // 塁上の走者が誰か(キャラ)。打席が終わるたびに進塁の記録から更新する
+    private readonly CharaDef[] _onBase = new CharaDef[4];
+
+    private void UpdateOnBase(bool[] oldBase)
+    {
+        var moved = new bool[4];
+        foreach (var m in _gs.Moves) if (m.From >= 1 && m.From <= 3) moved[m.From] = true;
+        var next = new CharaDef[4];
+        for (int b = 1; b <= 3; b++) next[b] = (oldBase[b] && !moved[b]) ? _onBase[b] : null;
+        var batter = string.IsNullOrEmpty(_batterStats.CharaId) ? null : CharaCatalog.Get(_batterStats.CharaId);
+        foreach (var m in _gs.Moves)
+            if (m.To >= 1 && m.To <= 3) next[m.To] = m.From == 0 ? batter : _onBase[m.From];
+        for (int b = 1; b <= 3; b++) _onBase[b] = _gs.Base[b] ? next[b] : null;
+    }
+
+    private void SkinRunners()
+    {
+        _stage.SetRunnerSkin(0, string.IsNullOrEmpty(_batterStats.CharaId) ? null : CharaCatalog.Cut(_batterStats.CharaId));
+        for (int b = 1; b <= 3; b++)
+            _stage.SetRunnerSkin(b, _onBase[b] != null ? CharaCatalog.Cut(_onBase[b].Id) : null);
+    }
+
     private void BuildTeams()
     {
         _userTeam = CharaRoster.UserTeam();
@@ -133,12 +166,14 @@ public class AtBatController : MonoBehaviour
             _pitcherStats = CharaRoster.Stats(_oppTeam.Pitcher);
             _stage.SetTeams(BattingConfig.OppJersey, BattingConfig.OppAccent, BattingConfig.UserJersey, BattingConfig.UserAccent);
             CreatePitcher(BattingConfig.OppJersey, BattingConfig.OppAccent);
+            SkinFielders(_oppTeam);
         }
         else
         {
             _pitcherStats = CharaRoster.Stats(_userTeam.Pitcher);
             _stage.SetTeams(BattingConfig.UserJersey, BattingConfig.UserAccent, BattingConfig.OppJersey, BattingConfig.OppAccent);
             CreatePitcher(BattingConfig.UserJersey, BattingConfig.UserAccent);
+            SkinFielders(_userTeam);
         }
     }
 
@@ -517,6 +552,7 @@ public class AtBatController : MonoBehaviour
         _gs.PlateAppearances++;
         _last1 = _last2 = -1;
         _stage.ResetFielders();
+        SkinRunners();
         _stage.ShowRunnersOnBases(_gs.Base);
         _ui.SetSwingLabel(_gs.UserBatting ? "SWING" : "投げる");
         _ui.ShowPitchPanel(false, _avail, _selKind);
@@ -542,7 +578,9 @@ public class AtBatController : MonoBehaviour
         while (!over)
         {
             yield return StartCoroutine(PlayPitch());
+            var oldBase = (bool[])_gs.Base.Clone();
             over = ApplyPitchResult();
+            UpdateOnBase(oldBase);
             RefreshHud();
             if (over && ReplayEnabled && _pitchEnd == PitchEnd.InPlay && (_lastPlay.Quirk != QuirkKind.None || _lastPlay.Kind == PlayKind.HomeRun))
                 yield return StartCoroutine(PlayReplay(_lastTraj, _lastPlay, 0.5f, 11f, "● REPLAY"));
@@ -700,6 +738,7 @@ public class AtBatController : MonoBehaviour
             }
         }
         _stage.HideRunners();
+        SkinRunners();
         _stage.ShowRunnersOnBases(_gs.Base);
     }
 
