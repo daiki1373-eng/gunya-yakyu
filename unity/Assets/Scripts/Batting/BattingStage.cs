@@ -458,35 +458,40 @@ public class BattingStage : MonoBehaviour
         head.flipX = (v % 2) == 1;
         _dollInfo[root] = new DollInfo { Variant = v, Helmet = runner };
         // キャラの立ち姿(切り抜き画像)。SetDollSkin で差し替える。ふだんは非表示
-        var stand = BattingSprites.Make("Standee", rig, SpriteFactory.White, Color.white, 4,
-            Vector3.zero, Vector3.zero, Vector3.one);
-        stand.enabled = false;
-        _standees[root] = stand;
+        _standees[root] = StandeePuppet.Create(rig, root, 4);
         _billboards.Add(root);
         AddShadow(root, 0.9f * s);
         return root;
     }
 
     private struct DollInfo { public int Variant; public bool Helmet; }
-    private readonly Dictionary<Transform, SpriteRenderer> _standees = new Dictionary<Transform, SpriteRenderer>();
+    private readonly Dictionary<Transform, StandeePuppet> _standees = new Dictionary<Transform, StandeePuppet>();
     public const float StandeeHeight = 3.3f;   // 遠くでも見えるよう実寸より大きめ(人形と同じ考え方)
 
     // 人形をキャラの立ち姿に差し替える(null で元の人形に戻す)
     private void SetDollSkin(Transform root, Sprite cut)
     {
         if (root == null) return;
-        SpriteRenderer stand;
+        StandeePuppet stand;
         if (!_standees.TryGetValue(root, out stand)) return;
         bool on = cut != null;
         foreach (var sr in root.GetComponentsInChildren<SpriteRenderer>(true))
-            if (sr != stand) sr.enabled = !on;
-        stand.enabled = on;
-        if (!on) return;
-        stand.sprite = cut;
-        Vector2 b = cut.bounds.size;
-        float k = Mathf.Min(StandeeHeight / b.y, StandeeHeight * 0.95f / b.x);
-        stand.transform.localScale = new Vector3(k, k, 1f);
-        stand.transform.localPosition = Vector3.zero;
+            if (!sr.transform.IsChildOf(stand.transform)) sr.enabled = !on;
+        stand.SetSprite(cut, StandeeHeight);
+    }
+
+    private StandeePuppet PuppetOf(Transform root)
+    {
+        StandeePuppet p;
+        return root != null && _standees.TryGetValue(root, out p) && p.gameObject.activeSelf ? p : null;
+    }
+
+    // 送球の動き(立ち姿のキャラのみ)
+    public void ThrowPose(int index)
+    {
+        if (index < 2 || index >= _fielders.Length) return;
+        var p = PuppetOf(_fielders[index]);
+        if (p != null) p.Throw();
     }
 
     public void SetFielderSkin(int index, Sprite cut)
@@ -625,7 +630,7 @@ public class BattingStage : MonoBehaviour
     {
         bool moving = (now - last).sqrMagnitude > 1e-5f;
         last = now;
-        float a = moving ? Mathf.Sin(Time.time * 16f) * 7f * BattingConfig.GunyaLevel : 0f;
+        float a = moving ? Mathf.Sin(Time.time * 16f) * 3f * BattingConfig.GunyaLevel : 0f;
         rig.localRotation = Quaternion.Euler(0f, 0f, a);
     }
 
@@ -689,6 +694,8 @@ public class BattingStage : MonoBehaviour
     {
         if (index < 2 || index >= _fielders.Length || _fielders[index] == null) return;
         StartCoroutine(PopRoutine(_fielderRigs[index]));
+        var p = PuppetOf(_fielders[index]);
+        if (p != null) p.Catch();
     }
 
     private IEnumerator PopRoutine(Transform rig)

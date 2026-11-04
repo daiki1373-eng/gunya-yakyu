@@ -27,3 +27,13 @@ for cid,(cx,cy,s) in H.items():
     a[...,3]*=m
     Image.fromarray(a.astype(np.uint8)).save(os.path.join(dst,'Head',cid+'.png'))
 print('ok',len(H))
+
+# 立ち姿の中身の範囲(x0 x1 高さ, 512台紙のピクセル)を書き出す。試合で体を上下・左右に分けて動かすのに使う
+import numpy as np
+lines=[]
+for f in sorted(os.listdir(os.path.join(dst,'Cut'))):
+    if not f.endswith('.png'): continue
+    a=np.asarray(Image.open(os.path.join(dst,'Cut',f)).convert('RGBA'))[...,3]
+    ys,xs=np.where(a>40)
+    lines.append('%s %d %d %d'%(f[:-4],xs.min(),xs.max()+1,a.shape[0]-ys.min()))
+open(os.path.join(dst,'cut_meta.txt'),'w').write('\n'.join(lines)+'\n')

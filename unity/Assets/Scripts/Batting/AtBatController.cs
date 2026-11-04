@@ -1159,9 +1159,15 @@ public class AtBatController : MonoBehaviour
         }
 
         float t = 0f;
+        bool thrown = false;
         while (t < play.EndTime)
         {
             t += Time.deltaTime * speed;
+            if (!thrown && throwStart >= 0f && t >= throwStart - 0.18f)
+            {
+                thrown = true;
+                _stage.ThrowPose(play.Fielder);
+            }
             Vector3 p;
             if (throwStart >= 0f && t >= throwStart)
             {

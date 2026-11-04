@@ -32,6 +32,10 @@ public class PlayerStats
     public string CharaId = "";
     // 肌(頭)の色の上書き。a=0 なら種族の標準色。
     public Color SkinTint = new Color(0f, 0f, 0f, 0f);
+    // 投げる・打つ体の服装(キャラの絵に合わせる)。HasLook=false なら所属チームのユニフォーム。
+    public bool HasLook;
+    public Color LookJersey, LookPants, LookTrim;
+    public bool LookStripe;
 
     public PlayerStats Clone()
     {

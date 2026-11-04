@@ -60,6 +60,7 @@ public class RagdollPlayer : MonoBehaviour
         go.transform.SetParent(parent, false);
         go.transform.position = new Vector3(rootPos.x, rootPos.y, 0f);
         var player = go.AddComponent<RagdollPlayer>();
+        if (stats.HasLook) { uniform = stats.LookJersey; accent = stats.LookTrim; pinstripe = stats.LookStripe; }
         player.Build(rootPos, facing, stats, uniform, accent, isBatter);
         if (pinstripe) player.AddPinstripes();
         return player;
@@ -76,7 +77,7 @@ public class RagdollPlayer : MonoBehaviour
         if (stats.Species == "panda") skin = Color.white; // パンダは白頭
         else if (stats.Species == "dog") skin = new Color(0.84f, 0.64f, 0.42f); // イヌは毛色
         if (stats.SkinTint.a > 0f) skin = stats.SkinTint;
-        Color pants = new Color(0.92f, 0.92f, 0.94f);
+        Color pants = stats.HasLook ? stats.LookPants : new Color(0.92f, 0.92f, 0.94f);
         Color shoe = new Color(0.25f, 0.2f, 0.2f);
         Color sleeve = uniform;
         Color torso = uniform;

@@ -51,6 +51,40 @@ public static class CharaRoster
         { "crow", new Color(0.20f, 0.20f, 0.24f) }, { "dog", new Color(0.88f, 0.62f, 0.32f) },
     };
 
+    // ---- 服装(上着 / ズボン / ソックス・ふち の色、縦じま)。絵を見て決めた仮置き ----
+    private struct Look { public Color J, P, T; public bool S; }
+    private static Look L(Color j, Color p, Color t, bool stripe = false) { return new Look { J = j, P = p, T = t, S = stripe }; }
+    private static readonly Color W = new Color(0.95f, 0.94f, 0.93f), Rd = new Color(0.80f, 0.12f, 0.12f),
+        DRd = new Color(0.45f, 0.06f, 0.08f), Bk = new Color(0.14f, 0.13f, 0.14f), Nv = new Color(0.14f, 0.18f, 0.35f),
+        Gd = new Color(0.88f, 0.70f, 0.25f), Br = new Color(0.55f, 0.38f, 0.22f), Pk = new Color(0.98f, 0.66f, 0.76f),
+        Pu = new Color(0.42f, 0.18f, 0.48f), LBl = new Color(0.62f, 0.72f, 0.90f), Den = new Color(0.22f, 0.33f, 0.55f),
+        Or = new Color(0.92f, 0.55f, 0.16f), Sv = new Color(0.72f, 0.74f, 0.78f), Gy = new Color(0.33f, 0.33f, 0.36f),
+        Bl = new Color(0.22f, 0.28f, 0.65f), Clay = new Color(0.66f, 0.52f, 0.36f);
+    private static readonly Dictionary<string, Look> Looks = new Dictionary<string, Look>
+    {
+        // 白地に赤の縦じまユニフォーム
+        { "alien", L(W, W, Rd, true) }, { "bigeater", L(W, W, Rd, true) }, { "carpenter", L(W, W, Rd, true) },
+        { "ceo", L(W, W, Rd, true) }, { "chef", L(W, W, Rd, true) }, { "dad", L(W, W, Rd, true) },
+        { "deliveryman", L(W, W, Rd, true) }, { "doctor", L(W, W, Rd, true) }, { "dragon", L(W, W, Rd, true) },
+        { "grandma", L(W, W, Rd, true) }, { "legend-grandpa", L(W, W, Rd, true) }, { "rookie", L(W, W, Rd, true) },
+        { "slacker", L(W, W, Rd, true) }, { "sleepyhead", L(W, W, Rd, true) }, { "teacher", L(W, W, Rd, true) },
+        { "twins", L(W, W, Rd, true) },
+        // 白無地
+        { "sumo", L(W, W, Rd) }, { "suntan", L(W, W, Rd) }, { "ghost", L(new Color(0.88f, 0.92f, 1f), new Color(0.88f, 0.92f, 1f), Rd) },
+        // 赤
+        { "cat", L(Rd, Rd, W) }, { "dog", L(Rd, W, Gd) }, { "helper", L(Rd, Rd, Bk) }, { "ojisan", L(Rd, Rd, Gd) },
+        { "mannequin", L(Rd, Rd, W) }, { "santa", L(Rd, Rd, W) }, { "tanuki", L(Rd, Rd, Gd) }, { "snowman", L(Rd, W, Gd) },
+        { "idol", L(Rd, Rd, Bk) }, { "fisherman", L(Nv, Nv, Rd) }, { "robot", L(Rd, Rd, Sv) },
+        // 黒・紺
+        { "crow", L(Bk, Bk, Rd) }, { "pumpkin", L(Bk, Bk, Or) }, { "salaryman", L(Bk, Bk, W) }, { "umpire", L(Bk, Gy, Pk) },
+        { "student", L(Nv, Bk, Rd) }, { "rainman", L(Nv, Nv, Rd) }, { "guard", L(LBl, Nv, Gd) },
+        { "stationstaff", L(Nv, W, Gd) }, { "ninja", L(Bk, W, Rd) }, { "thirdtwin", L(Bl, Bl, W) },
+        // その他
+        { "magician", L(DRd, W, Gd) }, { "fortuneteller", L(Pu, W, Gd) }, { "housewife", L(Pk, W, Rd) },
+        { "heroine", L(Pk, W, Pk) }, { "magical", L(Pk, Pk, W) }, { "farmer", L(Rd, Den, Br) }, { "monk", L(Or, Nv, Gd) },
+        { "robot-gold", L(Gd, Gd, Rd) }, { "deliveryrobot", L(Rd, Br, Gd) }, { "dogu", L(Clay, Clay, Nv) },
+    };
+
     public static CharaRole Role(CharaDef d)
     {
         CharaRole r;
@@ -99,6 +133,11 @@ public static class CharaRoster
         if (d.Id == "dog" || d.Id == "tanuki" || d.Id == "cat") p.Species = "dog";
         Color sk;
         if (Skins.TryGetValue(d.Id, out sk)) p.SkinTint = sk;
+        Look lk;
+        if (Looks.TryGetValue(d.Id, out lk))
+        {
+            p.HasLook = true; p.LookJersey = lk.J; p.LookPants = lk.P; p.LookTrim = lk.T; p.LookStripe = lk.S;
+        }
         return p;
     }
 
