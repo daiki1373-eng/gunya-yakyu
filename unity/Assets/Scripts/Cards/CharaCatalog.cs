@@ -16,16 +16,9 @@ public class CharaDef
     public int StackLimit = 1;
     public int ExchangePoints = 1;
     public string ImageFile = "";
-    private int _hasImage = -1;
-    // 画像があるか(ない51体はプレースホルダで表示。画像を置けば自動で差し替わる)
-    public bool HasImage
-    {
-        get
-        {
-            if (_hasImage < 0) _hasImage = Resources.Load<Sprite>("Chara/Thumb/" + Id) != null ? 1 : 0;
-            return _hasImage == 1;
-        }
-    }
+    // 小さい索引だけを読む。相手チームの編成で全員の画像をロードしない。
+    public bool HasImage { get { return CharaCatalog.HasImage(Id); } }
+
 }
 
 // ============================================================
@@ -163,13 +156,33 @@ public static class CharaCatalog
         }
     }
 
+    // 画像追加時は Editor/CharaImageIndex が自動更新する。
+    private static HashSet<string> _imageIds;
+    public static bool HasImage(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return false;
+        if (_imageIds == null)
+        {
+            _imageIds = new HashSet<string>(System.StringComparer.Ordinal);
+            var index = Resources.Load<TextAsset>("Chara/image-index");
+            if (index != null)
+                foreach (string line in index.text.Split('\n'))
+                {
+                    string key = line.Trim();
+                    if (key.Length > 0) _imageIds.Add(key);
+                }
+        }
+        return _imageIds.Contains(id);
+    }
+
     // ---- 画像の読み込み(拡大用は必要なときだけ読む) ----
     private static readonly Dictionary<string, Sprite> Thumbs = new Dictionary<string, Sprite>();
 
     public static Sprite Thumb(string id)
     {
         Sprite s;
-        if (Thumbs.TryGetValue(id, out s) && s != null) return s;
+        if (string.IsNullOrEmpty(id)) return null;
+        if (Thumbs.TryGetValue(id, out s)) return s;
         s = Resources.Load<Sprite>("Chara/Thumb/" + id);
         Thumbs[id] = s;
         return s;
@@ -182,7 +195,8 @@ public static class CharaCatalog
     public static Sprite Cut(string id)
     {
         Sprite s;
-        if (Cuts.TryGetValue(id, out s) && s != null) return s;
+        if (string.IsNullOrEmpty(id)) return null;
+        if (Cuts.TryGetValue(id, out s)) return s;
         s = Resources.Load<Sprite>("Chara/Cut/" + id);
         Cuts[id] = s;
         return s;
@@ -191,7 +205,8 @@ public static class CharaCatalog
     public static Sprite Head(string id)
     {
         Sprite s;
-        if (Heads.TryGetValue(id, out s) && s != null) return s;
+        if (string.IsNullOrEmpty(id)) return null;
+        if (Heads.TryGetValue(id, out s)) return s;
         s = Resources.Load<Sprite>("Chara/Head/" + id);
         Heads[id] = s;
         return s;
@@ -199,6 +214,7 @@ public static class CharaCatalog
 
     public static Sprite Full(string id)
     {
+        if (string.IsNullOrEmpty(id)) return null;
         return Resources.Load<Sprite>("Chara/Full/" + id);
     }
 }

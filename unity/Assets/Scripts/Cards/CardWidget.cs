@@ -16,7 +16,7 @@ public static class CardWidget
     }
 
     // size: カード全体の大きさ(2:3推奨)。full=true なら拡大用の画像を使う。
-    public static Parts Build(Transform parent, CharaDef d, Vector2 size, bool full, bool owned, int count)
+    public static Parts Build(Transform parent, CharaDef d, Vector2 size, bool full, bool owned, int count, bool lazy = false)
     {
         var p = new Parts();
         var frame = UiKit.Img(parent, "Card_" + d.Id, UiKit.Frame, CharaCatalog.FrameColor(d.Rarity), true);
@@ -37,10 +37,11 @@ public static class CardWidget
             // 画像のないキャラ: レア度の背景+謎のシルエット+「?」(画像が届けば自動で差し替わる)
             var bg = UiKit.Img(mask, "Bg", UiKit.RarityBg(d.Rarity), Color.white);
             UiKit.Fill(bg.rectTransform);
-            var sil = CharaCatalog.Cut("student");
+            Sprite sil = null;
             var art = UiKit.Img(mask, "Art", sil, new Color(0.05f, 0.02f, 0.03f, 0.92f));
             UiKit.Place(art.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(inner.y, inner.y));
             p.Art = art;
+            CardArtLoader.Attach(art, "student", CardArtLoader.ArtKind.Cut, inner, lazy);
             var q = UiKit.Txt(mask, "Q", "?", Mathf.RoundToInt(inner.y * 0.32f), UiKit.GoldLight, TextAnchor.MiddleCenter);
             UiKit.Place(q.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, inner.y * 0.08f), inner);
             p.Placeholder = true;
@@ -51,29 +52,20 @@ public static class CardWidget
             var bg = UiKit.Img(mask, "Bg", UiKit.RarityBg(d.Rarity), owned ? Color.white : dark);
             UiKit.Fill(bg.rectTransform);
             p.Bg = bg;
-            var cut = CharaCatalog.Cut(d.Id);
+            Sprite cut = null;
             var art = UiKit.Img(mask, "Art", cut, owned ? Color.white : dark);
             float side = inner.y * 1.04f;
             UiKit.Place(art.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, -inner.y * 0.02f), new Vector2(side, side));
             p.Art = art;
+            CardArtLoader.Attach(art, d.Id, CardArtLoader.ArtKind.Cut, inner, lazy);
         }
         else
         {
-            Sprite sp = full ? CharaCatalog.Full(d.Id) : CharaCatalog.Thumb(d.Id);
-            var art = UiKit.Img(mask, "Art", sp, owned ? Color.white : dark);
+            var art = UiKit.Img(mask, "Art", null, owned ? Color.white : dark);
             p.Art = art;
-            var ar = art.rectTransform;
-            ar.anchorMin = ar.anchorMax = new Vector2(0.5f, 0.5f);
-            if (sp != null)
-            {
-                // 覆うように拡大(縦長の絵は上寄せ)
-                float a = sp.rect.width / sp.rect.height;
-                float ia = inner.x / inner.y;
-                Vector2 sz = a > ia ? new Vector2(inner.y * a, inner.y) : new Vector2(inner.x, inner.x / a);
-                ar.sizeDelta = sz;
-                ar.anchoredPosition = new Vector2(0f, a > ia ? 0f : -(sz.y - inner.y) * 0.15f);
-            }
-            else ar.sizeDelta = inner;
+            art.rectTransform.anchorMin = art.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            art.rectTransform.sizeDelta = inner;
+            CardArtLoader.Attach(art, d.Id, full ? CardArtLoader.ArtKind.Full : CardArtLoader.ArtKind.Thumb, inner, lazy);
         }
 
         // きらめき(★4以上。動きは呼び出し側で)
