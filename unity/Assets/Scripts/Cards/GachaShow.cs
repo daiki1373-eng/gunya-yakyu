@@ -19,7 +19,27 @@ public partial class AppShell
     public void Pull(int times)
     {
         if (_busy) return;
-        StartCoroutine(PullRoutine(times));
+        List<PullResult> results;
+        if (!Gacha.TryPullCoins(times, out results))
+        {
+            GameAudio.Play(Sfx.Boing, 0.5f, 1.2f);
+            return;
+        }
+        RefreshGacha();
+        StartCoroutine(PullRoutineFixed(results));
+    }
+
+    private void Scout()
+    {
+        if (_busy) return;
+        List<PullResult> results;
+        if (!Gacha.TryScout(out results))
+        {
+            GameAudio.Play(Sfx.Boing, 0.5f, 1.2f);
+            return;
+        }
+        RefreshGacha();
+        StartCoroutine(PullRoutineFixed(results));
     }
 
     // 検証用: 指定のキャラで演出だけ見る(所持は増やさない)
@@ -29,12 +49,6 @@ public partial class AppShell
         if (d == null || _busy) return;
         var r = new PullResult { Chara = d, Add = new Collection.AddResult { Before = 0, After = 1, IsNew = true } };
         StartCoroutine(PullRoutineFixed(new List<PullResult> { r }));
-    }
-
-    private IEnumerator PullRoutine(int times)
-    {
-        var results = Gacha.Pull(times);
-        yield return PullRoutineFixed(results);
     }
 
     private IEnumerator PullRoutineFixed(List<PullResult> results)

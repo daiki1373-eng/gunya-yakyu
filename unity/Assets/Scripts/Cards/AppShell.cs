@@ -19,7 +19,7 @@ public partial class AppShell : MonoBehaviour
     private RectTransform _root, _home, _cards, _gacha, _detail, _show;
     private UiFx _fx;
     private GameObject _menuBtn;
-    private Text _playLabel, _homeOwned, _cardsTitle, _gachaInfo;
+    private Text _playLabel, _homeOwned, _homeCoins, _cardsTitle, _gachaInfo;
     private RectTransform _homeRays, _gachaRays;
     private bool _gameStarted;
     private float _savedScale = 1f, _nextFirework;
@@ -142,6 +142,8 @@ public partial class AppShell : MonoBehaviour
         UiKit.Place(gacha.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, -74f), new Vector2(300f, 62f));
         var cards = UiKit.Btn(_home, "Cards", "カード", new Vector2(300f, 62f), false, ShowCards, 28);
         UiKit.Place(cards.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, -150f), new Vector2(300f, 62f));
+        _homeCoins = UiKit.Txt(_home, "Coins", "", 20, UiKit.GoldLight, TextAnchor.UpperRight);
+        UiKit.Place(_homeCoins.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-20f, -16f), new Vector2(250f, 30f));
         _homeOwned = UiKit.Txt(_home, "Owned", "", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
         UiKit.Place(_homeOwned.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, -206f), new Vector2(300f, 30f));
     }
@@ -276,7 +278,7 @@ public partial class AppShell : MonoBehaviour
         foreach (var d in CharaCatalog.All)
         {
             var def = d;
-            var p = CardWidget.Build(content, d, grid.cellSize, false, Collection.Owned(d.Id), Collection.Count(d.Id));
+            var p = CardWidget.Build(content, d, grid.cellSize, false, Collection.Owned(d.Id), Collection.Count(d.Id), true);
             var b = p.Root.gameObject.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
             b.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.5f, 1.3f); ShowDetail(def); });
@@ -368,28 +370,34 @@ public partial class AppShell : MonoBehaviour
 
         _gachaInfo = UiKit.Txt(_gacha, "Info", "", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
         UiKit.Place(_gachaInfo.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -110f), new Vector2(600f, 30f));
-        var one = UiKit.Btn(_gacha, "Pull1", "1回", new Vector2(220f, 70f), false, () => Pull(1), 30);
+        var one = UiKit.Btn(_gacha, "Pull1", "1回  " + Collection.PullCoinCost + "枚", new Vector2(220f, 70f), false, () => Pull(1), 24);
         UiKit.Place(one.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-130f, -180f), new Vector2(220f, 70f));
-        var ten = UiKit.Btn(_gacha, "Pull10", "10連", new Vector2(220f, 70f), true, () => Pull(10), 30);
+        var ten = UiKit.Btn(_gacha, "Pull10", "10連  " + (Collection.PullCoinCost * 10) + "枚", new Vector2(220f, 70f), true, () => Pull(10), 24);
         UiKit.Place(ten.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(130f, -180f), new Vector2(220f, 70f));
         // 交換ポイントでスカウト(1回)
-        var sc = UiKit.Btn(_gacha, "Scout", "スカウト " + Collection.ScoutCost + "pt", new Vector2(210f, 46f), false, () =>
+        var exchange = UiKit.Btn(_gacha, "ExchangeCoins", "300枚 → 15pt", new Vector2(210f, 46f), false, () =>
         {
-            if (Collection.Points < Collection.ScoutCost) { GameAudio.Play(Sfx.Boing, 0.5f, 1.2f); return; }
-            Collection.Points = Collection.Points - Collection.ScoutCost;
-            Pull(1);
+            if (_busy) return;
+            bool exchanged = Collection.ExchangeCoins();
+            GameAudio.Play(exchanged ? Sfx.Catch : Sfx.Boing, 0.6f, 1.2f);
+            RefreshGacha();
         }, 20);
+        UiKit.Place(exchange.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(16f, 16f), new Vector2(210f, 46f));
+        var sc = UiKit.Btn(_gacha, "Scout", "スカウト " + Collection.ScoutCost + "pt", new Vector2(210f, 46f), false, Scout, 20);
         UiKit.Place(sc.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-16f, 16f), new Vector2(210f, 46f));
+        _gachaCoins = UiKit.Txt(_gacha, "Coins", "", 20, UiKit.GoldLight, TextAnchor.MiddleLeft);
+        UiKit.Place(_gachaCoins.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(20f, 68f), new Vector2(210f, 28f));
         _gachaPoints = UiKit.Txt(_gacha, "Points", "", 20, Color.white, TextAnchor.MiddleRight);
-        UiKit.Place(_gachaPoints.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-20f, 68f), new Vector2(240f, 28f));
+        UiKit.Place(_gachaPoints.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-20f, 68f), new Vector2(210f, 28f));
     }
 
-    private Text _gachaPoints;
+    private Text _gachaPoints, _gachaCoins;
 
     private void RefreshGacha()
     {
         int left = Gacha.PityLimit - Collection.PityCount;
         _gachaInfo.text = "★4以上確定まで あと " + left;
+        if (_gachaCoins != null) _gachaCoins.text = "コイン " + Collection.Coins.ToString("N0") + "枚";
         if (_gachaPoints != null) _gachaPoints.text = Collection.Points.ToString("N0") + " pt";
     }
 
@@ -412,6 +420,7 @@ public partial class AppShell : MonoBehaviour
         BgmPlayer.PlayBase(BgmPlayer.Home);
         Only(_home);
         RefreshCards();
+        _homeCoins.text = "コイン " + Collection.Coins.ToString("N0") + "枚";
         _playLabel.text = _gameStarted ? "試合に戻る" : "試合";
         _menuBtn.SetActive(false);
         MenuOpen = true;

@@ -19,6 +19,7 @@ public class UiFx : MonoBehaviour
     private readonly List<P> _live = new List<P>();
     private readonly Stack<P> _pool = new Stack<P>();
     private RectTransform _layer;
+    private readonly Color[] _burstColors = new Color[3];
 
     public static UiFx Create(RectTransform parent)
     {
@@ -115,7 +116,10 @@ public class UiFx : MonoBehaviour
                 Vector2 at = p.Pos;
                 Color bc = p.BurstColor;
                 p.Life = 0f;
-                Burst(at, p.BurstN, new[] { bc, Color.Lerp(bc, Color.white, 0.6f), UiKit.GoldLight }, 380f, 1.3f, 12f, 120f);
+                _burstColors[0] = bc;
+                _burstColors[1] = Color.Lerp(bc, Color.white, 0.6f);
+                _burstColors[2] = UiKit.GoldLight;
+                Burst(at, p.BurstN, _burstColors, 380f, 1.3f, 12f, 120f);
                 GameAudio.Play(Sfx.HitGood, 0.25f, Random.Range(0.5f, 0.7f));
             }
             if (p.Life <= 0f)
