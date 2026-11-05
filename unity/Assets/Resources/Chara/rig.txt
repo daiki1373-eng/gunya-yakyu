@@ -18,6 +18,16 @@ alien elbowR 177 122
 alien wristR 141 60
 alien kneeR 161 186
 alien ankleR 127 318
+alien eyeL 254 67
+alien eyeLSz 12 4
+alien eyeR 289 80
+alien eyeRSz 14 5
+alien mouth 267 106
+alien mouthSz 20 8
+alien browL 261 68
+alien browLSz 15 3
+alien browR 292 74
+alien browRSz 21 7
 bigeater size 512 512
 bigeater box 84 1 427 511
 bigeater flag frontR
@@ -37,6 +47,16 @@ bigeater elbowR 118 166
 bigeater wristR 176 91
 bigeater kneeR 124 262
 bigeater ankleR 148 434
+bigeater eyeL 250 48
+bigeater eyeLSz 11 3
+bigeater eyeR 276 44
+bigeater eyeRSz 12 3
+bigeater mouth 266 70
+bigeater mouthSz 22 9
+bigeater browL 248 40
+bigeater browLSz 15 4
+bigeater browR 277 36
+bigeater browRSz 19 3
 carpenter size 512 512
 carpenter box 101 1 410 510
 carpenter flag frontR
@@ -56,6 +76,16 @@ carpenter elbowR 143 162
 carpenter wristR 161 113
 carpenter kneeR 195 344
 carpenter ankleR 151 445
+carpenter eyeL 251 32
+carpenter eyeLSz 8 3
+carpenter eyeR 268 34
+carpenter eyeRSz 6 3
+carpenter mouth 262 48
+carpenter mouthSz 16 6
+carpenter browL 250 27
+carpenter browLSz 13 3
+carpenter browR 269 29
+carpenter browRSz 8 3
 carpenter batGrip 150 135
 carpenter batTip 223 63
 cat size 512 512
@@ -77,6 +107,9 @@ cat elbowR 255 303
 cat wristR 323 355
 cat kneeR 158 421
 cat ankleR 126 411
+cat eyeL 285 160
+cat eyeR 370 150
+cat mouth 330 195
 ceo size 512 512
 ceo box 73 1 439 510
 ceo flag frontR
@@ -94,6 +127,16 @@ ceo elbowR 124 178
 ceo wristR 134 114
 ceo kneeR 109 252
 ceo ankleR 120 358
+ceo eyeL 224 51
+ceo eyeLSz 10 4
+ceo eyeR 250 42
+ceo eyeRSz 12 3
+ceo mouth 241 68
+ceo mouthSz 28 15
+ceo browL 222 45
+ceo browLSz 13 8
+ceo browR 249 36
+ceo browRSz 18 3
 ceo batGrip 145 97
 ceo batTip 219 46
 ceo batTail 82 143
@@ -116,6 +159,16 @@ chef elbowR 111 137
 chef wristR 157 72
 chef kneeR 170 346
 chef ankleR 130 470
+chef eyeL 241 53
+chef eyeLSz 6 3
+chef eyeR 251 52
+chef eyeRSz 4 3
+chef mouth 256 68
+chef mouthSz 10 6
+chef browL 239 47
+chef browLSz 8 3
+chef browR 250 47
+chef browRSz 5 3
 crow size 512 512
 crow box 80 1 431 510
 crow flag frontR
@@ -130,6 +183,7 @@ crow shoulderR 212 212
 crow hipR 213 342
 crow elbowR 144 280
 crow wristR 106 201
+crow eyeR 272 104
 dad size 512 512
 dad box 87 1 425 511
 dad flag frontR
@@ -149,6 +203,16 @@ dad elbowR 283 81
 dad wristR 350 79
 dad kneeR 195 344
 dad ankleR 122 424
+dad eyeL 218 38
+dad eyeLSz 5 3
+dad eyeR 228 35
+dad eyeRSz 4 3
+dad mouth 234 52
+dad mouthSz 10 7
+dad browL 215 33
+dad browLSz 9 4
+dad browR 226 31
+dad browRSz 4 3
 dad batGrip 354 82
 dad batTip 423 19
 deliveryman size 512 512
@@ -168,6 +232,16 @@ deliveryman elbowR 215 150
 deliveryman wristR 213 70
 deliveryman kneeR 206 305
 deliveryman ankleR 138 398
+deliveryman eyeL 312 155
+deliveryman eyeLSz 10 3
+deliveryman eyeR 337 158
+deliveryman eyeRSz 12 3
+deliveryman mouth 315 180
+deliveryman mouthSz 25 11
+deliveryman browL 313 148
+deliveryman browLSz 13 3
+deliveryman browR 340 151
+deliveryman browRSz 18 5
 deliveryrobot size 512 512
 deliveryrobot box 90 1 421 510
 deliveryrobot flag frontR
@@ -183,6 +257,9 @@ deliveryrobot elbowR 315 300
 deliveryrobot wristR 312 325
 deliveryrobot hipL 160 380
 deliveryrobot hipR 270 380
+deliveryrobot eyeL 175 134
+deliveryrobot eyeR 260 134
+deliveryrobot mouth 215 183
 doctor size 512 512
 doctor box 81 1 430 511
 doctor flag frontR
@@ -202,6 +279,16 @@ doctor elbowR 112 143
 doctor wristR 208 217
 doctor kneeR 126 204
 doctor ankleR 134 400
+doctor eyeL 242 102
+doctor eyeLSz 11 3
+doctor eyeR 270 106
+doctor eyeRSz 12 3
+doctor mouth 253 130
+doctor mouthSz 21 6
+doctor browL 242 95
+doctor browLSz 17 5
+doctor browR 271 97
+doctor browRSz 17 3
 dog size 512 512
 dog box 84 1 427 510
 dog flag frontR
@@ -221,6 +308,9 @@ dog elbowR 146 266
 dog wristR 143 337
 dog kneeR 180 404
 dog ankleR 197 463
+dog eyeL 187 91
+dog eyeR 267 91
+dog mouth 238 145
 dogu size 512 512
 dogu box 80 2 431 510
 dogu flag frontL
@@ -237,6 +327,16 @@ dogu shoulderR 199 260
 dogu hipR 230 359
 dogu kneeR 222 479
 dogu ankleR 220 465
+dogu eyeL 233 130
+dogu eyeLSz 42 18
+dogu eyeR 332 130
+dogu eyeRSz 41 17
+dogu mouth 284 196
+dogu mouthSz 64 17
+dogu browL 234 100
+dogu browLSz 56 12
+dogu browR 333 99
+dogu browRSz 55 10
 dogu batGrip 345 322
 dogu batTip 88 242
 dragon size 512 512
@@ -275,6 +375,16 @@ farmer elbowR 192 162
 farmer wristR 175 117
 farmer kneeR 228 342
 farmer ankleR 241 418
+farmer eyeL 260 46
+farmer eyeLSz 8 3
+farmer eyeR 280 42
+farmer eyeRSz 9 3
+farmer mouth 274 65
+farmer mouthSz 22 12
+farmer browL 258 40
+farmer browLSz 12 3
+farmer browR 281 36
+farmer browRSz 14 3
 farmer batGrip 171 109
 farmer batTip 343 51
 fisherman size 512 512
@@ -297,6 +407,9 @@ fisherman kneeR 145 346
 fisherman ankleR 133 367
 fisherman batGrip 145 80
 fisherman batTip 82 177
+fisherman eyeL 237 79
+fisherman eyeR 321 79
+fisherman mouth 284 131
 fortuneteller size 512 512
 fortuneteller box 84 1 427 511
 fortuneteller flag frontL
@@ -316,6 +429,16 @@ fortuneteller elbowR 105 201
 fortuneteller wristR 179 151
 fortuneteller kneeR 154 233
 fortuneteller ankleR 193 407
+fortuneteller eyeL 257 102
+fortuneteller eyeLSz 13 3
+fortuneteller eyeR 287 103
+fortuneteller eyeRSz 12 3
+fortuneteller mouth 272 132
+fortuneteller mouthSz 22 7
+fortuneteller browL 256 94
+fortuneteller browLSz 20 3
+fortuneteller browR 289 95
+fortuneteller browRSz 18 3
 ghost size 512 512
 ghost box 76 0 433 511
 ghost flag frontR
@@ -335,6 +458,16 @@ ghost elbowR 260 202
 ghost wristR 341 194
 ghost kneeR 164 369
 ghost ankleR 110 472
+ghost eyeL 256 86
+ghost eyeLSz 12 3
+ghost eyeR 284 94
+ghost eyeRSz 12 4
+ghost mouth 262 112
+ghost mouthSz 22 9
+ghost browL 258 79
+ghost browLSz 17 4
+ghost browR 288 88
+ghost browRSz 14 7
 ghost batGrip 349 191
 ghost batTip 429 8
 grandma size 512 512
@@ -355,6 +488,16 @@ grandma elbowR 214 147
 grandma wristR 161 100
 grandma kneeR 229 290
 grandma ankleR 145 433
+grandma eyeL 268 76
+grandma eyeLSz 15 7
+grandma eyeR 309 60
+grandma eyeRSz 16 5
+grandma mouth 291 92
+grandma mouthSz 40 15
+grandma browL 265 64
+grandma browLSz 17 12
+grandma browR 307 48
+grandma browRSz 26 5
 guard size 512 512
 guard box 170 1 340 511
 guard flag frontR
@@ -374,6 +517,16 @@ guard elbowR 219 170
 guard wristR 273 221
 guard kneeR 218 337
 guard ankleR 195 452
+guard eyeL 255 51
+guard eyeLSz 8 3
+guard eyeR 270 51
+guard eyeRSz 6 3
+guard mouth 267 66
+guard mouthSz 13 4
+guard browL 253 46
+guard browLSz 12 3
+guard browR 270 46
+guard browRSz 8 3
 guard batGrip 277 219
 guard batTip 288 494
 helper size 512 512
@@ -395,6 +548,16 @@ helper elbowR 146 183
 helper wristR 154 122
 helper kneeR 179 359
 helper ankleR 204 458
+helper eyeL 253 47
+helper eyeLSz 12 4
+helper eyeR 279 49
+helper eyeRSz 12 4
+helper mouth 264 75
+helper mouthSz 30 18
+helper browL 252 39
+helper browLSz 17 3
+helper browR 281 41
+helper browRSz 16 5
 helper batGrip 160 109
 helper batTip 343 46
 heroine size 512 512
@@ -416,6 +579,16 @@ heroine elbowR 194 174
 heroine wristR 195 127
 heroine kneeR 246 346
 heroine ankleR 224 413
+heroine eyeL 245 81
+heroine eyeLSz 12 5
+heroine eyeR 270 75
+heroine eyeRSz 12 6
+heroine mouth 260 101
+heroine mouthSz 20 6
+heroine browL 241 75
+heroine browLSz 16 3
+heroine browR 269 67
+heroine browRSz 17 4
 heroine batGrip 208 109
 heroine batTip 149 143
 housewife size 512 512
@@ -437,6 +610,16 @@ housewife elbowR 291 93
 housewife wristR 352 51
 housewife kneeR 196 340
 housewife ankleR 130 452
+housewife eyeL 210 44
+housewife eyeLSz 11 3
+housewife eyeR 231 38
+housewife eyeRSz 8 3
+housewife mouth 230 62
+housewife mouthSz 20 16
+housewife browL 207 37
+housewife browLSz 15 7
+housewife browR 229 32
+housewife browRSz 10 3
 housewife batGrip 366 48
 housewife batTip 217 42
 idol size 512 512
@@ -458,6 +641,16 @@ idol elbowR 218 197
 idol wristR 157 239
 idol kneeR 264 364
 idol ankleR 224 366
+idol eyeL 237 73
+idol eyeLSz 11 3
+idol eyeR 261 68
+idol eyeRSz 12 4
+idol mouth 254 95
+idol mouthSz 22 11
+idol browL 234 66
+idol browLSz 14 3
+idol browR 261 61
+idol browRSz 16 3
 idol batGrip 151 242
 idol batTip 202 402
 idol batTail 134 208
@@ -480,6 +673,16 @@ legend-grandpa elbowR 138 250
 legend-grandpa wristR 147 187
 legend-grandpa kneeR 196 283
 legend-grandpa ankleR 171 455
+legend-grandpa eyeL 249 68
+legend-grandpa eyeLSz 17 4
+legend-grandpa eyeR 293 67
+legend-grandpa eyeRSz 18 4
+legend-grandpa mouth 266 96
+legend-grandpa mouthSz 46 25
+legend-grandpa browL 249 60
+legend-grandpa browLSz 24 6
+legend-grandpa browR 296 58
+legend-grandpa browRSz 28 6
 legend-grandpa batGrip 149 177
 legend-grandpa batTip 57 274
 legend-grandpa batTail 229 23
@@ -502,11 +705,22 @@ magical elbowR 198 140
 magical wristR 154 172
 magical kneeR 192 337
 magical ankleR 131 451
+magical eyeL 249 67
+magical eyeLSz 9 3
+magical eyeR 268 62
+magical eyeRSz 7 3
+magical mouth 268 81
+magical mouthSz 14 7
+magical browL 247 60
+magical browLSz 14 6
+magical browR 267 56
+magical browRSz 9 3
 magical batGrip 331 120
 magical batTip 377 51
 magical batTail 389 183
 magician size 512 512
 magician box 49 0 461 510
+magician flag noface
 magician flag frontL
 magician neck 221 174
 magician pelvis 274 252
@@ -541,6 +755,16 @@ mannequin elbowR 280 165
 mannequin wristR 353 127
 mannequin kneeR 206 387
 mannequin ankleR 122 458
+mannequin eyeL 193 82
+mannequin eyeLSz 8 3
+mannequin eyeR 213 76
+mannequin eyeRSz 10 3
+mannequin mouth 209 102
+mannequin mouthSz 21 10
+mannequin browL 190 77
+mannequin browLSz 11 4
+mannequin browR 213 69
+mannequin browRSz 16 4
 mannequin batGrip 357 120
 mannequin batTip 294 11
 monk size 512 512
@@ -562,6 +786,16 @@ monk elbowR 194 179
 monk wristR 188 255
 monk kneeR 222 364
 monk ankleR 218 471
+monk eyeL 252 34
+monk eyeLSz 8 3
+monk eyeR 270 34
+monk eyeRSz 8 3
+monk mouth 261 52
+monk mouthSz 15 4
+monk browL 251 29
+monk browLSz 12 3
+monk browR 271 29
+monk browRSz 12 3
 monk batGrip 189 259
 monk batTip 143 448
 ninja size 512 512
@@ -602,6 +836,16 @@ ojisan elbowR 168 105
 ojisan wristR 145 36
 ojisan kneeR 168 400
 ojisan ankleR 190 485
+ojisan eyeL 245 81
+ojisan eyeLSz 12 3
+ojisan eyeR 278 78
+ojisan eyeRSz 15 3
+ojisan mouth 260 116
+ojisan mouthSz 38 42
+ojisan browL 244 72
+ojisan browLSz 18 5
+ojisan browR 280 69
+ojisan browRSz 22 4
 ojisan batGrip 134 25
 ojisan batTip 117 62
 pumpkin size 512 512
@@ -625,6 +869,9 @@ pumpkin kneeR 172 366
 pumpkin ankleR 213 415
 pumpkin batGrip 194 160
 pumpkin batTip 326 86
+pumpkin eyeL 204 59
+pumpkin eyeR 247 56
+pumpkin mouth 225 85
 rainman size 512 512
 rainman box 172 2 339 510
 rainman flag frontR
@@ -644,6 +891,16 @@ rainman elbowR 198 193
 rainman wristR 187 272
 rainman kneeR 220 356
 rainman ankleR 223 456
+rainman eyeL 236 58
+rainman eyeLSz 8 3
+rainman eyeR 255 55
+rainman eyeRSz 8 3
+rainman mouth 249 76
+rainman mouthSz 16 5
+rainman browL 234 53
+rainman browLSz 12 3
+rainman browR 256 49
+rainman browRSz 13 3
 robot size 512 512
 robot box 45 1 465 509
 robot flag frontL
@@ -663,6 +920,9 @@ robot ankleL 95 440
 robot hipR 290 380
 robot kneeR 345 430
 robot ankleR 368 470
+robot eyeL 207 102
+robot eyeR 289 102
+robot mouth 246 164
 robot-gold size 512 512
 robot-gold box 96 1 415 510
 robot-gold flag frontR
@@ -685,6 +945,9 @@ robot-gold ankleR 214 431
 robot-gold batGrip 139 154
 robot-gold batTip 311 80
 robot-gold batTail 99 171
+robot-gold eyeL 225 94
+robot-gold eyeR 261 91
+robot-gold mouth 243 112
 rookie size 512 512
 rookie box 76 1 433 510
 rookie flag frontR
@@ -704,6 +967,16 @@ rookie elbowR 202 192
 rookie wristR 261 162
 rookie kneeR 213 358
 rookie ankleR 172 453
+rookie eyeL 277 57
+rookie eyeLSz 14 5
+rookie eyeR 306 62
+rookie eyeRSz 12 6
+rookie mouth 294 86
+rookie mouthSz 21 14
+rookie browL 276 46
+rookie browLSz 21 3
+rookie browR 307 52
+rookie browRSz 13 6
 salaryman size 512 512
 salaryman box 100 1 411 511
 salaryman flag frontL
@@ -723,6 +996,16 @@ salaryman elbowR 182 161
 salaryman wristR 157 247
 salaryman kneeR 209 335
 salaryman ankleR 149 461
+salaryman eyeL 240 32
+salaryman eyeLSz 8 3
+salaryman eyeR 257 28
+salaryman eyeRSz 7 3
+salaryman mouth 257 48
+salaryman mouthSz 16 11
+salaryman browL 237 27
+salaryman browLSz 12 5
+salaryman browR 256 23
+salaryman browRSz 9 3
 santa size 512 512
 santa box 26 1 486 510
 santa flag frontL
@@ -742,6 +1025,16 @@ santa elbowR 157 234
 santa wristR 124 186
 santa kneeR 121 427
 santa ankleR 114 484
+santa eyeL 217 76
+santa eyeLSz 12 5
+santa eyeR 248 69
+santa eyeRSz 15 4
+santa mouth 237 109
+santa mouthSz 34 29
+santa browL 214 66
+santa browLSz 15 6
+santa browR 248 57
+santa browRSz 25 3
 slacker size 512 512
 slacker box 64 0 447 511
 slacker flag frontR
@@ -761,6 +1054,16 @@ slacker elbowR 202 186
 slacker wristR 264 159
 slacker kneeR 132 189
 slacker ankleR 116 310
+slacker eyeL 303 106
+slacker eyeLSz 6 3
+slacker eyeR 319 100
+slacker eyeRSz 8 3
+slacker mouth 314 122
+slacker mouthSz 15 7
+slacker browL 301 102
+slacker browLSz 7 5
+slacker browR 318 94
+slacker browRSz 14 4
 sleepyhead size 512 512
 sleepyhead box 95 1 415 510
 sleepyhead flag frontR
@@ -780,6 +1083,16 @@ sleepyhead elbowR 180 39
 sleepyhead wristR 200 48
 sleepyhead kneeR 184 195
 sleepyhead ankleR 181 330
+sleepyhead eyeL 263 51
+sleepyhead eyeLSz 8 3
+sleepyhead eyeR 281 42
+sleepyhead eyeRSz 8 3
+sleepyhead mouth 284 66
+sleepyhead mouthSz 16 13
+sleepyhead browL 260 46
+sleepyhead browLSz 11 7
+sleepyhead browR 279 37
+sleepyhead browRSz 12 5
 snowman size 512 512
 snowman box 88 2 423 510
 snowman flag frontR
@@ -799,6 +1112,16 @@ snowman elbowR 164 216
 snowman wristR 138 160
 snowman kneeR 188 348
 snowman ankleR 215 450
+snowman eyeL 233 91
+snowman eyeLSz 16 5
+snowman eyeR 274 88
+snowman eyeRSz 18 5
+snowman mouth 251 125
+snowman mouthSz 33 11
+snowman browL 231 79
+snowman browLSz 25 5
+snowman browR 276 77
+snowman browRSz 28 4
 snowman batGrip 131 145
 snowman batTip 206 82
 snowman batTail 97 174
@@ -821,6 +1144,16 @@ stationstaff elbowR 198 93
 stationstaff wristR 161 68
 stationstaff kneeR 194 332
 stationstaff ankleR 135 444
+stationstaff eyeL 238 48
+stationstaff eyeLSz 9 3
+stationstaff eyeR 258 46
+stationstaff eyeRSz 9 3
+stationstaff mouth 249 68
+stationstaff mouthSz 14 9
+stationstaff browL 236 42
+stationstaff browLSz 12 3
+stationstaff browR 259 40
+stationstaff browRSz 12 3
 stationstaff batGrip 368 185
 stationstaff batTip 402 82
 student size 512 512
@@ -842,6 +1175,16 @@ student elbowR 188 163
 student wristR 196 115
 student kneeR 214 326
 student ankleR 147 454
+student eyeL 269 32
+student eyeLSz 8 3
+student eyeR 284 38
+student eyeRSz 6 3
+student mouth 274 55
+student mouthSz 16 12
+student browL 270 26
+student browLSz 13 3
+student browR 286 33
+student browRSz 7 3
 student batGrip 343 109
 student batTip 171 57
 sumo size 512 512
@@ -863,6 +1206,16 @@ sumo elbowR 124 84
 sumo wristR 159 28
 sumo kneeR 177 342
 sumo ankleR 132 451
+sumo eyeL 264 67
+sumo eyeLSz 8 3
+sumo eyeR 282 71
+sumo eyeRSz 7 3
+sumo mouth 276 88
+sumo mouthSz 20 15
+sumo browL 264 62
+sumo browLSz 13 3
+sumo browR 282 66
+sumo browRSz 9 3
 suntan size 512 512
 suntan box 98 1 413 511
 suntan flag frontL
@@ -882,6 +1235,16 @@ suntan elbowR 192 135
 suntan wristR 169 113
 suntan kneeR 197 325
 suntan ankleR 133 450
+suntan eyeL 240 36
+suntan eyeLSz 9 3
+suntan eyeR 261 30
+suntan eyeRSz 8 3
+suntan mouth 257 52
+suntan mouthSz 21 12
+suntan browL 237 29
+suntan browLSz 13 7
+suntan browR 260 24
+suntan browRSz 12 3
 suntan batGrip 362 103
 suntan batTip 197 74
 tanuki size 512 512
@@ -903,6 +1266,16 @@ tanuki elbowR 155 229
 tanuki wristR 121 183
 tanuki kneeR 205 333
 tanuki ankleR 202 436
+tanuki eyeL 256 102
+tanuki eyeLSz 24 8
+tanuki eyeR 312 101
+tanuki eyeRSz 23 7
+tanuki mouth 286 146
+tanuki mouthSz 48 28
+tanuki browL 253 84
+tanuki browLSz 35 8
+tanuki browR 314 84
+tanuki browRSz 31 7
 tanuki batGrip 126 174
 tanuki batTip 343 19
 tanuki batTail 80 200
@@ -925,6 +1298,16 @@ teacher elbowR 129 116
 teacher wristR 173 57
 teacher kneeR 192 331
 teacher ankleR 148 451
+teacher eyeL 200 42
+teacher eyeLSz 6 3
+teacher eyeR 216 38
+teacher eyeRSz 7 3
+teacher mouth 212 57
+teacher mouthSz 14 7
+teacher browL 198 37
+teacher browLSz 9 3
+teacher browR 216 33
+teacher browRSz 11 3
 thirdtwin size 512 512
 thirdtwin box 118 1 393 510
 thirdtwin flag frontR
@@ -944,6 +1327,16 @@ thirdtwin elbowR 159 87
 thirdtwin wristR 204 38
 thirdtwin kneeR 191 330
 thirdtwin ankleR 161 459
+thirdtwin eyeL 233 37
+thirdtwin eyeLSz 8 3
+thirdtwin eyeR 248 34
+thirdtwin eyeRSz 6 3
+thirdtwin mouth 247 55
+thirdtwin mouthSz 15 8
+thirdtwin browL 231 33
+thirdtwin browLSz 11 4
+thirdtwin browR 248 28
+thirdtwin browRSz 9 3
 twins size 512 512
 twins box 70 2 440 509
 twins flag frontL
@@ -983,3 +1376,13 @@ umpire shoulderR 169 294
 umpire hipR 181 413
 umpire elbowR 105 298
 umpire wristR 82 355
+umpire eyeL 245 220
+umpire eyeLSz 17 3
+umpire eyeR 278 222
+umpire eyeRSz 10 3
+umpire mouth 272 248
+umpire mouthSz 22 12
+umpire browL 243 209
+umpire browLSz 24 3
+umpire browR 278 212
+umpire browRSz 13 3

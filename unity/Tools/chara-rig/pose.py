@@ -52,8 +52,17 @@ def main():
         for nm, s in (('handL', 91), ('handR', 112)):
             hp = pts[s:s+21]; hs = sc[s:s+21]
             d[nm] = [round(float(hp[:, 0].mean()), 1), round(float(hp[:, 1].mean()), 1), round(float(hs.mean()), 2)]
+        # 顔68点(23〜90)。目・口・眉の中心と大きさ
+        fp = pts[23:91]; fs = sc[23:91]
+        def grp(a, b):
+            g = fp[a:b]; gs = fs[a:b]
+            return [round(float(g[:, 0].mean()), 1), round(float(g[:, 1].mean()), 1),
+                    round(float(g[:, 0].max() - g[:, 0].min()), 1), round(float(g[:, 1].max() - g[:, 1].min()), 1),
+                    round(float(gs.mean()), 2)]
+        d['face'] = {'eyeA': grp(36, 42), 'eyeB': grp(42, 48), 'browA': grp(17, 22), 'browB': grp(22, 27),
+                     'mouth': grp(48, 60), 'jaw': grp(0, 17)}
         res[f[:-4]] = d
-        print(f[:-4], ' '.join(f'{n}:{d[n][2]}' for n in ('shoulderL','wristR','hipL','ankleR')), flush=True)
+        print(f[:-4], 'face', d['face']['eyeA'][4], d['face']['eyeB'][4], d['face']['mouth'][4], flush=True)
     json.dump(res, open(out, 'w'), indent=1, ensure_ascii=False)
 
 if __name__ == '__main__':

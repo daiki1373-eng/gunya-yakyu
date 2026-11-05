@@ -28,7 +28,13 @@ def main():
                 if a in j and c in j:
                     dr.line([P(a), P(c)], fill=col, width=3)
             for n in j:
-                p = P(n); dr.ellipse([p[0]-3, p[1]-3, p[0]+3, p[1]+3], fill=(0, 0, 0))
+                if n.endswith('Sz'): continue
+                p = P(n)
+                if n + 'Sz' in j:
+                    w, h = j[n + 'Sz'][0]*s/2, j[n + 'Sz'][1]*s/2
+                    dr.ellipse([p[0]-w, p[1]-h, p[0]+w, p[1]+h], outline=(0, 255, 0) if n.startswith('eye') else (255, 0, 255) if n == 'mouth' else (0, 160, 255), width=2)
+                    continue
+                dr.ellipse([p[0]-3, p[1]-3, p[0]+3, p[1]+3], fill=(0, 0, 0))
             dr.text((x0 + 2, y0 + H - 24), cid + (' *' if rig[cid].get('manual') else ''), fill=(0, 0, 0))
         sheet.save(f'{out}{part}.jpg', quality=88)
 

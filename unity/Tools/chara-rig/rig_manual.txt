@@ -125,3 +125,30 @@ ninja kneeR 350 380
 ninja ankleR 290 450
 # 上半身寄りの絵なので小さめに
 umpire scale 0.72
+# 顔(目・口)。自動推定できなかった・ずれたキャラ。eyeL/eyeR は画像の左右、片目だけでもよい
+alien eyeL 254 67
+alien eyeR 289 80
+alien mouth 267 106
+cat eyeL 285 160
+cat eyeR 370 150
+cat mouth 330 195
+crow eyeR 272 104
+dog eyeL 187 91
+dog eyeR 267 91
+dog mouth 238 145
+fisherman eyeL 237 79
+fisherman eyeR 321 79
+fisherman mouth 284 131
+robot eyeL 207 102
+robot eyeR 289 102
+robot mouth 246 164
+robot-gold eyeL 225 94
+robot-gold eyeR 261 91
+robot-gold mouth 243 112
+pumpkin eyeL 204 59
+pumpkin eyeR 247 56
+pumpkin mouth 225 85
+deliveryrobot eyeL 175 134
+deliveryrobot eyeR 260 134
+deliveryrobot mouth 215 183
+magician flag noface

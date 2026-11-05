@@ -33,7 +33,21 @@ def auto(d):
             j['wrist'+s] = w
         if ok('knee'+s): j['knee'+s] = P('knee'+s)
         if ok('knee'+s) and ok('ankle'+s): j['ankle'+s] = P('ankle'+s)
+    # 顔(目・口・眉)。自信が低いキャラは書かない(実行時に頭の骨から推定)
+    fc = d.get('face')
+    if fc:
+        conf = min(fc['eyeA'][4], fc['eyeB'][4], fc['mouth'][4])
+        if conf >= FACE_TH:
+            ea, eb = fc['eyeA'], fc['eyeB']
+            if ea[0] > eb[0]: ea, eb = eb, ea
+            ba, bb = fc['browA'], fc['browB']
+            if ba[0] > bb[0]: ba, bb = bb, ba
+            for nm, g in (('eyeL', ea), ('eyeR', eb), ('mouth', fc['mouth']), ('browL', ba), ('browR', bb)):
+                j[nm] = (g[0], g[1])
+                j[nm + 'Sz'] = (max(g[2], 4.0), max(g[3], 3.0))
     return j
+
+FACE_TH = 0.5
 
 def main():
     raw = json.load(open(sys.argv[1]))
@@ -50,6 +64,9 @@ def main():
             rig[cid]['manual'] = True
             for k, v in m.items():
                 if k not in ('j', 'replace'): rig[cid][k] = v
+        if rig[cid].get('noface'):
+            for nm in ('eyeL', 'eyeR', 'mouth', 'browL', 'browR'):
+                rig[cid]['j'].pop(nm, None); rig[cid]['j'].pop(nm + 'Sz', None)
         if not rig[cid]['j']: del rig[cid]
         else:
             # 前に出す腕(打者=バットを振る腕/投手=投げる腕)。バットを握る側、なければ手が高い側

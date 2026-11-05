@@ -39,6 +39,7 @@ public class RagdollPlayer : MonoBehaviour
     public RigSkin Skin { get; private set; }
     public bool BatThrown { get; private set; }
     public float HeadPopScale { get; private set; }
+    public Expr CurrentExpr { get { return _expr; } }
 
     // 元絵の体を使うときは、ラグドールの絵(胴・腕・脚・顔・飾り)を消して当たり判定だけ残す
     private void HideBodyArt(bool keepBat)

@@ -35,3 +35,18 @@ python Tools/chara-rig/preview.py Assets/Resources/Chara/Cut Assets/Resources/Ch
 - バットなどの持ち物は `batGrip`(握る手)/`batTip`(先端)/`batTail`(反対の端)を書くと、手に付いて一緒に動く
 - 上半身だけの絵などで大きさが合わないときは `id scale 0.7` のように補正
 - 振る腕(打者)・投げる腕(投手)は自動で決める(バットを握る腕、なければ手が高い腕)。逆なら `id flag frontL` / `frontR`
+
+## 表情(どのキャラでも同じ仕組み)
+
+`Scripts/Batting/RigSkinFace.cs`。表情5種(普段/集中/驚き/喜び/目が回る)を、元絵1枚から作る。
+
+- 顔の部分だけ細かい網目(3px)を重ね、目・口・眉のまわりを伸び縮みさせる
+  - 集中: 目を細めて眉を下げる + こめかみに汗
+  - 驚き: 目を見開き口を縦に大きく開け、頭がびよんと伸びる + 驚き線・びっくりマーク
+  - 喜び: 目を細めて(笑い目)口を広げ、頭が弾む + 頬の赤み・キラキラ
+  - 目が回る: 目を細め頭がぐらぐら + 頭の上を星が回る
+  - 普段: ときどきまばたき
+- 目・口・眉の位置は pose.py が顔の68点から自動で出す(`eyeL/eyeR/mouth/browL/browR`)。
+  人の顔でない絵で自動推定できないときは rig_manual.txt に `id eyeL x y` などを書く(片目だけでも可)。
+  顔が分からないキャラは記号と頭の伸び縮みだけになる。ずれる絵は `id flag noface` で目口の変形を止められる
+- 確認: 再生中に `FaceShot.Run(new[]{"monk","dog"})` → `Recordings/faces/<id>.png` に5表情が並ぶ

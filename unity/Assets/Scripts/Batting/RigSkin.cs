@@ -5,7 +5,7 @@ using UnityEngine;
 // 画像を細かい網目(メッシュ)にして、各点を近くの骨(腕・脚・胴・頭・バット)に重み付けし、
 // ラグドールの各パーツの「最初の姿勢からの回転」を元絵の関節まわりに当てて毎フレーム変形する。
 // → 立ち姿は元絵のまま、振る・投げる・転ぶ・歩くはラグドールの動きに追従する。
-public class RigSkin : MonoBehaviour
+public partial class RigSkin : MonoBehaviour
 {
     private class Bone
     {
@@ -21,6 +21,8 @@ public class RigSkin : MonoBehaviour
         public float Ang;              // 回転(度)
         public Vector2 Cur;            // 関節の今の位置
         public float Scale = 1f;
+        public Vector2 Sq = Vector2.one;   // 表情での伸び縮み(頭)
+        public float Extra;                // 表情での追加の傾き(頭)
     }
 
     private RagdollPlayer _p;
@@ -38,6 +40,7 @@ public class RigSkin : MonoBehaviour
     public bool HasPaintedBat { get { return _batBone >= 0 || _paintedBat; } }
     private bool _paintedBat;
 
+    private int _headBone = 2;
     private int _farmF = -1;
     private Vector2 _wristF;
     private Transform _batVis;
@@ -118,6 +121,7 @@ public class RigSkin : MonoBehaviour
         if (Has("shoulderL") && Has("shoulderR")) Seg(iChest, J("shoulderL"), J("shoulderR"));
         if (Has("chest")) Seg(iChest, J("chest"), neck);
         int iHead = AddBone(p.Head, iChest, neck, 7);
+        _headBone = iHead;
         Vector2 head = Has("head") ? J("head") : neck + (neck - pel) * 0.5f;
         Seg(iHead, Vector2.Lerp(neck, head, 0.15f), head);
 
@@ -153,6 +157,7 @@ public class RigSkin : MonoBehaviour
         }
 
         BuildMesh(spr);
+        BuildFace(spr);
     }
 
     private int Arm(string s, Rigidbody2D up, Rigidbody2D fore, int parent, int layer)
@@ -180,6 +185,31 @@ public class RigSkin : MonoBehaviour
         Seg(fo, kn, an + (an - kn) * 0.25f);
     }
 
+    private float _wScale;
+
+    // 画素 px の骨の重み(上位3本)を bi/bw の v 番目に書く
+    private void Weights(Vector2 px, float scale, float[] w, int[] bi, float[] bw, int v)
+    {
+        int nb = _bones.Count;
+        for (int b = 0; b < nb; b++)
+        {
+            float d = 1e9f;
+            var sg = _bones[b].Seg;
+            for (int s = 0; s + 1 < sg.Count; s += 2) d = Mathf.Min(d, SegDist(px, sg[s], sg[s + 1]));
+            d = Mathf.Max(d, 3f) / scale;
+            float d2 = d * d; w[b] = sg.Count == 0 ? 0f : 1f / (d2 * d2 * d2);   // 6乗: 骨の近くはほぼその骨だけに付く
+        }
+        for (int k = 0; k < 3; k++)
+        {
+            int best = -1; float bv = -1f;
+            for (int b = 0; b < nb; b++) if (w[b] > bv) { bv = w[b]; best = b; }
+            bi[v * 3 + k] = Mathf.Max(0, best); bw[v * 3 + k] = Mathf.Max(0f, bv);
+            if (best >= 0) w[best] = -1f;
+        }
+        float sum = bw[v * 3] + bw[v * 3 + 1] + bw[v * 3 + 2];
+        for (int k = 0; k < 3; k++) bw[v * 3 + k] = sum > 0f ? bw[v * 3 + k] / sum : (k == 0 ? 1f : 0f);
+    }
+
     private static float SegDist(Vector2 p, Vector2 a, Vector2 b)
     {
         Vector2 ab = b - a;
@@ -204,8 +234,8 @@ public class RigSkin : MonoBehaviour
         var tex = spr.texture;
         Rect tr = spr.textureRect;
         float scale = 0.5f * _rig.Size.y / Mathf.Max(64f, box.w - box.y);   // 骨の太さの目安
-        int nb = _bones.Count;
-        var w = new float[nb];
+        _wScale = scale;
+        var w = new float[_bones.Count];
         for (int j = 0; j < ny; j++)
             for (int i = 0; i < nx; i++)
             {
@@ -214,24 +244,7 @@ public class RigSkin : MonoBehaviour
                 _rest[v] = ToWorldRest(px);
                 uv[v] = new Vector2((tr.x + px.x / _rig.Size.x * tr.width) / tex.width,
                                     (tr.y + (1f - px.y / _rig.Size.y) * tr.height) / tex.height);
-                for (int b = 0; b < nb; b++)
-                {
-                    float d = 1e9f;
-                    var sg = _bones[b].Seg;
-                    for (int s = 0; s + 1 < sg.Count; s += 2) d = Mathf.Min(d, SegDist(px, sg[s], sg[s + 1]));
-                    d = Mathf.Max(d, 3f) / scale;
-                    float d2 = d * d; w[b] = sg.Count == 0 ? 0f : 1f / (d2 * d2 * d2);   // 6乗: 骨の近くはほぼその骨だけに付く
-                }
-                // 上位3本
-                for (int k = 0; k < 3; k++)
-                {
-                    int best = -1; float bv = -1f;
-                    for (int b = 0; b < nb; b++) if (w[b] > bv) { bv = w[b]; best = b; }
-                    _bi[v * 3 + k] = best; _bw[v * 3 + k] = Mathf.Max(0f, bv);
-                    if (best >= 0) w[best] = -1f;
-                }
-                float sum = _bw[v * 3] + _bw[v * 3 + 1] + _bw[v * 3 + 2];
-                for (int k = 0; k < 3; k++) _bw[v * 3 + k] = sum > 0f ? _bw[v * 3 + k] / sum : (k == 0 ? 1f : 0f);
+                Weights(px, scale, w, _bi, _bw, v);
             }
 
         // 三角形は骨の前後(レイヤー)順に並べる(後ろ脚→後ろ腕→腰→胸→前脚→前腕→頭→バット)
@@ -333,7 +346,7 @@ public class RigSkin : MonoBehaviour
     private Vector2 Apply(int b, Vector2 restWorld)
     {
         var bo = _bones[b];
-        return Rot((restWorld - bo.Pivot) * bo.Scale, bo.Ang) + bo.Cur;
+        return Rot(Vector2.Scale(restWorld - bo.Pivot, bo.Sq) * bo.Scale, bo.Ang + bo.Extra) + bo.Cur;
     }
 
     private void Pose()
@@ -359,7 +372,7 @@ public class RigSkin : MonoBehaviour
                 bo.Cur = bo.Pivot + (now - _pelRest);
             }
             else bo.Cur = Apply(bo.Parent, bo.Pivot);
-            bo.Scale = (b == 2) ? _p.HeadPopScale : 1f;
+            bo.Scale = (b == _headBone) ? _p.HeadPopScale : 1f;
         }
         var root = transform;
         float z = 0f;
@@ -381,10 +394,12 @@ public class RigSkin : MonoBehaviour
     private void LateUpdate()
     {
         if (_mesh == null || _p == null) return;
+        FaceState(Time.timeScale > 0f ? Time.deltaTime : Mathf.Min(Time.unscaledDeltaTime, 0.05f));   // 一時停止中も表情は動かす
         Pose();
         AttachBat();
         _mesh.vertices = _verts;
         UpdateSeams();
+        FaceDraw();
         _mesh.RecalculateBounds();
     }
 }
