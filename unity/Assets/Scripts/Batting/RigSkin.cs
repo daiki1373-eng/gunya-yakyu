@@ -5,11 +5,40 @@ using UnityEngine;
 // 画像を細かい網目(メッシュ)にして、各点を近くの骨(腕・脚・胴・頭・バット)に重み付けし、
 // ラグドールの各パーツの「最初の姿勢からの回転」を元絵の関節まわりに当てて毎フレーム変形する。
 // → 立ち姿は元絵のまま、振る・投げる・転ぶ・歩くはラグドールの動きに追従する。
+// 動かす骨の出どころ。ラグドール(物理)でも、コードで角度を付ける人形(守備・走者)でもよい。
+// 位置と角度は Space(この中に網目を置く)から見た2Dの値として使う。
+public class RigBody
+{
+    public Transform Space;
+    public Transform Pelvis, Chest, Head, ArmFU, ArmFF, ArmBU, ArmBF, LegFU, LegFF, LegBU, LegBF, Bat;
+    public SpriteRenderer BatSprite;
+    public float Facing = 1f;
+    public System.Func<float> HeadPop = () => 1f;
+    public System.Func<bool> BatThrown = () => false;
+    public System.Func<Expr> Expression = () => Expr.Normal;
+    public int Layer;
+    public int Order = 6;
+    public bool Light;            // 遠くの選手用: 網目を粗く、顔の変形・記号なし
+
+    public static RigBody From(RagdollPlayer p)
+    {
+        return new RigBody
+        {
+            Space = p.transform, Pelvis = p.Pelvis.transform, Chest = p.Chest.transform, Head = p.Head.transform,
+            ArmFU = p.ArmFrontUpper.transform, ArmFF = p.ArmFrontFore.transform, ArmBU = p.ArmBackUpper.transform, ArmBF = p.ArmBackFore.transform,
+            LegFU = p.LegFrontUpper.transform, LegFF = p.LegFrontFore.transform, LegBU = p.LegBackUpper.transform, LegBF = p.LegBackFore.transform,
+            Bat = p.Bat != null ? p.Bat.transform : null,
+            BatSprite = p.Bat != null ? p.Bat.GetComponentInChildren<SpriteRenderer>() : null,
+            Facing = p.Facing, HeadPop = () => p.HeadPopScale, BatThrown = () => p.BatThrown, Expression = () => p.CurrentExpr,
+            Layer = RagdollPlayer.RagdollLayer, Order = 6
+        };
+    }
+}
+
 public partial class RigSkin : MonoBehaviour
 {
     private class Bone
     {
-        public Rigidbody2D Rb;
         public Transform Tr;
         public int Parent = -1;
         public Vector2 Pivot;          // 最初の姿勢でのワールド座標(関節)
@@ -25,7 +54,7 @@ public partial class RigSkin : MonoBehaviour
         public float Extra;                // 表情での追加の傾き(頭)
     }
 
-    private RagdollPlayer _p;
+    private RigBody _p;
     private CharaRig _rig;
     private readonly List<Bone> _bones = new List<Bone>();
     private Mesh _mesh;
@@ -52,33 +81,46 @@ public partial class RigSkin : MonoBehaviour
     private float[] _restEdge;
     private readonly List<int> _triBuf = new List<int>();
     private const float StretchHide = 2.2f;   // つなぎ目がこの倍率より伸びたら隠す
-    private const int Cell = 8;        // 網目の細かさ(画素)
+    private int Cell = 8;              // 網目の細かさ(画素)
     public const float TargetHeight = 2.45f;
 
-    public static RigSkin TryAttach(RagdollPlayer p, string charaId)
+    public static RigSkin TryAttach(RagdollPlayer p, string charaId) { return TryAttach(RigBody.From(p), charaId); }
+
+    public static bool CanRig(string charaId)
     {
         var rig = CharaRig.Get(charaId);
+        return rig != null && rig.Has("pelvis") && rig.Has("neck") && CharaCatalog.Cut(charaId) != null;
+    }
+
+    public static RigSkin TryAttach(RigBody body, string charaId)
+    {
+        if (!CanRig(charaId)) return null;
+        var rig = CharaRig.Get(charaId);
         var spr = CharaCatalog.Cut(charaId);
-        if (rig == null || spr == null) return null;
-        if (!rig.Has("pelvis") || !rig.Has("neck")) return null;
         var go = new GameObject("RigSkin");
-        go.transform.SetParent(p.transform, false);
+        go.transform.SetParent(body.Space, false);
         go.transform.localPosition = Vector3.zero;
         go.transform.localRotation = Quaternion.identity;
-        go.layer = RagdollPlayer.RagdollLayer;
+        go.transform.localScale = Vector3.one;
+        go.layer = body.Layer;
         var s = go.AddComponent<RigSkin>();
-        s.Build(p, rig, spr);
+        if (body.Light) s.Cell = 16;
+        s.Build(body, rig, spr);
         return s;
     }
+
+    // Space から見た位置・角度
+    private Vector2 Loc(Transform t) { return _p.Space.InverseTransformPoint(t.position); }
+    private float AngOf(Transform t) { return (Quaternion.Inverse(_p.Space.rotation) * t.rotation).eulerAngles.z; }
 
     private Vector2 J(string n) { return _rig.J[n]; }
     private bool Has(string n) { return _rig.J.ContainsKey(n); }
 
-    private int AddBone(Rigidbody2D rb, int parent, Vector2 pivotPx, int layer)
+    private int AddBone(Transform tr, int parent, Vector2 pivotPx, int layer)
     {
-        var b = new Bone { Rb = rb, Tr = rb != null ? rb.transform : null, Parent = parent, Layer = layer };
+        var b = new Bone { Tr = tr, Parent = parent, Layer = layer };
         b.Pivot = ToWorldRest(pivotPx);
-        b.Rest = rb != null ? rb.transform.eulerAngles.z : 0f;
+        b.Rest = tr != null ? AngOf(tr) : 0f;
         _bones.Add(b);
         return _bones.Count - 1;
     }
@@ -92,7 +134,7 @@ public partial class RigSkin : MonoBehaviour
         return new Vector2(_rootX + _m * (px.x - _cx) * _k, _groundY + (_footY - px.y) * _k);
     }
 
-    private void Build(RagdollPlayer p, CharaRig rig, Sprite spr)
+    private void Build(RigBody p, CharaRig rig, Sprite spr)
     {
         _p = p; _rig = rig;
         float f = p.Facing;
@@ -106,9 +148,9 @@ public partial class RigSkin : MonoBehaviour
         _k = TargetHeight * rig.Scale / h;
         _cx = J("pelvis").x;
         _footY = rig.Box.w;
-        _rootX = p.Pelvis.transform.position.x;
-        _groundY = p.transform.position.y - 0.02f;
-        _pelRest = p.Pelvis.transform.position;
+        _rootX = Loc(p.Pelvis).x;
+        _groundY = -0.02f;
+        _pelRest = Loc(p.Pelvis);
 
         Vector2 pel = J("pelvis"), neck = J("neck");
         Vector2 waist = Vector2.Lerp(pel, neck, 0.25f);
@@ -125,12 +167,12 @@ public partial class RigSkin : MonoBehaviour
         Vector2 head = Has("head") ? J("head") : neck + (neck - pel) * 0.5f;
         Seg(iHead, Vector2.Lerp(neck, head, 0.15f), head);
 
-        int farmF = Arm(armF, p.ArmFrontUpper, p.ArmFrontFore, iChest, 6);
+        int farmF = Arm(armF, p.ArmFU, p.ArmFF, iChest, 6);
         _farmF = farmF;
         if (farmF >= 0 && Has("wrist" + armF)) _wristF = ToWorldRest(J("wrist" + armF));
-        int farmB = Arm(armB, p.ArmBackUpper, p.ArmBackFore, iChest, 1);
-        Leg(F, p.LegFrontUpper, p.LegFrontFore, iPel, 5);
-        Leg(B, p.LegBackUpper, p.LegBackFore, iPel, 0);
+        int farmB = Arm(armB, p.ArmBU, p.ArmBF, iChest, 1);
+        Leg(F, p.LegFU, p.LegFF, iPel, 5);
+        Leg(B, p.LegBU, p.LegBF, iPel, 0);
 
         // バット(元絵に描かれた持ち物)
         if (Has("batGrip") && Has("batTip"))
@@ -157,10 +199,10 @@ public partial class RigSkin : MonoBehaviour
         }
 
         BuildMesh(spr);
-        BuildFace(spr);
+        if (!p.Light) BuildFace(spr);
     }
 
-    private int Arm(string s, Rigidbody2D up, Rigidbody2D fore, int parent, int layer)
+    private int Arm(string s, Transform up, Transform fore, int parent, int layer)
     {
         if (!Has("shoulder" + s) || !Has("elbow" + s) || up == null) return -1;
         Vector2 sh = J("shoulder" + s), el = J("elbow" + s);
@@ -173,7 +215,7 @@ public partial class RigSkin : MonoBehaviour
         return fo;
     }
 
-    private void Leg(string s, Rigidbody2D up, Rigidbody2D fore, int parent, int layer)
+    private void Leg(string s, Transform up, Transform fore, int parent, int layer)
     {
         if (!Has("hip" + s) || !Has("knee" + s) || up == null) return;
         Vector2 hp = J("hip" + s), kn = J("knee" + s);
@@ -286,7 +328,7 @@ public partial class RigSkin : MonoBehaviour
         var mat = new Material(Shader.Find("Sprites/Default"));
         mat.mainTexture = tex;
         mr.sharedMaterial = mat;
-        mr.sortingOrder = 6;
+        mr.sortingOrder = _p.Order;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         mr.receiveShadows = false;
     }
@@ -295,9 +337,7 @@ public partial class RigSkin : MonoBehaviour
     {
         bool changed = false;
         float lim = StretchHide * StretchHide;
-        var root = transform;
-        Vector3 sc = root.lossyScale;
-        float s2 = sc.x * sc.x;
+        const float s2 = 1f;   // 頂点も最初の形も同じ座標(Space)なので倍率なし
         for (int t = 0; t < _seam.Length; t++)
         {
             if (!_seam[t]) continue;
@@ -322,18 +362,19 @@ public partial class RigSkin : MonoBehaviour
         if (HasPaintedBat || _p.Bat == null || _farmF < 0) return;
         if (_batVis == null)
         {
-            var sr = _p.Bat.GetComponentInChildren<SpriteRenderer>();
+            var sr = _p.BatSprite;
             if (sr == null) return;
             _batVis = sr.transform; _batVisLocal = _batVis.localPosition;
         }
-        Vector2 grip = _p.Bat.transform.TransformPoint(new Vector3(0f, -0.40f, 0f));
-        Vector2 off = Apply(_farmF, _wristF) - grip;
-        if (_p.BatThrown)
+        Vector2 grip = _p.Space.InverseTransformPoint(_p.Bat.TransformPoint(new Vector3(0f, -0.40f, 0f)));
+        Vector2 offLocal = Apply(_farmF, _wristF) - grip;
+        Vector2 off = _p.Space.TransformVector(offLocal);
+        if (_p.BatThrown())
         {
             if (!_batOffFrozenSet) { _batOffFrozenSet = true; _batOffFrozen = off; }
             off = _batOffFrozen;
         }
-        Vector3 basePos = _p.Bat.transform.TransformPoint(_batVisLocal);
+        Vector3 basePos = _p.Bat.TransformPoint(_batVisLocal);
         _batVis.position = new Vector3(basePos.x + off.x, basePos.y + off.y, basePos.z);
     }
 
@@ -355,11 +396,11 @@ public partial class RigSkin : MonoBehaviour
         for (int b = 0; b < _bones.Count; b++)
         {
             var bo = _bones[b];
-            float a = bo.Tr != null ? Mathf.DeltaAngle(bo.Rest, bo.Tr.eulerAngles.z) : 0f;
+            float a = bo.Tr != null ? Mathf.DeltaAngle(bo.Rest, AngOf(bo.Tr)) : 0f;
             if (bo.IsBat)
             {
                 float pa = _bones[bo.Parent].Ang;
-                if (_p.BatThrown)
+                if (_p.BatThrown())
                 {
                     if (!_batFree) { _batFree = true; _batRel = Mathf.DeltaAngle(pa, a); }
                     a = pa + _batRel;
@@ -368,14 +409,13 @@ public partial class RigSkin : MonoBehaviour
             bo.Ang = a;
             if (bo.Parent < 0)
             {
-                Vector2 now = bo.Tr.position;
+                Vector2 now = Loc(bo.Tr);
                 bo.Cur = bo.Pivot + (now - _pelRest);
             }
             else bo.Cur = Apply(bo.Parent, bo.Pivot);
-            bo.Scale = (b == _headBone) ? _p.HeadPopScale : 1f;
+            bo.Scale = (b == _headBone) ? _p.HeadPop() : 1f;
         }
-        var root = transform;
-        float z = 0f;
+        const float z = 0f;
         for (int v = 0; v < _rest.Length; v++)
         {
             Vector2 acc = Vector2.zero;
@@ -385,9 +425,7 @@ public partial class RigSkin : MonoBehaviour
                 if (wt <= 0f) continue;
                 acc += Apply(_bi[v * 3 + k], _rest[v]) * wt;
             }
-            Vector3 lp = root.InverseTransformPoint(new Vector3(acc.x, acc.y, root.position.z));
-            lp.z = z;
-            _verts[v] = lp;
+            _verts[v] = new Vector3(acc.x, acc.y, z);
         }
     }
 

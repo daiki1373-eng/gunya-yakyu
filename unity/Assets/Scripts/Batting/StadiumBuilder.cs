@@ -11,13 +11,16 @@ public class StadiumBuilder : MonoBehaviour
 {
     // 描画順(BattingStage: 地面-90〜-80 / フェンス-60 / 影-50)
     private const int OSky = -130;
-    private const int OUpper = -76, ORoof = -75, OGlow = -73, OLower = -72, OLowerShade = -71, OFascia = -70;
-    private const int OBoard = -69, OBoardText = -64;
+    // 描画の前後(地面 -90〜-80 より上、外野フェンス -60 より下)
+    private const int OUpper = -79, OUpperAisle = -78, ORoof = -77, OGlow = -76;
+    private const int OLower = -72, OLowerShade = -71, OLowerAisle = -71, OSoffit = -70, OFascia = -69;
+    private const int OBoard = -64, OBoardText = -61;
 
     private Transform _root;
     private Font _font;
 
-    private class CrowdSeg { public SpriteRenderer Sr; public int Side, Variant; public float Phase, Period, Gate; public Color Tint; }
+    private class CrowdSeg { public SpriteRenderer Sr; public MeshRenderer Mr; public int Side, Variant; public float Phase, Period, Gate; public Color Tint; }
+    private readonly List<Material> _ribbonMats = new List<Material>();
     private readonly List<CrowdSeg> _crowd = new List<CrowdSeg>();
     private readonly List<SpriteRenderer> _ribbons = new List<SpriteRenderer>();
     private readonly List<Vector3> _sparkSpots = new List<Vector3>();
@@ -226,72 +229,116 @@ public class StadiumBuilder : MonoBehaviour
         Quad("StandShade", g, Color.white, order, c, new Vector3(tilt, yaw, 0f), new Vector2(width, len));
     }
 
+    // 外野〜内野の2層スタンド。なめらかな曲面で、上段が下段にかぶさる(ひさしの裏が見える)立体的な形。
     private void BuildFairStands()
     {
-        Sprite white = SpriteFactory.White;
-        const float step = 4f;
-        for (float phi = -56f; phi <= 56.1f; phi += step)
+        float[] cuts = { -56f, -48f, -40f, -32f, -24f, -16f, -10f, -6f, 6f, 10f, 16f, 24f, 32f, 40f, 48f, 56f };
+        System.Func<float, float> rf = phi => BattingConfig.FenceRadius(Mathf.Min(Mathf.Abs(phi), 45f));
+        const float h0 = 4.4f, run0 = 22f, rise0 = 16f;
+        const float over = 0.72f;                 // 上段の先端が下段の奥行きのどこまで張り出すか
+        const float run1 = 18f, rise1 = 20f;
+        float hU = h0 + rise0 + 1.4f;             // 上段の床の高さ
+        System.Func<float, float> r0 = p => rf(p) + 1.2f;
+        System.Func<float, float> rBack = p => rf(p) + 1.2f + run0;
+        System.Func<float, float> rU = p => rf(p) + 1.2f + run0 * over;
+        System.Func<float, float> rU1 = p => rU(p) + 0.3f;
+        System.Func<float, float> rTop = p => rU(p) + 0.3f + run1 + 0.8f;
+        float yTop = hU + rise1;
+        Color gold = new Color(1.1f, 0.85f, 0.2f);
+        for (int c = 0; c + 1 < cuts.Length; c++)
         {
-            float rf = BattingConfig.FenceRadius(Mathf.Min(Mathf.Abs(phi), 45f));
-            Vector3 dir = Dir(phi);
-            int side = phi < -14f ? 1 : 0;   // 左翼側はビジター応援席
-            bool center = Mathf.Abs(phi) <= 6.1f;
-            bool boardZone = Mathf.Abs(phi) <= 10.1f;
+            float a = cuts[c], b = cuts[c + 1], mid = (a + b) * 0.5f;
+            int side = mid < -14f ? 1 : 0;        // 左翼側はビジター応援席
+            bool center = Mathf.Abs(mid) <= 6.1f;
+            bool board = Mathf.Abs(mid) <= 10.1f;
+            float uo = Random.value;
 
-            // 下段
-            float r0 = rf + 1.2f, h0 = 4.4f, run0 = 22f, rise0 = 16f;
-            float w0 = 2f * Mathf.PI * (r0 + run0 * 0.5f) * (step / 360f) * 1.05f;
-            Vector3 b0 = dir * r0 + Vector3.up * h0;
+            // ---- 下段 ----
             if (center)
-            {
-                // バックスクリーン(打者の目のため無地の濃い緑)
-                float L = Mathf.Sqrt(run0 * run0 + rise0 * rise0);
-                Quad("BackScreen", white, new Color(0.04f, 0.10f, 0.08f), OLower,
-                    b0 + dir * (run0 * 0.5f) + Vector3.up * (rise0 * 0.5f),
-                    new Vector3(Mathf.Atan2(run0, rise0) * Mathf.Rad2Deg, phi, 0f), new Vector2(w0, L));
-            }
+                StadiumMesh.ConeBand(_root, "BackScreen", null, OLower, a, b, 0.5f, r0, h0, rBack, h0 + rise0,
+                    new Color(0.05f, 0.13f, 0.10f), new Color(0.025f, 0.07f, 0.05f), 8f, 8f);
             else
             {
-                CrowdPlane("LowerStand", side, b0, phi, run0, rise0, w0, OLower, Color.white, dir);
-                Shade(b0, phi, run0, rise0, w0, OLowerShade, 0.55f, 0.55f, dir);
+                var lo = StadiumMesh.ConeBand(_root, "LowerStand", StadiumArt.Crowd(side, 0).texture, OLower, a, b, 0.5f,
+                    r0, h0, rBack, h0 + rise0, new Color(1.08f, 1.06f, 1.04f), new Color(0.38f, 0.40f, 0.48f), 32f, 8f, uo, 4);
+                AddCrowd(lo, side);
+                Aisles(a, b, r0, h0, rBack, h0 + rise0, OLowerAisle, 1f);
+                Spots(a, b, r0, h0, rBack, h0 + rise0);
             }
-            // 段の間の帯(LEDリボン)
-            float r1 = r0 + run0 + 0.6f;
-            Vector3 fp = dir * r1 + Vector3.up * (h0 + rise0 + 1.6f);
-            float wf = 2f * Mathf.PI * r1 * (step / 360f) * 1.05f;
-            Quad("Fascia", white, new Color(0.06f, 0.06f, 0.08f), OFascia, fp, new Vector3(0f, phi, 0f), new Vector2(wf, 3.4f));
-            Quad("FasciaGold", white, new Color(0.91f, 0.73f, 0.14f), OFascia + 1, fp + Vector3.up * 1.55f - dir * 0.06f, new Vector3(0f, phi, 0f), new Vector2(wf, 0.25f));
-            Quad("FasciaGold2", white, new Color(0.91f, 0.73f, 0.14f), OFascia + 1, fp - Vector3.up * 1.55f - dir * 0.06f, new Vector3(0f, phi, 0f), new Vector2(wf, 0.25f));
-            if (!boardZone)
+            // 下段の前のガラスの手すり
+            StadiumMesh.CurvedWall(_root, "Rail", null, OLowerAisle, a, b, 0.5f, p => rf(p) + 1.05f, h0 - 0.3f, h0 + 0.9f,
+                new Color(0.6f, 0.75f, 0.9f, 0.10f), new Color(0.9f, 0.95f, 1f, 0.30f), 4f);
+
+            // ---- 上段の張り出し(前面の厚み + 裏の天井と照明) ----
+            StadiumMesh.CurvedWall(_root, "Fascia", null, OFascia, a, b, 0.5f, rU, hU - 3.2f, hU + 0.25f,
+                new Color(0.045f, 0.045f, 0.06f), new Color(0.085f, 0.085f, 0.10f), 4f);
+            StadiumMesh.CurvedWall(_root, "FasciaGold", null, OFascia + 1, a, b, 0.5f, rU, hU + 0.0f, hU + 0.25f, gold, gold, 4f, 0.05f);
+            StadiumMesh.CurvedWall(_root, "FasciaGold2", null, OFascia + 1, a, b, 0.5f, rU, hU - 3.2f, hU - 2.95f, gold, gold, 4f, 0.05f);
+            if (!board)
             {
-                var rib = Quad("Ribbon", white, new Color(0.9f, 0.2f, 0.2f), OFascia + 1, fp - dir * 0.05f,
-                    new Vector3(0f, phi, 0f), new Vector2(wf, 1.8f));
-                _ribbons.Add(rib);
+                var rib = StadiumMesh.CurvedWall(_root, "Ribbon", null, OFascia + 1, a, b, 0.5f, rU, hU - 2.4f, hU - 0.7f,
+                    Color.white, Color.white, 4f, 0.06f);
+                var m = new Material(rib.sharedMaterial); rib.sharedMaterial = m; _ribbonMats.Add(m);
+            }
+            // 天井(下から見える面)。手前は暗く、照明の列、奥はさらに暗い
+            System.Func<float, float> s1 = p => rU(p) + 1.8f, s2 = p => rU(p) + 2.3f;
+            float ySoff = hU - 3.2f;
+            StadiumMesh.ConeBand(_root, "Soffit", null, OSoffit, a, b, 0.5f, rU, ySoff, s1, ySoff + 0.25f,
+                new Color(0.075f, 0.08f, 0.095f), new Color(0.06f, 0.065f, 0.08f), 8f, 8f);
+            StadiumMesh.ConeBand(_root, "SoffitLight", null, OSoffit, a, b, 0.5f, s1, ySoff + 0.25f, s2, ySoff + 0.32f,
+                new Color(1.7f, 1.5f, 1.2f), new Color(1.7f, 1.5f, 1.2f), 8f, 8f);
+            StadiumMesh.ConeBand(_root, "SoffitBack", null, OSoffit, a, b, 0.5f, s2, ySoff + 0.32f, p => rBack(p) + 1.5f, ySoff + 1.4f,
+                new Color(0.055f, 0.06f, 0.075f), new Color(0.02f, 0.02f, 0.03f), 8f, 8f);
+
+            // ---- 上段 ----
+            if (board)
+                StadiumMesh.ConeBand(_root, "BoardStructure", null, OUpper, a, b, 0.5f, rU1, hU, p => rU1(p) + run1, yTop,
+                    new Color(0.08f, 0.09f, 0.11f), new Color(0.05f, 0.055f, 0.07f), 8f, 8f);
+            else
+            {
+                var up = StadiumMesh.ConeBand(_root, "UpperStand", StadiumArt.Crowd(side, 0).texture, OUpper, a, b, 0.5f,
+                    rU1, hU, p => rU1(p) + run1, yTop, new Color(0.95f, 0.95f, 1.0f), new Color(0.50f, 0.52f, 0.60f), 32f, 8f, uo + 0.5f, 4);
+                AddCrowd(up, side);
+                Aisles(a, b, rU1, hU, p => rU1(p) + run1, yTop, OUpperAisle, 0.85f);
+                Spots(a, b, rU1, hU, p => rU1(p) + run1, yTop);
+                StadiumMesh.CurvedWall(_root, "UpperRail", null, OUpperAisle, a, b, 0.5f, p => rU(p) + 0.2f, hU + 0.25f, hU + 1.15f,
+                    new Color(0.6f, 0.75f, 0.9f, 0.10f), new Color(0.9f, 0.95f, 1f, 0.26f), 4f);
             }
 
-            // 上段
-            float h1 = h0 + rise0 + 3.4f, run1 = 18f, rise1 = 20f;
-            float w1 = 2f * Mathf.PI * (r1 + run1 * 0.5f) * (step / 360f) * 1.05f;
-            Vector3 b1 = dir * (r1 + 0.4f) + Vector3.up * h1;
-            if (boardZone)
-            {
-                float L = Mathf.Sqrt(run1 * run1 + rise1 * rise1);
-                Quad("BoardStructure", white, new Color(0.07f, 0.08f, 0.10f), OUpper,
-                    b1 + dir * (run1 * 0.5f) + Vector3.up * (rise1 * 0.5f),
-                    new Vector3(Mathf.Atan2(run1, rise1) * Mathf.Rad2Deg, phi, 0f), new Vector2(w1, L));
-            }
-            else
-            {
-                CrowdPlane("UpperStand", side, b1, phi, run1, rise1, w1, OUpper, new Color(0.80f, 0.80f, 0.86f), dir);
-                Shade(b1, phi, run1, rise1, w1, OUpper + 0, 0.6f, 0.6f, dir);
-            }
-            // 屋根のへり(下面に照明の帯)
-            float r2 = r1 + run1 + 0.8f;
-            Vector3 rp = dir * r2 + Vector3.up * (h1 + rise1 + 1.5f);
-            float w2 = 2f * Mathf.PI * r2 * (step / 360f) * 1.05f;
-            Quad("Roof", white, new Color(0.10f, 0.11f, 0.13f), ORoof, rp, new Vector3(0f, phi, 0f), new Vector2(w2, 3.2f));
-            Quad("RoofLight", white, new Color(1f, 0.95f, 0.82f, 0.85f), ORoof, rp - Vector3.up * 1.45f - dir * 0.05f,
-                new Vector3(0f, phi, 0f), new Vector2(w2, 0.35f));
+            // ---- 屋根(後ろの壁 + 照明の帯 + 手前に張り出す屋根の裏) ----
+            StadiumMesh.CurvedWall(_root, "RoofLight", null, ORoof, a, b, 0.5f, rTop, yTop + 0.1f, yTop + 0.55f,
+                new Color(2.2f, 2.05f, 1.75f), new Color(2.2f, 2.05f, 1.75f), 4f);
+            StadiumMesh.CurvedWall(_root, "Roof", null, ORoof, a, b, 0.5f, rTop, yTop + 0.55f, yTop + 3.4f,
+                new Color(0.10f, 0.11f, 0.13f), new Color(0.14f, 0.15f, 0.17f), 4f);
+            StadiumMesh.ConeBand(_root, "Canopy", null, ORoof, a, b, 0.5f, rTop, yTop + 3.4f, p => rTop(p) - 8f, yTop + 4.6f,
+                new Color(0.07f, 0.075f, 0.09f), new Color(0.11f, 0.12f, 0.14f), 8f, 8f);
+        }
+    }
+
+    private void AddCrowd(MeshRenderer mr, int side)
+    {
+        _crowd.Add(new CrowdSeg
+        {
+            Mr = mr, Side = side, Phase = Random.value * 10f, Period = Random.Range(0.16f, 0.32f), Gate = Random.value, Tint = Color.white
+        });
+    }
+
+    // 通路(上下の階段)。4度ごと
+    private void Aisles(float a, float b, System.Func<float, float> rA, float yA, System.Func<float, float> rB, float yB, int order, float bright)
+    {
+        Color lo = new Color(0.20f * bright, 0.21f * bright, 0.24f * bright, 1f), hi = new Color(0.09f * bright, 0.10f * bright, 0.12f * bright, 1f);
+        for (float p = a; p <= b + 0.01f; p += 4f)
+            StadiumMesh.ConeBand(_root, "Aisle", null, order, p - 0.13f, p + 0.13f, 0.26f, rA, yA, rB, yB, lo, hi, 8f, 8f);
+    }
+
+    // カメラのフラッシュが光る候補地点
+    private void Spots(float a, float b, System.Func<float, float> rA, float yA, System.Func<float, float> rB, float yB)
+    {
+        for (int k = 0; k < 5; k++)
+        {
+            float p = Random.Range(a, b), t = Random.Range(0.1f, 0.9f);
+            Vector3 d = Dir(p);
+            _sparkSpots.Add(d * Mathf.Lerp(rA(p), rB(p), t) + Vector3.up * Mathf.Lerp(yA, yB, t) - d * 0.3f);
         }
     }
 
@@ -579,6 +626,12 @@ public class StadiumBuilder : MonoBehaviour
                 frame = (Mathf.FloorToInt((t + c.Phase) / c.Period) % 2 == 0) ? 1 : 0;
             else if (Mathf.Repeat(t * 0.07f + c.Phase, 1f) < 0.04f)
                 frame = 1; // ときどき一部の客が立つ
+            if (c.Mr != null)
+            {
+                var mat = StadiumMesh.Mat(StadiumArt.Crowd(c.Side, frame).texture);
+                if (c.Mr.sharedMaterial != mat) c.Mr.sharedMaterial = mat;
+                continue;
+            }
             var sp = StadiumArt.CrowdSlice(c.Side, frame, c.Variant);
             if (c.Sr.sprite != sp) c.Sr.sprite = sp;
         }
@@ -594,6 +647,17 @@ public class StadiumBuilder : MonoBehaviour
                 baseC = on ? new Color(1f, 0.95f, 0.4f) : new Color(0.9f, 0.15f, 0.15f);
             }
             _ribbons[i].color = baseC;
+        }
+        for (int i = 0; i < _ribbonMats.Count; i++)
+        {
+            float h = Mathf.Repeat(t * 0.05f + i * 0.06f, 1f);
+            Color baseC = Color.HSVToRGB(Mathf.Lerp(0.95f, 1.08f, h) % 1f, 0.85f, 0.85f) * 1.25f;
+            if (amp > 0f)
+            {
+                bool on = Mathf.FloorToInt(t * 8f + i * 0.5f) % 2 == 0;
+                baseC = on ? new Color(1.3f, 1.2f, 0.5f) : new Color(1.1f, 0.2f, 0.2f);
+            }
+            _ribbonMats[i].color = baseC;
         }
 
         // カメラのフラッシュ

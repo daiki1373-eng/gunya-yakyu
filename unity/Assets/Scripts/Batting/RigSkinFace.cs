@@ -136,7 +136,7 @@ public partial class RigSkin
     private void FaceState(float dt)
     {
         _t += dt;
-        int cur = (int)_p.CurrentExpr;
+        int cur = (int)_p.Expression();
         for (int e = 0; e < 7; e++) _ew[e] = Mathf.MoveTowards(_ew[e], e == cur ? 1f : 0f, dt * 9f);
         _surpriseAge = cur == (int)Expr.Surprise ? _surpriseAge + dt : 0f;
         _happyAge = cur == (int)Expr.Happy ? _happyAge + dt : 0f;
@@ -205,9 +205,9 @@ public partial class RigSkin
     public Vector3 FaceWorld()
     {
         Vector2 w = Apply(_headBone, ToWorldRest(_faceC));
-        return new Vector3(w.x, w.y, transform.position.z);
+        return transform.TransformPoint(new Vector3(w.x, w.y, 0f));
     }
-    public float FaceSpan() { return _io * _k * 2.2f; }
+    public float FaceSpan() { return _io * _k * 2.2f * transform.lossyScale.y; }
 
     private bool FaceActive()
     {
@@ -231,7 +231,6 @@ public partial class RigSkin
     {
         var L = _now;
         float erx = _io * 0.42f, ery = _io * 0.36f;
-        var root = transform;
         Vector2 browD = new Vector2(0f, L.Brow * _io);
         for (int v = 0; v < _fPx.Length; v++)
         {
@@ -254,9 +253,7 @@ public partial class RigSkin
                 float wt = _fBw[v * 3 + k];
                 if (wt > 0f) acc += Apply(_fBi[v * 3 + k], rw) * wt;
             }
-            Vector3 lp = root.InverseTransformPoint(new Vector3(acc.x, acc.y, root.position.z));
-            lp.z = 0f;
-            _fV[v] = lp;
+            _fV[v] = new Vector3(acc.x, acc.y, 0f);
         }
         _fMesh.vertices = _fV;
         _fMesh.RecalculateBounds();
@@ -320,10 +317,7 @@ public partial class RigSkin
         if (alpha <= 0.01f || size <= 0.001f) { sr.enabled = false; return; }
         sr.enabled = true;
         Vector2 w = Apply(_headBone, ToWorldRest(px));
-        var root = transform;
-        Vector3 lp = root.InverseTransformPoint(new Vector3(w.x, w.y, root.position.z));
-        lp.z = 0f;
-        sr.transform.localPosition = lp;
+        sr.transform.localPosition = new Vector3(w.x, w.y, 0f);
         float ws = size * _io * _k;
         sr.transform.localScale = new Vector3(ws, ws * sy, 1f);
         sr.transform.localRotation = Quaternion.Euler(0f, 0f, _bones[_headBone].Ang + _bones[_headBone].Extra + rotDeg);
@@ -332,6 +326,7 @@ public partial class RigSkin
 
     private void DrawMarks()
     {
+        if (_sweat == null) return;   // 遠くの選手(記号なし)
         float io = _io, sd = _side;
         Vector2 top = _headTopPx;
         // 集中: こめかみに汗が一粒たれる
