@@ -13,31 +13,6 @@ public enum CharaRole { Pitcher, Power, Contact, Speed }
 
 public static class CharaRoster
 {
-    private static readonly Dictionary<string, CharaRole> Roles = new Dictionary<string, CharaRole>
-    {
-        // 投手
-        { "alien", CharaRole.Pitcher }, { "dragon", CharaRole.Pitcher }, { "robot-gold", CharaRole.Pitcher },
-        { "robot", CharaRole.Pitcher }, { "sleepyhead", CharaRole.Pitcher }, { "grandma", CharaRole.Pitcher },
-        { "magician", CharaRole.Pitcher }, { "monk", CharaRole.Pitcher },
-        // 長打
-        { "sumo", CharaRole.Power }, { "ojisan", CharaRole.Power }, { "legend-grandpa", CharaRole.Power },
-        { "carpenter", CharaRole.Power }, { "bigeater", CharaRole.Power }, { "fisherman", CharaRole.Power },
-        { "farmer", CharaRole.Power }, { "suntan", CharaRole.Power }, { "santa", CharaRole.Power },
-        { "dogu", CharaRole.Power }, { "pumpkin", CharaRole.Power }, { "snowman", CharaRole.Power },
-        // 巧打
-        { "heroine", CharaRole.Contact }, { "twins", CharaRole.Contact }, { "idol", CharaRole.Contact },
-        { "ceo", CharaRole.Contact }, { "teacher", CharaRole.Contact }, { "doctor", CharaRole.Contact },
-        { "student", CharaRole.Contact }, { "housewife", CharaRole.Contact }, { "chef", CharaRole.Contact },
-        { "mannequin", CharaRole.Contact }, { "thirdtwin", CharaRole.Contact }, { "dad", CharaRole.Contact },
-        { "guard", CharaRole.Contact }, { "crow", CharaRole.Contact }, { "salaryman", CharaRole.Contact },
-        // 俊足
-        { "ninja", CharaRole.Speed }, { "dog", CharaRole.Speed }, { "rookie", CharaRole.Speed },
-        { "helper", CharaRole.Speed }, { "deliveryman", CharaRole.Speed }, { "stationstaff", CharaRole.Speed },
-        { "cat", CharaRole.Speed }, { "tanuki", CharaRole.Speed }, { "ghost", CharaRole.Speed },
-        { "slacker", CharaRole.Speed }, { "rainman", CharaRole.Speed }, { "magical", CharaRole.Speed },
-        { "fortuneteller", CharaRole.Speed }, { "umpire", CharaRole.Speed }, { "deliveryrobot", CharaRole.Speed },
-    };
-
     // 頭の色(画像の雰囲気に合わせた仮置き)
     private static readonly Dictionary<string, Color> Skins = new Dictionary<string, Color>
     {
@@ -85,11 +60,24 @@ public static class CharaRoster
         { "robot-gold", L(Gd, Gd, Rd) }, { "deliveryrobot", L(Rd, Br, Gd) }, { "dogu", L(Clay, Clay, Nv) },
     };
 
+    // 役割は roster-101.csv のポジションとタグから決める
     public static CharaRole Role(CharaDef d)
     {
-        CharaRole r;
-        return Roles.TryGetValue(d.Id, out r) ? r : CharaRole.Contact;
+        if (d.Position == "投手") return CharaRole.Pitcher;
+        bool power = false, speed = false;
+        foreach (var t in d.Tags)
+        {
+            if (t.Contains("パワー")) power = true;
+            if (t.Contains("俊足") || t.Contains("盗塁")) speed = true;
+        }
+        if (power) return CharaRole.Power;
+        if (speed) return CharaRole.Speed;
+        if (d.Position == "打者専門") return CharaRole.Power;
+        return CharaRole.Contact;
     }
+
+    // 守備につかないキャラ(マスコット)は打順に入れない
+    public static bool Fields(CharaDef d) { return d.Position != "マスコット"; }
 
     private static int Base(Rarity r)
     {
@@ -100,7 +88,7 @@ public static class CharaRoster
             case Rarity.R3: return 50;
             case Rarity.R4: return 56;
             case Rarity.R5: return 63;
-            default: return 70;
+            default: return 52;   // SECRET は「ネタ枠」。数値で最強にはしない(価値は見た目と演出)
         }
     }
 
@@ -114,7 +102,7 @@ public static class CharaRoster
         int j = (h % 7) - 3;   // キャラごとの小さな個性(-3〜+3)
         var p = new PlayerStats
         {
-            Name = d.Name, CharaId = d.Id, Species = "human",
+            Name = d.Name, CharaId = d.Id, Species = "human", PositionLabel = d.Position,
             BatsRight = (h % 4) != 0,   // 4人に1人は左打ち
             Field = C(b + j), Arm = C(b - j), Stam = C(b), Ctrl = C(b - 8), Velo = C(b - 12), Brk = C(b - 20)
         };
@@ -155,7 +143,7 @@ public static class CharaRoster
         foreach (var d in owned) if (Role(d) == CharaRole.Pitcher) { t.Pitcher = d; break; }
         if (t.Pitcher == null) t.Pitcher = CharaCatalog.Get("sleepyhead");
         // 打者: 所持(レア度順)→ 足りなければおまかせ(★3〜★1の野手から)
-        foreach (var d in owned) if (Role(d) != CharaRole.Pitcher && t.Lineup.Count < 9) t.Lineup.Add(d);
+        foreach (var d in owned) if (Role(d) != CharaRole.Pitcher && Fields(d) && t.Lineup.Count < 9) t.Lineup.Add(d);
         string[] fallback = { "rookie", "ceo", "carpenter", "umpire", "teacher", "bigeater", "chef", "student", "suntan", "cat", "farmer", "guard" };
         foreach (var id in fallback)
         {
@@ -177,6 +165,7 @@ public static class CharaRoster
         {
             if (user.Lineup.Contains(d) || d == user.Pitcher) continue;
             if (d.Rarity >= Rarity.R5) continue;   // 相手は★4まで
+            if (!Fields(d) || !d.HasImage) continue; // 相手は画像のあるキャラから(足りなければ下で補う)
             if (Role(d) == CharaRole.Pitcher) pitchers.Add(d); else pool.Add(d);
         }
         for (int i = 0; i < 9 && pool.Count > 0; i++)

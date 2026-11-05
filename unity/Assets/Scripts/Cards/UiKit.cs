@@ -215,6 +215,42 @@ public static class UiKit
         }
     }
 
+    // ---- カードの背景(★1〜★3用)。上のレア度ほど派手に(★1は地味、★4以上は元の豪華な絵を使う) ----
+    private static readonly Sprite[] _rarityBg = new Sprite[8];
+    public static Sprite RarityBg(Rarity r)
+    {
+        int k = (int)r;
+        if (_rarityBg[k] != null) return _rarityBg[k];
+        int w = 160, h = 240;
+        var cv = new ArtCanvas(w, h);
+        Color inner, outer; float rays;
+        switch (r)
+        {
+            case Rarity.R1: inner = new Color(0.30f, 0.34f, 0.42f); outer = new Color(0.10f, 0.12f, 0.17f); rays = 0f; break;
+            case Rarity.R2: inner = new Color(0.72f, 0.45f, 0.25f); outer = new Color(0.20f, 0.10f, 0.06f); rays = 0.12f; break;
+            case Rarity.R3: inner = new Color(0.40f, 0.62f, 1.00f); outer = new Color(0.06f, 0.12f, 0.32f); rays = 0.25f; break;
+            default: inner = new Color(1f, 0.80f, 0.35f); outer = new Color(0.45f, 0.04f, 0.04f); rays = 0.4f; break;
+        }
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                float dx = (x + 0.5f) / w - 0.5f, dy = ((y + 0.5f) / h - 0.62f) * 1.5f;
+                float d = Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy) * 1.6f);
+                Color c = Color.Lerp(inner, outer, d);
+                if (rays > 0f)
+                {
+                    float a = Mathf.Atan2(dy, dx);
+                    float ray = Mathf.Pow(0.5f + 0.5f * Mathf.Cos(a * 14f), 3f);
+                    c = Color.Lerp(c, Color.Lerp(inner, Color.white, 0.4f), ray * rays * (1f - d));
+                }
+                if (r == Rarity.R1 && ((x + y) / 12) % 2 == 0) c *= 0.96f;   // 地味な斜めじま(芝の刈り目)
+                c.a = 1f;
+                cv.Px[y * w + x] = c;
+            }
+        _rarityBg[k] = cv.ToSprite(100f, new Vector2(0.5f, 0.5f));
+        return _rarityBg[k];
+    }
+
     // 帯(名前の下地など)。左右が少し透ける黒
     public static Sprite Plate
     {

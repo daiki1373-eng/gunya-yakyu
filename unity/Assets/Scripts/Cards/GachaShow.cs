@@ -40,6 +40,7 @@ public partial class AppShell
     private IEnumerator PullRoutineFixed(List<PullResult> results)
     {
         _busy = true;
+        BgmPlayer.Jingle("bgm-gacha-pull", 3.5f);
         _skipAll = false;
         ClearChildren(_show);
         _show.gameObject.SetActive(true);
@@ -126,6 +127,7 @@ public partial class AppShell
         // 低レアは白、上がるほど早い段階で色が付く(期待感)
         Color pre = rr >= Rarity.R4 ? UiKit.Gold : (rr == Rarity.R3 ? tint : Color.white);
         GameAudio.Play(Sfx.Whoosh, 0.6f, 0.8f);
+        if (!multi || rich || index == 0) BgmPlayer.Jingle("bgm-gacha-suspense", 4f);
         float charge = multi && !rich ? 0.35f : 0.7f;
         yield return Anim(charge, u =>
         {
@@ -161,6 +163,7 @@ public partial class AppShell
             ssh.effectColor = new Color(0.5f, 0f, 0f, 1f);
             ssh.effectDistance = new Vector2(5f, -6f);
             GameAudio.Play(Sfx.HitPerfect, 1f, 0.8f);
+            BgmPlayer.Jingle(secret ? "bgm-rarity-secret" : "bgm-rarity-5");
             GameAudio.Play(Sfx.BigCheer, 0.9f);
             for (int k = 0; k < (secret ? 8 : 5); k++)
                 _fx.Firework(new Vector2(UnityEngine.Random.Range(-420f, 420f), -300f), UnityEngine.Random.Range(300f, 480f),
@@ -181,9 +184,13 @@ public partial class AppShell
         Destroy(glow.gameObject);
         Destroy(ball.gameObject);
         _fx.Burst(Vector2.zero, rich ? 90 : 40, new[] { tint, Color.white, UiKit.GoldLight }, rich ? 700f : 480f, 1.2f, rich ? 18f : 12f, 160f);
-        if (rr == Rarity.R4) GameAudio.PlayJingle(new[] { 0, 4, 7, 12, 7, 12, 16 }, 0.09f, 0.6f);
-        else if (special) GameAudio.PlayJingle(new[] { 0, 4, 7, 12, -99, 12, 16, 19, 24 }, 0.11f, 0.7f);
-        else GameAudio.Play(rr == Rarity.R3 ? Sfx.HitGood : Sfx.HitNormal, 0.7f, 1.2f);
+        // 排出の曲: SECRET > ★5 > ★4 > 通常(★5以上は確定演出で鳴らし済み)
+        if (rr == Rarity.R4) BgmPlayer.Jingle("bgm-rarity-4");
+        else if (!special)
+        {
+            GameAudio.Play(rr == Rarity.R3 ? Sfx.HitGood : Sfx.HitNormal, 0.7f, 1.2f);
+            if (!multi || index == 0) BgmPlayer.Jingle("bgm-rarity-low", 6f);
+        }
         if (rich) _fx.Confetti(1000f, 300f, special ? 120 : 60, new[] { UiKit.Gold, UiKit.Red, Color.white, UiKit.GoldLight });
 
         Vector2 size = new Vector2(280f, 420f);
@@ -194,7 +201,7 @@ public partial class AppShell
         flash.transform.SetAsLastSibling();
         var name = UiKit.Txt(stage, "Name", d.Name, 32, Color.white, TextAnchor.MiddleCenter);
         UiKit.Place(name.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -222f), new Vector2(700f, 44f));
-        string sub = r.Add.Capped ? "MAX" : (r.Add.IsNew ? "" : "重ね " + r.Add.After + " / " + CharaCatalog.StackMax(rr));
+        string sub = r.Add.Capped ? "MAX" : (r.Add.IsNew ? "" : "重ね " + r.Add.After + " / " + CharaCatalog.StackMax(d));
         var subT = UiKit.Txt(stage, "Sub", sub, 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
         UiKit.Place(subT.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -252f), new Vector2(500f, 28f));
         if (r.Add.IsNew)
@@ -228,6 +235,15 @@ public partial class AppShell
         {
             t += Time.unscaledDeltaTime;
             bgRays.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -t * 14f);
+            if (rr == Rarity.Secret)
+            {
+                // SECRET は「ネタ枠」: 規格外に豪華なのに、カード自体がぐにゃぐにゃ揺れる
+                float w = Mathf.Sin(t * 5.5f) * 9f * Mathf.Max(0.25f, 1f - t * 0.15f);
+                card.Root.localRotation = Quaternion.Euler(0f, 0f, w);
+                float sq = 1f + Mathf.Sin(t * 11f) * 0.06f;
+                card.Root.localScale = new Vector3(2f - sq, sq, 1f);
+                if (Mathf.Repeat(t, 1.8f) < Time.unscaledDeltaTime) GameAudio.Play(Sfx.Boing, 0.6f, UnityEngine.Random.Range(0.8f, 1.3f));
+            }
             if (card.Shine != null)
             {
                 float u = Mathf.Repeat(t * 0.6f, 1.4f);

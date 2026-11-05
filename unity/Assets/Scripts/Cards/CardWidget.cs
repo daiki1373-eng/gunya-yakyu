@@ -10,7 +10,8 @@ public static class CardWidget
     public class Parts
     {
         public RectTransform Root;
-        public Image Frame, Art, Shine, StackFrame;
+        public Image Frame, Art, Shine, StackFrame, Bg;
+        public bool Placeholder;
         public Text RarityText, NameText, CountText;
     }
 
@@ -29,22 +30,51 @@ public static class CardWidget
         var maskImg = UiKit.Img(p.Root, "Mask", SpriteFactory.White, new Color(0.08f, 0.03f, 0.03f));
         var mask = UiKit.Fill(maskImg.rectTransform, inset);
         mask.gameObject.AddComponent<Mask>().showMaskGraphic = true;
-        Sprite sp = full ? CharaCatalog.Full(d.Id) : CharaCatalog.Thumb(d.Id);
-        var art = UiKit.Img(mask, "Art", sp, owned ? Color.white : new Color(0.22f, 0.22f, 0.26f));
-        p.Art = art;
-        var ar = art.rectTransform;
-        ar.anchorMin = ar.anchorMax = new Vector2(0.5f, 0.5f);
         Vector2 inner = size - Vector2.one * inset * 2f;
-        if (sp != null)
+        Color dark = new Color(0.22f, 0.22f, 0.26f);
+        if (!d.HasImage)
         {
-            // 覆うように拡大(縦長の絵は上寄せ)
-            float a = sp.rect.width / sp.rect.height;
-            float ia = inner.x / inner.y;
-            Vector2 sz = a > ia ? new Vector2(inner.y * a, inner.y) : new Vector2(inner.x, inner.x / a);
-            ar.sizeDelta = sz;
-            ar.anchoredPosition = new Vector2(0f, a > ia ? 0f : -(sz.y - inner.y) * 0.15f);
+            // 画像のないキャラ: レア度の背景+謎のシルエット+「?」(画像が届けば自動で差し替わる)
+            var bg = UiKit.Img(mask, "Bg", UiKit.RarityBg(d.Rarity), Color.white);
+            UiKit.Fill(bg.rectTransform);
+            var sil = CharaCatalog.Cut("student");
+            var art = UiKit.Img(mask, "Art", sil, new Color(0.05f, 0.02f, 0.03f, 0.92f));
+            UiKit.Place(art.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(inner.y, inner.y));
+            p.Art = art;
+            var q = UiKit.Txt(mask, "Q", "?", Mathf.RoundToInt(inner.y * 0.32f), UiKit.GoldLight, TextAnchor.MiddleCenter);
+            UiKit.Place(q.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, inner.y * 0.08f), inner);
+            p.Placeholder = true;
         }
-        else ar.sizeDelta = inner;
+        else if (d.Rarity <= Rarity.R3)
+        {
+            // ★1〜★3: 切り抜いたキャラをレア度の背景に載せる(元絵の豪華な背景は★4以上の特権にする)
+            var bg = UiKit.Img(mask, "Bg", UiKit.RarityBg(d.Rarity), owned ? Color.white : dark);
+            UiKit.Fill(bg.rectTransform);
+            p.Bg = bg;
+            var cut = CharaCatalog.Cut(d.Id);
+            var art = UiKit.Img(mask, "Art", cut, owned ? Color.white : dark);
+            float side = inner.y * 1.04f;
+            UiKit.Place(art.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, -inner.y * 0.02f), new Vector2(side, side));
+            p.Art = art;
+        }
+        else
+        {
+            Sprite sp = full ? CharaCatalog.Full(d.Id) : CharaCatalog.Thumb(d.Id);
+            var art = UiKit.Img(mask, "Art", sp, owned ? Color.white : dark);
+            p.Art = art;
+            var ar = art.rectTransform;
+            ar.anchorMin = ar.anchorMax = new Vector2(0.5f, 0.5f);
+            if (sp != null)
+            {
+                // 覆うように拡大(縦長の絵は上寄せ)
+                float a = sp.rect.width / sp.rect.height;
+                float ia = inner.x / inner.y;
+                Vector2 sz = a > ia ? new Vector2(inner.y * a, inner.y) : new Vector2(inner.x, inner.x / a);
+                ar.sizeDelta = sz;
+                ar.anchoredPosition = new Vector2(0f, a > ia ? 0f : -(sz.y - inner.y) * 0.15f);
+            }
+            else ar.sizeDelta = inner;
+        }
 
         // きらめき(★4以上。動きは呼び出し側で)
         {
@@ -91,8 +121,9 @@ public static class CardWidget
 
     public static void SetCount(Parts p, CharaDef d, bool owned, int count)
     {
-        p.Art.color = owned ? Color.white : new Color(0.22f, 0.22f, 0.26f);
-        int max = CharaCatalog.StackMax(d.Rarity);
+        if (!p.Placeholder) p.Art.color = owned ? Color.white : new Color(0.22f, 0.22f, 0.26f);
+        if (p.Bg != null) p.Bg.color = owned ? Color.white : new Color(0.22f, 0.22f, 0.26f);
+        int max = CharaCatalog.StackMax(d);
         bool isMax = owned && count >= max;
         bool shine = owned && (d.Rarity >= Rarity.R4 || isMax);
         if (p.Shine != null) p.Shine.color = new Color(1f, 0.95f, 0.75f, shine ? 1f : 0f);

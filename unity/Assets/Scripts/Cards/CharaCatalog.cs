@@ -1,22 +1,39 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// ============================================================
-// CharaCatalog.cs
-// キャラ50体の表(ID=画像ファイル名 / 表示名 / レア度)。
-// 画像は Resources/Chara/Full(拡大用) と Resources/Chara/Thumb(一覧用 2:3)。
-// レア度ごとの重ね上限・表示色もここで決める。
-// ============================================================
 public enum Rarity { R1 = 1, R2 = 2, R3 = 3, R4 = 4, R5 = 5, Secret = 6 }
 
 public class CharaDef
 {
-    public string Id;
+    public string Id;          // 画像ファイル名(拡張子なし)。保存データ・画像のキー
+    public string Code;        // ch001 など(roster-101.csv の id)
     public string Name;
     public Rarity Rarity;
     public int Index;
+    public string Intro = "";
+    public string Position = "";
+    public string[] Tags = new string[0];
+    public int StackLimit = 1;
+    public int ExchangePoints = 1;
+    public string ImageFile = "";
+    private int _hasImage = -1;
+    // 画像があるか(ない51体はプレースホルダで表示。画像を置けば自動で差し替わる)
+    public bool HasImage
+    {
+        get
+        {
+            if (_hasImage < 0) _hasImage = Resources.Load<Sprite>("Chara/Thumb/" + Id) != null ? 1 : 0;
+            return _hasImage == 1;
+        }
+    }
 }
 
+// ============================================================
+// CharaCatalog.cs
+// キャラ一覧の正本は Resources/Chara/roster-101.csv(id,name,rarity,intro,position,tags,stack_limit,exchange_points,image_file)。
+// 101体すべてを読み込み、図鑑・ガチャ・試合に使う。画像がないキャラはプレースホルダで表示する。
+// 画像は Resources/Chara/Full(拡大用) と Thumb(一覧用 2:3)、試合用に Cut(立ち姿) と Head(顔)。
+// ============================================================
 public static class CharaCatalog
 {
     public static readonly List<CharaDef> All = new List<CharaDef>();
@@ -24,74 +41,83 @@ public static class CharaCatalog
 
     static CharaCatalog()
     {
-        Add("alien", "宇宙人エース", Rarity.Secret);
-
-        Add("heroine", "ヒロイン", Rarity.R5);
-        Add("robot-gold", "黄金ブリキロボ", Rarity.R5);
-        Add("legend-grandpa", "伝説の90歳", Rarity.R5);
-        Add("dragon", "ドラゴン選手", Rarity.R5);
-
-        Add("ojisan", "熱血おじさんキャプテン", Rarity.R4);
-        Add("dog", "柴犬マスコット", Rarity.R4);
-        Add("robot", "ブリキロボット", Rarity.R4);
-        Add("sumo", "力士系巨漢", Rarity.R4);
-        Add("twins", "双子選手", Rarity.R4);
-        Add("ninja", "忍者選手", Rarity.R4);
-        Add("idol", "アイドル兼任選手", Rarity.R4);
-
-        Add("umpire", "審判おばちゃん", Rarity.R3);
-        Add("grandma", "ナックルおばあちゃん", Rarity.R3);
-        Add("ceo", "社長選手", Rarity.R3);
-        Add("rookie", "ランドセルルーキー", Rarity.R3);
-        Add("magical", "自称・魔法少女", Rarity.R3);
-        Add("helper", "外国人助っ人", Rarity.R3);
-        Add("fisherman", "漁師選手", Rarity.R3);
-        Add("carpenter", "大工選手", Rarity.R3);
-        Add("fortuneteller", "占い師選手", Rarity.R3);
-        Add("stationstaff", "駅員選手", Rarity.R3);
-
-        Add("ghost", "幽霊選手", Rarity.R2);
-        Add("salaryman", "兼業サラリーマン", Rarity.R2);
-        Add("sleepyhead", "寝坊助エース", Rarity.R2);
-        Add("bigeater", "早食い選手", Rarity.R2);
-        Add("slacker", "サボり魔ベテラン", Rarity.R2);
-        Add("rainman", "雨男選手", Rarity.R2);
-        Add("magician", "マジシャン選手", Rarity.R2);
-        Add("chef", "料理人選手", Rarity.R2);
-        Add("doctor", "医者選手", Rarity.R2);
-        Add("teacher", "先生選手", Rarity.R2);
-        Add("dad", "パパ選手", Rarity.R2);
-        Add("thirdtwin", "双子の三男", Rarity.R2);
-
-        Add("suntan", "日焼け選手", Rarity.R1);
-        Add("student", "学生", Rarity.R1);
-        Add("housewife", "主婦", Rarity.R1);
-        Add("deliveryman", "配達員", Rarity.R1);
-        Add("guard", "警備員", Rarity.R1);
-        Add("farmer", "農家", Rarity.R1);
-        Add("monk", "僧侶", Rarity.R1);
-        Add("pumpkin", "かぼちゃ男", Rarity.R1);
-        Add("snowman", "雪だるま", Rarity.R1);
-        Add("tanuki", "たぬき", Rarity.R1);
-        Add("cat", "猫", Rarity.R1);
-        Add("crow", "カラス", Rarity.R1);
-        Add("mannequin", "マネキン", Rarity.R1);
-        Add("dogu", "土偶", Rarity.R1);
-        Add("santa", "サンタ", Rarity.R1);
-        Add("deliveryrobot", "配達ロボ", Rarity.R1);
+        var ta = Resources.Load<TextAsset>("Chara/roster-101");
+        if (ta == null) { Debug.LogError("roster-101.csv が見つかりません"); return; }
+        var rows = ParseCsv(ta.text);
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var r = rows[i];
+            if (r.Count < 9 || string.IsNullOrEmpty(r[0])) continue;
+            string file = r[8].Trim();
+            string id = System.IO.Path.GetFileNameWithoutExtension(file);
+            var d = new CharaDef
+            {
+                Id = id, Code = r[0].Trim(), Name = r[1].Trim(), Rarity = ParseRarity(r[2].Trim()), Index = All.Count,
+                Intro = r[3].Trim(), Position = r[4].Trim(), Tags = r[5].Trim().Split('|'),
+                StackLimit = ParseInt(r[6], 1), ExchangePoints = ParseInt(r[7], 1), ImageFile = file
+            };
+            All.Add(d);
+            ById[id] = d;
+        }
+        // 表示順: レア度の高い順、同じレア度はCSVの順
+        All.Sort((x, y) => x.Rarity != y.Rarity ? ((int)y.Rarity).CompareTo((int)x.Rarity) : x.Code.CompareTo(y.Code));
+        for (int i = 0; i < All.Count; i++) All[i].Index = i;
     }
 
-    private static void Add(string id, string name, Rarity r)
+    private static int ParseInt(string s, int def)
     {
-        var d = new CharaDef { Id = id, Name = name, Rarity = r, Index = All.Count };
-        All.Add(d);
-        ById[id] = d;
+        int v;
+        return int.TryParse(s.Trim(), out v) ? v : def;
+    }
+
+    public static Rarity ParseRarity(string s)
+    {
+        if (s.StartsWith("SECRET")) return Rarity.Secret;
+        // 「★5」(星+数字) と「★★★★★」(星の数) のどちらでも読めるようにする
+        int n;
+        if (!int.TryParse(s.Replace("★", "").Trim(), out n))
+        {
+            n = 0;
+            foreach (char c in s) if (c == '★') n++;
+        }
+        return (Rarity)Mathf.Clamp(n, 1, 5);
+    }
+
+    // ダブルクォート対応の簡易CSV
+    public static List<List<string>> ParseCsv(string text)
+    {
+        var rows = new List<List<string>>();
+        var row = new List<string>();
+        var sb = new System.Text.StringBuilder();
+        bool q = false;
+        text = text.Replace("\r\n", "\n").TrimStart('\uFEFF');
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (q)
+            {
+                if (c == '"') { if (i + 1 < text.Length && text[i + 1] == '"') { sb.Append('"'); i++; } else q = false; }
+                else sb.Append(c);
+            }
+            else if (c == '"') q = true;
+            else if (c == ',') { row.Add(sb.ToString()); sb.Length = 0; }
+            else if (c == '\n') { row.Add(sb.ToString()); sb.Length = 0; rows.Add(row); row = new List<string>(); }
+            else if (c != '\r') sb.Append(c);
+        }
+        if (sb.Length > 0 || row.Count > 0) { row.Add(sb.ToString()); rows.Add(row); }
+        return rows;
     }
 
     public static CharaDef Get(string id)
     {
         CharaDef d;
-        return ById.TryGetValue(id, out d) ? d : null;
+        return id != null && ById.TryGetValue(id, out d) ? d : null;
+    }
+
+    public static CharaDef ByCode(string code)
+    {
+        foreach (var d in All) if (d.Code == code) return d;
+        return null;
     }
 
     public static List<CharaDef> OfRarity(Rarity r)
@@ -101,7 +127,9 @@ public static class CharaCatalog
         return list;
     }
 
-    // 重ね上限(★1=10 … ★5=6 / SECRET=5)
+    // 重ね上限(CSVの stack_limit が正。これはCSVにない場合の既定値: ★1=10 … ★5=6 / SECRET=5)
+    public static int StackMax(CharaDef d) { return d.StackLimit > 0 ? d.StackLimit : StackMax(d.Rarity); }
+
     public static int StackMax(Rarity r)
     {
         switch (r)

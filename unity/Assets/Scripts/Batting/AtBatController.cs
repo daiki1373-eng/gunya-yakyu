@@ -184,6 +184,8 @@ public class AtBatController : MonoBehaviour
         BuildTeams();   // 所持カードは試合開始時点のもので組む
         _gameStartT = Time.time;
         _ui.ShowResult("PLAY BALL");
+        BgmPlayer.PlayBase(BgmPlayer.Match);
+        BgmPlayer.Jingle("bgm-playball", 7f);
         RefreshHud();
         // 開幕: 球場全体を映して花火を上げる(タップで飛ばせる)
         _stage.SetShot(new Vector3(0f, 9f, -14f), new Vector3(0f, 40f, 130f), 0.3f, true);
@@ -252,8 +254,8 @@ public class AtBatController : MonoBehaviour
         _stage.SetShot(cam, look, 0.55f, false);
         _batter.SetExpression(d.Face, 30f);
 
-        string title = user ? (_batterIndex + 1) + "番  " + IntroCatalog.PositionName(_batterStats.Position)
-                            : "相手  " + IntroCatalog.PositionName(_batterStats.Position);
+        string pos = string.IsNullOrEmpty(_batterStats.PositionLabel) ? IntroCatalog.PositionName(_batterStats.Position) : _batterStats.PositionLabel;
+        string title = user ? (_batterIndex + 1) + "番  " + pos : "相手  " + pos;
         string stats = "ミート " + _batterStats.Meet + "   パワー " + _batterStats.Power + "   走力 " + _batterStats.Speed;
         GameAudio.Play(Sfx.Cheer, full ? d.Cheer : d.Cheer * 0.5f);
         if (walk > 0f)
@@ -263,7 +265,7 @@ public class AtBatController : MonoBehaviour
         }
         // 歩き終わって定位置に来たら名前とジングル
         _ui.ShowIntroCard(title, _batterStats.Name, stats, full ? d.Copy : "", d.CardColor, Portrait(_batterStats));
-        if (full && !_introSkip) GameAudio.PlayJingle(d.Jingle, d.NoteSec);
+        if (full && !_introSkip) IntroMusic(_batterStats, d);
         if (full && d.Fireworks > 0) _stage.Stadium.LaunchFireworks(d.Fireworks);
         if (full && d.Pose != IntroPose.None && !_introSkip)
         {
@@ -313,7 +315,7 @@ public class AtBatController : MonoBehaviour
             yield return StartCoroutine(IntroWait(walkSec + 0.1f));
         }
         _ui.ShowIntroCard(title, _pitcherStats.Name, stats, full ? d.Copy : "", d.CardColor, Portrait(_pitcherStats));
-        if (full && !_introSkip) GameAudio.PlayJingle(d.Jingle, d.NoteSec);
+        if (full && !_introSkip) IntroMusic(_pitcherStats, d);
         if (full && d.Fireworks > 0) _stage.Stadium.LaunchFireworks(d.Fireworks);
         if (full && d.Pose != IntroPose.None && !_introSkip)
         {
@@ -326,6 +328,15 @@ public class AtBatController : MonoBehaviour
             yield return StartCoroutine(IntroWait(full ? 0.8f : 0.5f));
         }
         yield return StartCoroutine(EndIntro(_pitcher));
+    }
+
+    // 登場の曲: SECRET と ★5 は専用曲、それ以外は合成のジングル
+    private void IntroMusic(PlayerStats p, IntroDef d)
+    {
+        var cd = string.IsNullOrEmpty(p.CharaId) ? null : CharaCatalog.Get(p.CharaId);
+        if (cd != null && cd.Rarity == Rarity.Secret) Music("bgm-entrance-secret", 7f);
+        else if (cd != null && cd.Rarity == Rarity.R5) Music("bgm-entrance-5", 7f);
+        else GameAudio.PlayJingle(d.Jingle, d.NoteSec);
     }
 
     private static Sprite Portrait(PlayerStats p)
@@ -560,6 +571,8 @@ public class AtBatController : MonoBehaviour
         RefreshHud();
         _ui.ShowResult("");
         _ui.ShowBanner("");
+        _replaying = false;
+        SituationMusic();
         if (IntroEnabled)
         {
             _introSkip = false;
@@ -600,7 +613,8 @@ public class AtBatController : MonoBehaviour
             if (_gs.GameOver)
             {
                 string res = _gs.Runs > _gs.OppRuns ? "勝ち！" : (_gs.Runs < _gs.OppRuns ? "負け…" : "引き分け");
-                if (_gs.Runs > _gs.OppRuns) { _stage.Stadium.LaunchFireworks(10); GameAudio.Play(Sfx.BigCheer, 0.9f); }
+                if (_gs.Runs > _gs.OppRuns) { _stage.Stadium.LaunchFireworks(10); GameAudio.Play(Sfx.BigCheer, 0.9f); BgmPlayer.Jingle("bgm-win"); }
+                else if (_gs.Runs < _gs.OppRuns) BgmPlayer.Jingle("bgm-lose");
                 _ui.ShowResult("試合終了  " + _gs.Runs + " - " + _gs.OppRuns + "  " + res);
                 _ui.ShowBanner("珍プレー " + _gs.QuirkCount);
                 GameLog.Add("game" + _gs.GameNo + " " + _gs.Runs + "-" + _gs.OppRuns + " quirks=" + _gs.QuirkCount + " pa=" + _gs.PlateAppearances + " sec=" + (Time.time - _gameStartT).ToString("F0"));
@@ -614,6 +628,7 @@ public class AtBatController : MonoBehaviour
                 }
                 _bestScore = -1;
                 _gs.NewGame();
+                BgmPlayer.Jingle("bgm-playball", 7f);
                 _introSeen.Clear();
                 BuildTeams();
                 _ui.ShowBanner("");
@@ -622,11 +637,34 @@ public class AtBatController : MonoBehaviour
         }
     }
 
+    // ---- 場面の曲(BRIEF_music30_addendum.md の対応表) ----
+    private bool _wasLoaded, _wasScoring;
+    private bool _replaying;
+
+    private void Music(string name, float fadeAfter = 0f)
+    {
+        if (_replaying) return;
+        BgmPlayer.Jingle(name, fadeAfter);
+    }
+
+    // 打席の始まり: 満塁 / 得点圏(自軍=チャンス、相手=ピンチ)になった瞬間だけ鳴らす
+    private void SituationMusic()
+    {
+        bool loaded = _gs.Base[1] && _gs.Base[2] && _gs.Base[3];
+        bool scoring = _gs.Base[2] || _gs.Base[3];
+        if (loaded && !_wasLoaded) Music("bgm-bases-loaded", 8f);
+        else if (scoring && !_wasScoring) Music(_gs.UserBatting ? "bgm-chance" : "bgm-pinch", 8f);
+        _wasLoaded = loaded;
+        _wasScoring = scoring;
+    }
+
     // 1球ぶんの結果をカウントと走者へ反映。打席が終わったら true。
     private bool ApplyPitchResult()
     {
         bool over = false;
         string key = _pitchEnd.ToString();
+        int runsBefore = _gs.Runs, oppBefore = _gs.OppRuns;
+        _replaying = false;
         _gs.Moves.Clear();
         _gs.LastRuns = 0;
         switch (_pitchEnd)
@@ -638,12 +676,13 @@ public class AtBatController : MonoBehaviour
             case PitchEnd.HitByPitch:
                 _gs.ApplyWalk();
                 _ui.ShowResult("デッドボール");
+                Music("bgm-hit-by-pitch", 7f);
                 over = true;
                 key = "HitByPitch";
                 break;
             case PitchEnd.CalledStrike:
                 _gs.Strikes++;
-                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("見逃し三振！"); _pitcher.SetExpression(Expr.Happy, 1.5f); _batter.SetExpression(Expr.Surprise, 1.2f); over = true; key = "StrikeoutLooking"; }
+                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("見逃し三振！"); _pitcher.SetExpression(Expr.Happy, 1.5f); _batter.SetExpression(Expr.Surprise, 1.2f); over = true; key = "StrikeoutLooking"; Music("bgm-strikeout"); }
                 break;
             case PitchEnd.SwingMiss:
                 _gs.Strikes++;
@@ -655,6 +694,7 @@ public class AtBatController : MonoBehaviour
                     _batter.Flop(1.0f * BattingConfig.GunyaLevel);
                     over = true;
                     key = "StrikeoutSwinging";
+                    Music("bgm-strikeout");
                 }
                 break;
             case PitchEnd.Foul:
@@ -662,7 +702,7 @@ public class AtBatController : MonoBehaviour
                 break;
             case PitchEnd.FoulTip:
                 _gs.Strikes++;
-                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("ファウルチップ三振！"); over = true; key = "StrikeoutTip"; }
+                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("ファウルチップ三振！"); over = true; key = "StrikeoutTip"; Music("bgm-strikeout"); }
                 break;
             case PitchEnd.InPlay:
                 over = true;
@@ -673,8 +713,10 @@ public class AtBatController : MonoBehaviour
                 {
                     int ob = _gs.Outs;
                     _gs.ApplyOut(_play.Kind, _play.Fielder, _play.Distance);
-                    if (_gs.Outs - ob >= 2) { key = "DoublePlay"; Say(Commentary.ForDoublePlay(), new Color(1f, 0.9f, 0.4f), true); }
+                    if (_gs.Outs - ob >= 2) { key = "DoublePlay"; Say(Commentary.ForDoublePlay(), new Color(1f, 0.9f, 0.4f), true); Music("bgm-doubleplay", 8f); }
                 }
+                // 逆転打(自軍がリードを奪った)
+                if (_gs.UserBatting && runsBefore <= oppBefore && _gs.Runs > _gs.OppRuns) Music("bgm-comeback", 10f);
                 break;
         }
         if (over && _gs.LastRuns > 0) _ui.ShowBanner("+" + _gs.LastRuns + "点");
@@ -1130,6 +1172,7 @@ public class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     private IEnumerator PlayBattedBall(BattedBallTrajectory tr, PlayResult play, float speed = 1f, bool replay = false)
     {
+        _replaying = replay;
         _stage.SetCameraMode(CamMode.Follow);
         _stage.ResetFielders();
 
@@ -1333,6 +1376,7 @@ public class AtBatController : MonoBehaviour
             case QuirkKind.BadThrow: GameAudio.Play(Sfx.Boing, 0.7f, 0.9f); break;
         }
         GameAudio.Haptic();
+        Music(play.Quirk == QuirkKind.BadThrow || play.Quirk == QuirkKind.Slip ? "bgm-error" : "bgm-rare-play", 9f);
         if (FreezeKind == -50) { FreezeKind = -99; StartCoroutine(FreezeSoon(0.45f)); }
         switch (play.Quirk)
         {
@@ -1359,6 +1403,12 @@ public class AtBatController : MonoBehaviour
         else if (play.Kind == PlayKind.HomeRun || play.IsHit)
             label += "  " + Mathf.RoundToInt(play.Distance) + "m";
         _ui.ShowResult(label);
+        // 曲: 自軍の本塁打 / 自軍投手が痛打された / 自軍のファインプレー
+        if (play.Kind == PlayKind.HomeRun) Music(_gs.UserBatting ? "bgm-homerun" : "bgm-pitcher-hit", 10f);
+        else if (!_gs.UserBatting && play.IsHit && play.Quirk == QuirkKind.None
+                 && (_outcome.Rank == HitRank.Perfect || play.Bases >= 2)) Music("bgm-pitcher-hit", 7f);
+        else if (!_gs.UserBatting && play.IsOut && play.Quirk == QuirkKind.None
+                 && (play.Kind == PlayKind.FlyOut || play.Kind == PlayKind.LineOut) && play.Distance > 62f) Music("bgm-fineplay", 8f);
         if (play.Kind == PlayKind.HomeRun)
         {
             _pitcher.Flop(0.7f * BattingConfig.GunyaLevel);

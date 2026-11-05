@@ -39,7 +39,7 @@ public partial class AppShell : MonoBehaviour
         AtBatController.InputBlocked = true;
         GameAudio.Init(gameObject);
         Build();
-        ShowHome();
+        ShowTitle();
     }
 
     // ------------------------------------------------------------
@@ -68,6 +68,7 @@ public partial class AppShell : MonoBehaviour
 
         BuildHome();
         BuildCards();
+        BuildTitle();
         BuildGacha();
         _detail = UiKit.Fill(UiKit.Rect(_root, "Detail"));
         _show = UiKit.Fill(UiKit.Rect(_root, "GachaShow"));
@@ -145,6 +146,102 @@ public partial class AppShell : MonoBehaviour
         UiKit.Place(_homeOwned.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, -206f), new Vector2(300f, 30f));
     }
 
+    // ---- タイトル(主ボタンは「つづきから」だけ)と、初回の名前入力 ----
+    private RectTransform _title, _namePanel, _titleRays;
+    private InputField _nameInput;
+    private const string NameKey = "gunya.player.name";
+
+    public static string PlayerName { get { return PlayerPrefs.GetString(NameKey, ""); } }
+
+    private void BuildTitle()
+    {
+        _title = MakeScreen("Title", 1f);
+        _titleRays = AddRays(_title, new Color(1f, 0.85f, 0.4f, 0.55f), 1600f, new Vector2(0f, 40f));
+        // キービジュアル: キャラのカードを扇状に
+        string[] ids = { "ojisan", "robot-gold", "heroine", "dog", "sumo" };
+        for (int i = 0; i < ids.Length; i++)
+        {
+            var d = CharaCatalog.Get(ids[i]);
+            if (d == null) continue;
+            float k = i - 2;
+            var c = CardWidget.Build(_title, d, new Vector2(170f, 255f), false, true, 1);
+            c.Root.anchorMin = c.Root.anchorMax = new Vector2(0.5f, 0.5f);
+            c.Root.anchoredPosition = new Vector2(k * 150f, -12f - Mathf.Abs(k) * 18f);
+            c.Root.localRotation = Quaternion.Euler(0f, 0f, -k * 7f);
+            c.CountText.text = "";
+            c.Frame.raycastTarget = false;
+            if (i == 2) c.Root.SetAsLastSibling();
+        }
+        var logo1 = UiKit.Txt(_title, "Logo1", "ぐにゃぐにゃ", 64, UiKit.GoldLight, TextAnchor.MiddleCenter);
+        UiKit.Place(logo1.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -22f), new Vector2(800f, 80f));
+        var logo2 = UiKit.Txt(_title, "Logo2", "ベースボール", 74, Color.white, TextAnchor.MiddleCenter);
+        UiKit.Place(logo2.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(860f, 92f));
+        foreach (var t in new[] { logo1, logo2 })
+        {
+            var sh = t.gameObject.AddComponent<Shadow>();
+            sh.effectColor = new Color(0.45f, 0f, 0f, 0.95f);
+            sh.effectDistance = new Vector2(4f, -5f);
+        }
+        var cont = UiKit.Btn(_title, "Continue", "つづきから", new Vector2(320f, 74f), true, OnContinue, 34);
+        UiKit.Place(cont.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 28f), new Vector2(320f, 74f));
+
+        // 名前入力(初回だけ)
+        _namePanel = UiKit.Fill(UiKit.Rect(_title, "NamePanel"));
+        var dim = UiKit.Img(_namePanel, "Dim", SpriteFactory.White, new Color(0f, 0f, 0f, 0.75f), true);
+        UiKit.Fill(dim.rectTransform);
+        var box = UiKit.Img(_namePanel, "Box", UiKit.ButtonDark, Color.white, true);
+        UiKit.Place(box.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 20f), new Vector2(520f, 240f));
+        var label = UiKit.Txt(box.transform, "Label", "なまえ", 30, UiKit.GoldLight, TextAnchor.MiddleCenter);
+        UiKit.Place(label.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(400f, 44f));
+        var field = UiKit.Img(box.transform, "Field", SpriteFactory.White, new Color(1f, 0.97f, 0.9f), true);
+        UiKit.Place(field.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), new Vector2(420f, 58f));
+        var txt = UiKit.Txt(field.transform, "Text", "", 28, new Color(0.15f, 0.05f, 0.05f), TextAnchor.MiddleCenter, true, false);
+        UiKit.Fill(txt.rectTransform, 6f);
+        txt.supportRichText = false;
+        txt.horizontalOverflow = HorizontalWrapMode.Wrap;
+        var ph = UiKit.Txt(field.transform, "Placeholder", "10文字まで", 22, new Color(0.5f, 0.42f, 0.4f), TextAnchor.MiddleCenter, false, false);
+        UiKit.Fill(ph.rectTransform, 6f);
+        _nameInput = field.gameObject.AddComponent<InputField>();
+        _nameInput.textComponent = txt;
+        _nameInput.placeholder = ph;
+        _nameInput.characterLimit = 10;
+        var ok = UiKit.Btn(box.transform, "OK", "決定", new Vector2(200f, 56f), true, OnNameDecided, 26);
+        UiKit.Place(ok.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(200f, 56f));
+        _namePanel.gameObject.SetActive(false);
+    }
+
+    public void ShowTitle()
+    {
+        Only(_title);
+        _namePanel.gameObject.SetActive(false);
+        _menuBtn.SetActive(false);
+        MenuOpen = true;
+        AtBatController.InputBlocked = true;
+        BgmPlayer.PlayBase(BgmPlayer.Home);
+    }
+
+    private void OnContinue()
+    {
+        if (string.IsNullOrEmpty(PlayerName))
+        {
+            _namePanel.gameObject.SetActive(true);
+            _nameInput.text = "";
+            _nameInput.ActivateInputField();
+            return;
+        }
+        ShowHome();
+    }
+
+    private void OnNameDecided()
+    {
+        string n = _nameInput.text.Trim();
+        if (n.Length == 0) { GameAudio.Play(Sfx.Boing, 0.5f, 1.2f); return; }
+        PlayerPrefs.SetString(NameKey, n);
+        PlayerPrefs.Save();
+        _namePanel.gameObject.SetActive(false);
+        ShowHome();
+    }
+
     // ---- カード一覧 ----
     private void BuildCards()
     {
@@ -193,7 +290,7 @@ public partial class AppShell : MonoBehaviour
             CardWidget.SetCount(kv.Value, kv.Key, Collection.Owned(kv.Key.Id), Collection.Count(kv.Key.Id));
         int owned = Collection.OwnedKinds();
         _cardsTitle.text = "カード   " + owned + " / " + CharaCatalog.All.Count;
-        _homeOwned.text = "カード " + owned + " / " + CharaCatalog.All.Count;
+        _homeOwned.text = (string.IsNullOrEmpty(PlayerName) ? "" : PlayerName + "   ") + "カード " + owned + " / " + CharaCatalog.All.Count;
     }
 
     // ---- カード拡大 ----
@@ -216,19 +313,39 @@ public partial class AppShell : MonoBehaviour
         p.Frame.raycastTarget = false;
         StartCoroutine(PopIn(p.Root, 0.25f));
 
-        var r = UiKit.Txt(_detail, "Rarity", CharaCatalog.Label(d.Rarity), 40, d.Rarity == Rarity.Secret ? new Color(1f, 0.6f, 0.95f) : UiKit.GoldLight, TextAnchor.MiddleLeft);
-        UiKit.Place(r.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 120f), new Vector2(400f, 56f));
-        var n = UiKit.Txt(_detail, "Name", d.Name, 38, Color.white, TextAnchor.MiddleLeft);
-        UiKit.Place(n.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 60f), new Vector2(420f, 56f));
-        int max = CharaCatalog.StackMax(d.Rarity);
-        var s = UiKit.Txt(_detail, "Stack", owned ? "重ね " + cnt + " / " + max : "未所持", 26, owned ? UiKit.GoldLight : new Color(0.7f, 0.7f, 0.75f), TextAnchor.MiddleLeft);
-        UiKit.Place(s.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(40f, 4f), new Vector2(420f, 40f));
+        var r = UiKit.Txt(_detail, "Rarity", CharaCatalog.Label(d.Rarity) + "   " + d.Code, 30, d.Rarity == Rarity.Secret ? new Color(1f, 0.6f, 0.95f) : UiKit.GoldLight, TextAnchor.MiddleLeft);
+        UiKit.Place(r.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, 178f), new Vector2(440f, 40f));
+        var n = UiKit.Txt(_detail, "Name", d.Name, 34, Color.white, TextAnchor.MiddleLeft);
+        UiKit.Place(n.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, 134f), new Vector2(460f, 48f));
+        var pos = UiKit.Txt(_detail, "Pos", d.Position + "   " + string.Join(" / ", d.Tags), 18, new Color(1f, 0.85f, 0.6f), TextAnchor.MiddleLeft, false);
+        UiKit.Place(pos.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(22f, 98f), new Vector2(460f, 28f));
+        // 紹介文(roster-101.csv の intro)
+        var intro = UiKit.Txt(_detail, "Intro", d.Intro, 17, Color.white, TextAnchor.UpperLeft, false);
+        intro.horizontalOverflow = HorizontalWrapMode.Wrap;
+        UiKit.Place(intro.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 1f), new Vector2(22f, 80f), new Vector2(430f, 90f));
+        int max = CharaCatalog.StackMax(d);
+        var s = UiKit.Txt(_detail, "Stack", owned ? "重ね " + cnt + " / " + max : "未所持", 24, owned ? UiKit.GoldLight : new Color(0.7f, 0.7f, 0.75f), TextAnchor.MiddleLeft);
+        UiKit.Place(s.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, -30f), new Vector2(420f, 36f));
         // 重ねの段階を丸で表示
         for (int i = 0; i < max; i++)
         {
             var dot = UiKit.Img(_detail, "Pip" + i, SpriteFactory.Circle, i < cnt ? UiKit.Gold : new Color(1f, 1f, 1f, 0.18f));
-            UiKit.Place(dot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(42f + i * 26f, -40f), new Vector2(18f, 18f));
+            UiKit.Place(dot.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(22f + i * 26f, -64f), new Vector2(18f, 18f));
         }
+        // 交換所: ダブりを交換ポイントに
+        var ex = UiKit.Txt(_detail, "ExPt", "交換 " + d.ExchangePoints.ToString("N0") + " pt", 22, UiKit.GoldLight, TextAnchor.MiddleLeft);
+        UiKit.Place(ex.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, -104f), new Vector2(240f, 36f));
+        if (cnt >= 2)
+        {
+            var def = d;
+            var b = UiKit.Btn(_detail, "Exchange", "交換する", new Vector2(150f, 46f), true, () =>
+            {
+                if (Collection.Exchange(def)) { GameAudio.Play(Sfx.Catch, 0.8f, 1.3f); ShowDetail(def); RefreshCards(); }
+            }, 20);
+            UiKit.Place(b.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(262f, -104f), new Vector2(150f, 46f));
+        }
+        var have = UiKit.Txt(_detail, "Points", Collection.Points.ToString("N0") + " pt", 20, Color.white, TextAnchor.MiddleLeft);
+        UiKit.Place(have.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, -146f), new Vector2(240f, 32f));
     }
 
     // ---- ガチャ画面 ----
@@ -255,12 +372,25 @@ public partial class AppShell : MonoBehaviour
         UiKit.Place(one.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-130f, -180f), new Vector2(220f, 70f));
         var ten = UiKit.Btn(_gacha, "Pull10", "10連", new Vector2(220f, 70f), true, () => Pull(10), 30);
         UiKit.Place(ten.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(130f, -180f), new Vector2(220f, 70f));
+        // 交換ポイントでスカウト(1回)
+        var sc = UiKit.Btn(_gacha, "Scout", "スカウト " + Collection.ScoutCost + "pt", new Vector2(210f, 46f), false, () =>
+        {
+            if (Collection.Points < Collection.ScoutCost) { GameAudio.Play(Sfx.Boing, 0.5f, 1.2f); return; }
+            Collection.Points = Collection.Points - Collection.ScoutCost;
+            Pull(1);
+        }, 20);
+        UiKit.Place(sc.GetComponent<RectTransform>(), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-16f, 16f), new Vector2(210f, 46f));
+        _gachaPoints = UiKit.Txt(_gacha, "Points", "", 20, Color.white, TextAnchor.MiddleRight);
+        UiKit.Place(_gachaPoints.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-20f, 68f), new Vector2(240f, 28f));
     }
+
+    private Text _gachaPoints;
 
     private void RefreshGacha()
     {
         int left = Gacha.PityLimit - Collection.PityCount;
         _gachaInfo.text = "★4以上確定まで あと " + left;
+        if (_gachaPoints != null) _gachaPoints.text = Collection.Points.ToString("N0") + " pt";
     }
 
     // ------------------------------------------------------------
@@ -268,6 +398,7 @@ public partial class AppShell : MonoBehaviour
     // ------------------------------------------------------------
     private void Only(RectTransform r)
     {
+        if (_title != null) _title.gameObject.SetActive(r == _title);
         _home.gameObject.SetActive(r == _home);
         _cards.gameObject.SetActive(r == _cards);
         _gacha.gameObject.SetActive(r == _gacha);
@@ -278,6 +409,7 @@ public partial class AppShell : MonoBehaviour
 
     public void ShowHome()
     {
+        BgmPlayer.PlayBase(BgmPlayer.Home);
         Only(_home);
         RefreshCards();
         _playLabel.text = _gameStarted ? "試合に戻る" : "試合";
@@ -286,11 +418,12 @@ public partial class AppShell : MonoBehaviour
         AtBatController.InputBlocked = true;
     }
 
-    public void ShowCards() { Only(_cards); RefreshCards(); }
-    public void ShowGacha() { Only(_gacha); RefreshGacha(); }
+    public void ShowCards() { Only(_cards); RefreshCards(); BgmPlayer.PlayBase(BgmPlayer.Team); }
+    public void ShowGacha() { Only(_gacha); RefreshGacha(); BgmPlayer.PlayBase(BgmPlayer.GachaScreen); }
 
     public void StartGame()
     {
+        BgmPlayer.PlayBase(BgmPlayer.Match);
         Only(null);
         MenuOpen = false;
         _menuBtn.SetActive(true);
@@ -326,6 +459,7 @@ public partial class AppShell : MonoBehaviour
     {
         float t = Time.unscaledTime;
         if (_homeRays != null) _homeRays.localRotation = Quaternion.Euler(0f, 0f, t * 6f);
+        if (_titleRays != null) _titleRays.localRotation = Quaternion.Euler(0f, 0f, -t * 5f);
         if (_gachaRays != null) _gachaRays.localRotation = Quaternion.Euler(0f, 0f, -t * 8f);
         if (_cards.gameObject.activeSelf)
         {
@@ -338,7 +472,7 @@ public partial class AppShell : MonoBehaviour
                 p.Shine.rectTransform.anchoredPosition = new Vector2(Mathf.Lerp(-w * 1.2f, w * 1.2f, u), 0f);
             }
         }
-        if (_home.gameObject.activeSelf && t > _nextFirework)
+        if ((_home.gameObject.activeSelf || (_title != null && _title.gameObject.activeSelf)) && t > _nextFirework)
         {
             _nextFirework = t + UnityEngine.Random.Range(1.4f, 2.6f);
             Color c = UnityEngine.Random.value < 0.5f ? UiKit.Gold : new Color(1f, 0.3f, 0.2f);

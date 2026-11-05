@@ -20,7 +20,7 @@ public static class Collection
     public static AddResult Add(CharaDef d)
     {
         int before = Count(d.Id);
-        int max = CharaCatalog.StackMax(d.Rarity);
+        int max = CharaCatalog.StackMax(d);
         int after = Mathf.Min(max, before + 1);
         PlayerPrefs.SetInt(Prefix + d.Id, after);
         return new AddResult { Before = before, After = after, IsNew = before == 0, Capped = before >= max };
@@ -39,6 +39,27 @@ public static class Collection
         set { PlayerPrefs.SetInt(PullsKey, value); }
     }
 
+    // ---- 交換所: ダブったカード(ベンチ選手)を交換ポイントにする ----
+    private const string PointsKey = "gunya.exchange.points";
+    public const int ScoutCost = 25;   // スカウトチケット1枚(=1回引ける)
+
+    public static int Points
+    {
+        get { return PlayerPrefs.GetInt(PointsKey, 0); }
+        set { PlayerPrefs.SetInt(PointsKey, Mathf.Max(0, value)); }
+    }
+
+    // 1枚を交換ポイントにする。最後の1枚は残す(図鑑から消えないように)
+    public static bool Exchange(CharaDef d)
+    {
+        int c = Count(d.Id);
+        if (c < 2) return false;
+        PlayerPrefs.SetInt(Prefix + d.Id, c - 1);
+        Points = Points + d.ExchangePoints;
+        Save();
+        return true;
+    }
+
     public static int OwnedKinds()
     {
         int n = 0;
@@ -54,6 +75,7 @@ public static class Collection
         foreach (var d in CharaCatalog.All) PlayerPrefs.DeleteKey(Prefix + d.Id);
         PlayerPrefs.DeleteKey(PityKey);
         PlayerPrefs.DeleteKey(PullsKey);
+        PlayerPrefs.DeleteKey(PointsKey);
         PlayerPrefs.Save();
     }
 }

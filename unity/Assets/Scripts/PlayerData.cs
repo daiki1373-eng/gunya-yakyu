@@ -30,6 +30,7 @@ public class PlayerStats
 
     // ガチャのキャラ(Resources/Chara の画像ID)。空なら従来キャラ。
     public string CharaId = "";
+    public string PositionLabel = "";   // 表示用の守備位置(roster-101.csv の position)
     // 肌(頭)の色の上書き。a=0 なら種族の標準色。
     public Color SkinTint = new Color(0f, 0f, 0f, 0f);
     // 投げる・打つ体の服装(キャラの絵に合わせる)。HasLook=false なら所属チームのユニフォーム。
