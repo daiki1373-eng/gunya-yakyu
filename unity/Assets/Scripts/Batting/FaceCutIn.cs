@@ -104,7 +104,8 @@ public class FaceCutIn : MonoBehaviour
     private void OnExpr(RagdollPlayer p, Expr e, float seconds)
     {
         if (p == null || _ctl == null) return;
-        if (e == Expr.Normal || e == Expr.Focus) return;
+        // 目が回る(空振りで崩れるたびに出る)は出さない。大事な場面は後に続く がっかり/怒り で出る
+        if (e == Expr.Normal || e == Expr.Focus || e == Expr.Dizzy) return;
         if (seconds < 1f || seconds > 5f) return;            // 一瞬の驚き・登場ポーズは出さない
         if (_ctl.Replaying || AppShell.MenuOpen) return;
         // 打者は右・投手は左

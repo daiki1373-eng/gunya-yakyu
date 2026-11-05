@@ -694,6 +694,7 @@ public class AtBatController : MonoBehaviour
                     _ui.ShowResult("空振り三振！"); _pitcher.SetExpression(Expr.Happy, 1.5f);
                     if (Random.value < 0.5f) Say(Commentary.ForWhiffK(), new Color(1f, 0.9f, 0.4f), false);
                     _batter.Flop(1.0f * BattingConfig.GunyaLevel);
+                    StartCoroutine(LaterExpression(_batter, Expr.Sad, 0.9f, 1.6f));
                     over = true;
                     key = "StrikeoutSwinging";
                     Music("bgm-strikeout");

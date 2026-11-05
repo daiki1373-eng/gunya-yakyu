@@ -11,20 +11,24 @@ public class ClipRecorder : MonoBehaviour
     public static ClipRecorder Current;
     public string Dir;
     public float Fps = 15f;
+    public int SuperSize = 1;   // 2 なら画面の2倍の解像度で書き出す
     public int Frames;
     private float _next, _t0;
     private readonly List<string> _times = new List<string>();
     private readonly List<float> _samples = new List<float>(1 << 22);
     private int _channels = 2;
     private bool _on;
+    private static int _pending;
 
-    public static ClipRecorder Begin(string dir, float fps)
+    public static ClipRecorder Begin(string dir, float fps) { return Begin(dir, fps, 1); }
+
+    public static ClipRecorder Begin(string dir, float fps, int superSize)
     {
         End();
         var lis = FindObjectOfType<AudioListener>();
         GameObject host = lis != null ? lis.gameObject : new GameObject("ClipRecorder");
         var r = host.AddComponent<ClipRecorder>();
-        r.Dir = dir; r.Fps = fps;
+        r.Dir = dir; r.Fps = fps; r.SuperSize = Mathf.Max(1, superSize);
         Directory.CreateDirectory(dir);
         foreach (var f in Directory.GetFiles(dir)) File.Delete(f);
         r._t0 = Time.realtimeSinceStartup; r._next = r._t0;
@@ -41,6 +45,7 @@ public class ClipRecorder : MonoBehaviour
         Current = null;
         r._on = false;
         r.StopAllCoroutines();
+        for (int i = 0; i < 300 && _pending > 0; i++) System.Threading.Thread.Sleep(10);   // 書き込みの終わりを待つ
         string info;
         lock (r._samples) { info = r.WriteWav(); }
         File.WriteAllLines(Path.Combine(r.Dir, "times.txt"), r._times.ToArray());
@@ -58,11 +63,19 @@ public class ClipRecorder : MonoBehaviour
             if (now < _next) continue;
             _next += 1f / Fps;
             if (_next < now) _next = now + 1f / Fps;
-            var tex = ScreenCapture.CaptureScreenshotAsTexture();
-            byte[] jpg = tex.EncodeToJPG(85);
-            Destroy(tex);
+            var tex = ScreenCapture.CaptureScreenshotAsTexture(SuperSize);
             string name = "f" + Frames.ToString("D5") + ".jpg";
-            File.WriteAllBytes(Path.Combine(Dir, name), jpg);
+            // JPG にする処理と書き込みは別スレッドで(録画中の試合を重くしない)
+            byte[] raw = tex.GetRawTextureData();
+            var fmt = tex.graphicsFormat; uint w = (uint)tex.width, h = (uint)tex.height;
+            string path = Path.Combine(Dir, name);
+            Destroy(tex);
+            System.Threading.Interlocked.Increment(ref _pending);
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try { File.WriteAllBytes(path, ImageConversion.EncodeArrayToJPG(raw, fmt, w, h, 0, 88)); }
+                finally { System.Threading.Interlocked.Decrement(ref _pending); }
+            });
             _times.Add(name + " " + (now - _t0).ToString("F3"));
             Frames++;
         }
