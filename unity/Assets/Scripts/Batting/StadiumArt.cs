@@ -122,88 +122,153 @@ public static class StadiumArt
     }
 
     // ---- 観客(2コマ: 座り / 立ち上がって手を上げる) --------------------
+    // 1024x256(1列32px)。輪郭をなめらかに描き、下から照明が当たった陰影と、列の足元の暗がりを付ける。
     private static readonly Sprite[,] _crowd = new Sprite[2, 2];
     // side: 0=ホーム側(赤系が多い) 1=ビジター側(青系が多い)
     public static Sprite Crowd(int side, int frame)
     {
         if (_crowd[side, frame] != null) return _crowd[side, frame];
-        int w = 512, h = 128, rowH = 16;
+        int w = 1024, h = 256, rowH = 32;
         var px = new Color[w * h];
-        Color riser = new Color(0.10f, 0.11f, 0.15f), seat = new Color(0.16f, 0.22f, 0.38f);
+        Color riser = new Color(0.035f, 0.04f, 0.06f), seatLo = new Color(0.06f, 0.08f, 0.15f), seatHi = new Color(0.11f, 0.14f, 0.25f);
         for (int y = 0; y < h; y++)
         {
             int ry = y % rowH;
-            Color c = ry < 3 ? riser : seat;
+            Color c = ry < 5 ? riser : Color.Lerp(seatLo, seatHi, (ry - 5) / (float)(rowH - 5));
             for (int x = 0; x < w; x++) px[y * w + x] = c;
         }
-        Color team = side == 0 ? new Color(0.86f, 0.16f, 0.16f) : new Color(0.16f, 0.30f, 0.85f);
+        Color team = side == 0 ? new Color(0.80f, 0.13f, 0.14f) : new Color(0.14f, 0.27f, 0.80f);
         Color[] shirts =
         {
-            team, team, team, new Color(0.95f, 0.95f, 0.95f), new Color(0.15f, 0.15f, 0.18f),
-            new Color(0.95f, 0.80f, 0.25f), new Color(0.45f, 0.60f, 0.45f), new Color(0.70f, 0.70f, 0.75f),
-            team * 0.7f, new Color(0.95f, 0.55f, 0.35f)
+            team, team, team, team, new Color(0.92f, 0.92f, 0.94f), new Color(0.12f, 0.12f, 0.15f),
+            new Color(0.92f, 0.76f, 0.22f), new Color(0.38f, 0.52f, 0.40f), new Color(0.62f, 0.63f, 0.68f),
+            team * 0.65f, new Color(0.90f, 0.50f, 0.32f), new Color(0.30f, 0.32f, 0.40f)
         };
-        Color[] skins = { new Color(0.96f, 0.80f, 0.65f), new Color(0.88f, 0.68f, 0.52f), new Color(0.75f, 0.55f, 0.40f) };
-        Color[] hairs = { new Color(0.08f, 0.07f, 0.07f), new Color(0.25f, 0.17f, 0.10f), new Color(0.12f, 0.10f, 0.10f), team };
+        Color[] skins = { new Color(0.95f, 0.78f, 0.64f), new Color(0.86f, 0.66f, 0.50f), new Color(0.70f, 0.50f, 0.36f) };
+        Color[] hairs = { new Color(0.06f, 0.05f, 0.05f), new Color(0.22f, 0.15f, 0.09f), new Color(0.10f, 0.08f, 0.08f), new Color(0.45f, 0.40f, 0.36f) };
         var rng = new System.Random(900 + side * 31);
         for (int row = 0; row < h / rowH; row++)
         {
             int yb = row * rowH;
-            int x = rng.Next(0, 6);
+            float x = rng.Next(0, 10);
             while (x < w)
             {
-                int pw = 7 + rng.Next(0, 3);
-                bool present = rng.NextDouble() < 0.93;
+                float pw = 14f + rng.Next(0, 5);
+                bool present = rng.NextDouble() < 0.94;
                 bool stand = frame == 1 && rng.NextDouble() < 0.55;
                 if (present)
                 {
                     Color shirt = shirts[rng.Next(shirts.Length)];
                     Color skin = skins[rng.Next(skins.Length)];
                     Color hair = hairs[rng.Next(hairs.Length)];
-                    int lift = stand ? 3 : 0;
-                    // 体
-                    Rect(px, w, h, x, yb + 3 + lift, pw, 7, shirt);
-                    // 頭
-                    Disc(px, w, h, x + pw * 0.5f, yb + 12.2f + lift, 2.6f, skin);
-                    Disc(px, w, h, x + pw * 0.5f, yb + 13.4f + lift, 2.3f, hair, true);
+                    bool cap = rng.NextDouble() < 0.3;
+                    float lift = stand ? 6f : 0f;
+                    float cx = x + pw * 0.5f;
+                    // 体(肩の丸い四角)。下ほど暗く、上(肩)は照明で明るい
+                    RoundRect(px, w, h, x + 0.5f, yb + 5f + lift, x + pw - 0.5f, yb + 19f + lift, 4.5f,
+                        shirt * 0.55f, shirt * 1.05f);
+                    // 首の影
+                    Disc(px, w, h, cx, yb + 19.5f + lift, 2.6f, skin * 0.6f);
+                    // 頭(左上に光)
+                    DiscShade(px, w, h, cx, yb + 23.5f + lift, 4.8f, skin * 0.8f, skin * 1.12f);
+                    if (cap) { Disc(px, w, h, cx, yb + 25.5f + lift, 4.9f, team * 0.9f, true); RoundRect(px, w, h, cx - 1f, yb + 24.5f + lift, cx + 7f, yb + 26f + lift, 0.8f, team * 0.6f, team * 0.8f); }
+                    else Disc(px, w, h, cx, yb + 25.2f + lift, 4.6f, hair, true);
                     if (stand)
                     {
                         // 手を上げる / タオルを掲げる
-                        if (rng.NextDouble() < 0.35) Rect(px, w, h, x - 1, yb + 15 + lift, pw + 2, 2, team * 1.1f);
+                        if (rng.NextDouble() < 0.35)
+                            RoundRect(px, w, h, x - 2f, yb + 30f + lift, x + pw + 2f, yb + 33f + lift, 1f, team * 0.8f, team * 1.15f);
                         else
                         {
-                            Rect(px, w, h, x, yb + 9 + lift, 1, 7, skin);
-                            Rect(px, w, h, x + pw - 1, yb + 9 + lift, 1, 7, skin);
+                            RoundRect(px, w, h, x + 0.5f, yb + 17f + lift, x + 2.5f, yb + 31f + lift, 1f, skin * 0.7f, skin);
+                            RoundRect(px, w, h, x + pw - 2.5f, yb + 17f + lift, x + pw - 0.5f, yb + 31f + lift, 1f, skin * 0.7f, skin);
                         }
                     }
                 }
-                x += pw + 1 + rng.Next(0, 2);
+                x += pw + 1.5f + rng.Next(0, 3);
+            }
+        }
+        // 列の足元(前の列の背もたれ)の暗がり
+        for (int y = 0; y < h; y++)
+        {
+            int ry = y % rowH;
+            float ao = ry < 9 ? Mathf.Lerp(0.55f, 1f, ry / 9f) : 1f;
+            for (int x = 0; x < w; x++)
+            {
+                Color c = px[y * w + x] * ao;
+                // 夜のスタンドらしく少し暗く・彩度を控えめに
+                float l = c.r * 0.3f + c.g * 0.59f + c.b * 0.11f;
+                c = Color.Lerp(new Color(l, l, l), c, 0.82f) * 0.86f;
+                c.a = 1f;
+                px[y * w + x] = c;
             }
         }
         var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
         tex.wrapMode = TextureWrapMode.Repeat;
         tex.filterMode = FilterMode.Trilinear;
-        tex.anisoLevel = 4;
+        tex.anisoLevel = 8;
         tex.SetPixels(px);
         tex.Apply(true);
         tex.hideFlags = HideFlags.HideAndDontSave;
-        var sp = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 16f, 0, SpriteMeshType.FullRect);
+        var sp = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 32f, 0, SpriteMeshType.FullRect);
         sp.hideFlags = HideFlags.HideAndDontSave;
         _crowd[side, frame] = sp;
         return sp;
     }
 
-    // 観客テクスチャの一部(幅128px=8m)を切り出したもの。区画ごとに柄をずらして繰り返しを目立たなくする。
+    // 観客テクスチャの一部(幅256px=8m)を切り出したもの。区画ごとに柄をずらして繰り返しを目立たなくする。
     private static readonly Sprite[,,] _slices = new Sprite[2, 2, 4];
     public static Sprite CrowdSlice(int side, int frame, int variant)
     {
         var s = _slices[side, frame, variant];
         if (s != null) return s;
         var full = Crowd(side, frame);
-        s = Sprite.Create(full.texture, new Rect(variant * 128, 0, 128, 128), new Vector2(0.5f, 0.5f), 16f, 0, SpriteMeshType.FullRect);
+        s = Sprite.Create(full.texture, new Rect(variant * 256, 0, 256, 256), new Vector2(0.5f, 0.5f), 32f, 0, SpriteMeshType.FullRect);
         s.hideFlags = HideFlags.HideAndDontSave;
         _slices[side, frame, variant] = s;
         return s;
+    }
+
+    // 角の丸い四角(輪郭はなめらか)。下 colBottom → 上 colTop のグラデーション
+    private static void RoundRect(Color[] px, int w, int h, float x0, float y0, float x1, float y1, float rad, Color colBottom, Color colTop)
+    {
+        for (int y = Mathf.FloorToInt(y0) - 1; y <= Mathf.CeilToInt(y1) + 1; y++)
+        {
+            if (y < 0 || y >= h) continue;
+            float py = y + 0.5f;
+            Color c = Color.Lerp(colBottom, colTop, Mathf.Clamp01((py - y0) / Mathf.Max(1f, y1 - y0)));
+            c.a = 1f;
+            for (int x = Mathf.FloorToInt(x0) - 1; x <= Mathf.CeilToInt(x1) + 1; x++)
+            {
+                float pxx = x + 0.5f;
+                float qx = Mathf.Max(Mathf.Abs(pxx - (x0 + x1) * 0.5f) - ((x1 - x0) * 0.5f - rad), 0f);
+                float qy = Mathf.Max(Mathf.Abs(py - (y0 + y1) * 0.5f) - ((y1 - y0) * 0.5f - rad), 0f);
+                float d = Mathf.Sqrt(qx * qx + qy * qy) - rad;
+                float a = Mathf.Clamp01(0.5f - d);
+                if (a <= 0f) continue;
+                int xx = ((x % w) + w) % w;
+                px[y * w + xx] = Color.Lerp(px[y * w + xx], c, a);
+            }
+        }
+    }
+
+    // 陰影付きの円(左上が明るい)
+    private static void DiscShade(Color[] px, int w, int h, float cx, float cy, float r, Color dark, Color lit)
+    {
+        for (int y = Mathf.FloorToInt(cy - r) - 1; y <= Mathf.CeilToInt(cy + r) + 1; y++)
+        {
+            if (y < 0 || y >= h) continue;
+            for (int x = Mathf.FloorToInt(cx - r) - 1; x <= Mathf.CeilToInt(cx + r) + 1; x++)
+            {
+                float dx = x + 0.5f - cx, dy = y + 0.5f - cy;
+                float a = Mathf.Clamp01(r - Mathf.Sqrt(dx * dx + dy * dy) + 0.5f);
+                if (a <= 0f) continue;
+                float k = Mathf.Clamp01(0.5f + (-dx * 0.5f + dy * 0.8f) / (r * 1.6f));
+                Color c = Color.Lerp(dark, lit, k); c.a = 1f;
+                int xx = ((x % w) + w) % w;
+                px[y * w + xx] = Color.Lerp(px[y * w + xx], c, a);
+            }
+        }
     }
 
     private static void Rect(Color[] px, int w, int h, int x0, int y0, int rw, int rh, Color c)

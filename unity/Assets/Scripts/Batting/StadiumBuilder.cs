@@ -114,17 +114,21 @@ public class StadiumBuilder : MonoBehaviour
         for (int i = -14; i <= 14; i++)
         {
             float off = i * 12f;
-            Flat("MowA" + i, white, new Color(1f, 1f, 1f, 0.055f), G + 1, off * 0.7071f, 60f + off * 0.7071f, 6f, 300f, 45f);
-            Flat("MowB" + i, white, new Color(0f, 0.05f, 0f, 0.06f), G + 1, -off * 0.7071f, 60f + off * 0.7071f, 6f, 300f, -45f);
+            Flat("MowA" + i, white, new Color(1f, 1f, 1f, 0.085f), G + 1, off * 0.7071f, 60f + off * 0.7071f, 6f, 300f, 45f);
+            Flat("MowB" + i, white, new Color(0f, 0.05f, 0f, 0.09f), G + 1, -off * 0.7071f, 60f + off * 0.7071f, 6f, 300f, -45f);
         }
-        // 外野のウォーニングゾーン(土)
-        for (float phi = -47f; phi <= 47f; phi += 2f)
-        {
-            float rf = BattingConfig.FenceRadius(Mathf.Min(Mathf.Abs(phi), 45f));
-            Vector3 p = Dir(phi) * (rf - 2.6f);
-            float segW = 2f * Mathf.PI * rf * (2f / 360f) * 1.12f;
-            Flat("Track", dirt, new Color(0.85f, 0.80f, 0.78f), G + 2, p.x, p.z, segW, 5.4f, -phi, true);
-        }
+        // 外野のウォーニングゾーン(土)。なめらかな弧で、芝との境目は少しぼかす
+        System.Func<float, float> fr = phi => BattingConfig.FenceRadius(Mathf.Min(Mathf.Abs(phi), 45f));
+        Color trackCol = new Color(0.85f, 0.80f, 0.78f);
+        StadiumMesh.GroundArc(_root, "Track", dirt.texture, G + 2, -47f, 47f, 0.5f, phi => fr(phi) - 5.3f, phi => fr(phi) + 0.3f,
+            trackCol, trackCol, 8f);
+        StadiumMesh.GroundArc(_root, "TrackEdge", dirt.texture, G + 2, -47f, 47f, 0.5f, phi => fr(phi) - 5.9f, phi => fr(phi) - 5.3f,
+            new Color(trackCol.r, trackCol.g, trackCol.b, 0f), trackCol, 8f);
+        // 照明の届きにくい外野の奥は少し暗く(奥行き)
+        StadiumMesh.GroundArc(_root, "OutfieldFalloff", null, G + 3, -47f, 47f, 1f, phi => fr(phi) - 26f, phi => fr(phi) + 0.3f,
+            new Color(0f, 0.01f, 0.03f, 0f), new Color(0f, 0.01f, 0.03f, 0.30f), 8f);
+        // 内野まわりに照明が集まった明るさ
+        Flat("LightPool", StadiumArt.Glow, new Color(1f, 0.95f, 0.8f, 0.10f), G + 3, 0f, 22f, 110f, 90f, 0f);
         // 内野
         Flat("InfieldDirt", disc, Color.white, G + 4, 0f, 17f, 56f, 56f, 0f);
         Flat("InfieldGrass", grass, new Color(1.05f, 1.08f, 1.02f), G + 5, 0f, 19.4f, 23f, 23f, 45f, true);
@@ -349,10 +353,14 @@ public class StadiumBuilder : MonoBehaviour
             new Vector3(0f, yaw, 0f), new Vector2(1.0f, top - poleFrom));
         Vector3 panel = foot + Vector3.up * (top + 3.5f);
         Quad("LightPanel", StadiumArt.LightPanel, Color.white, OGlow, panel, new Vector3(-14f, yaw, 0f), new Vector2(13f, 7.8f));
-        Quad("LightGlow", StadiumArt.Glow, new Color(1f, 0.96f, 0.85f, 0.55f), OGlow + 1, panel - Dir(yaw) * 1f,
+        // 照明の光(明るさ1を超える色にしてブルームでにじませる)
+        Quad("LightGlow", StadiumArt.Glow, new Color(1.6f, 1.5f, 1.3f, 0.55f), OGlow + 1, panel - Dir(yaw) * 1f,
             new Vector3(0f, yaw, 0f), new Vector2(58f, 44f));
-        Quad("LightCore", StadiumArt.Glow, new Color(1f, 1f, 0.95f, 0.75f), OGlow + 2, panel - Dir(yaw) * 1.5f,
+        Quad("LightCore", StadiumArt.Glow, new Color(3.0f, 2.9f, 2.6f, 0.85f), OGlow + 2, panel - Dir(yaw) * 1.5f,
             new Vector3(0f, yaw, 0f), new Vector2(22f, 16f));
+        // 横に伸びる光の筋(カメラのレンズ越しの照明らしさ)
+        Quad("LightStreak", StadiumArt.Glow, new Color(1.4f, 1.6f, 2.2f, 0.22f), OGlow + 3, panel - Dir(yaw) * 2f,
+            new Vector3(0f, yaw, 0f), new Vector2(140f, 5f));
     }
 
     // ---- 電光掲示板 ---------------------------------------------------
@@ -453,7 +461,10 @@ public class StadiumBuilder : MonoBehaviour
             float rf = BattingConfig.FenceRadius(Mathf.Abs(phi));
             Vector3 p = Dir(phi) * (rf - 0.15f) + Vector3.up * (h * 0.5f);
             float w = 2f * Mathf.PI * rf * (7f / 360f);
-            Quad("AdPanel", white, bg[i], -59, p, new Vector3(0f, phi, 0f), new Vector2(w, h * 0.72f));
+            // LEDの看板: 少し発光 + 上半分のつや
+            Quad("AdPanel", white, bg[i] * 1.12f, -59, p, new Vector3(0f, phi, 0f), new Vector2(w, h * 0.72f));
+            Quad("AdGloss", SpriteFactory.GradientVertical(new Color(1f, 1f, 1f, 0.26f), new Color(1f, 1f, 1f, 0f)), Color.white, -59,
+                p + Vector3.up * (h * 0.18f) - Dir(phi) * 0.03f, new Vector3(0f, phi, 0f), new Vector2(w, h * 0.36f));
             Color tc = i == 2 ? new Color(0.15f, 0.1f, 0.05f) : Color.white;
             Text("AdText", ads[i], p - Dir(phi) * 0.05f, Quaternion.Euler(0f, phi, 0f), 1.5f, tc, TextAnchor.MiddleCenter, -58);
         }

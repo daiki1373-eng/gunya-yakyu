@@ -134,10 +134,14 @@ public class BattingUI
         _result = NewText(canvasGo.transform, "Result", new Vector2(0.5f, 0.5f), new Vector2(0f, 96f),
             new Vector2(800f, 50f), 34, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.6f));
         _result.fontStyle = FontStyle.Bold;
+        // 結果の文字はグラデーション + 弾んで出る
+        _rank.gameObject.AddComponent<UiFxText>();
+        _result.gameObject.AddComponent<UiFxText>().PopScale = 1.3f;
 
         _quirk = NewText(canvasGo.transform, "Quirk", new Vector2(0.5f, 0.5f), new Vector2(0f, 40f),
             new Vector2(800f, 70f), 46, TextAnchor.MiddleCenter, new Color(1f, 0.55f, 0.15f));
         _quirk.fontStyle = FontStyle.Bold;
+        _quirk.gameObject.AddComponent<UiFxText>().PopScale = 1.7f;
         _banner = NewText(canvasGo.transform, "Banner", new Vector2(0.5f, 0.5f), new Vector2(0f, -60f),
             new Vector2(800f, 60f), 38, TextAnchor.MiddleCenter, Color.white);
         _banner.fontStyle = FontStyle.Bold;

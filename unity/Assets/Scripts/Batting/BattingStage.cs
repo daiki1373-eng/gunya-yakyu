@@ -29,6 +29,10 @@ public class BattingStage : MonoBehaviour
     private const int OrderBall = 20;
 
     private SpriteRenderer _ball, _ballSeam, _shadow;
+    private TrailRenderer _ballTrail;
+    private Quaternion _sway = Quaternion.identity;
+    private float _swayAmt;
+    private ParticleSystem _hitSparks;
     private readonly List<Transform> _billboards = new List<Transform>();
     private Transform[] _fielders;
     public float FollowDist = 18f;      // 打球カメラの後ろ距離(リプレイでは寄る)
@@ -81,6 +85,8 @@ public class BattingStage : MonoBehaviour
         _catcherRot = Quaternion.Euler(BattingConfig.CameraPitchDeg, 0f, 0f);
         Cam.transform.position = BattingConfig.CameraPos;
         Cam.transform.rotation = _catcherRot;
+        _sway = Quaternion.identity;
+        PostFX.Attach(Cam);
     }
 
     public void SetCameraMode(CamMode mode)
@@ -104,6 +110,7 @@ public class BattingStage : MonoBehaviour
         Vector3 fwd = Vector3.forward;
         Cam.transform.position = new Vector3(b.x, 3.5f * (FollowDist / 18f), b.z - FollowDist);
         Cam.transform.rotation = Quaternion.LookRotation(b + fwd * 4f + Vector3.up * 0.5f - Cam.transform.position, Vector3.up);
+        _sway = Quaternion.identity;
     }
 
     private GameObject _zoneRoot;
@@ -123,6 +130,7 @@ public class BattingStage : MonoBehaviour
             _camVel = Vector3.zero;
             Cam.transform.position = pos;
             Cam.transform.rotation = Quaternion.LookRotation(look - pos, Vector3.up);
+            _sway = Quaternion.identity;
         }
     }
 
@@ -132,6 +140,7 @@ public class BattingStage : MonoBehaviour
         _camVel = Vector3.zero;
         Cam.transform.position = BattingConfig.CameraPos;
         Cam.transform.rotation = _catcherRot;
+        _sway = Quaternion.identity;
     }
 
     public bool CatcherCameraSettled()
@@ -145,6 +154,9 @@ public class BattingStage : MonoBehaviour
         if (Cam == null) return;
         var ct = Cam.transform;
         float dt = Time.unscaledDeltaTime > 0f ? Mathf.Min(Time.unscaledDeltaTime, 0.05f) : 0.016f;
+        // 前のフレームの手持ちカメラの揺れを外してから計算する
+        ct.rotation = ct.rotation * Quaternion.Inverse(_sway);
+        _sway = Quaternion.identity;
 
         if (_mode == CamMode.Catcher)
         {
@@ -178,6 +190,16 @@ public class BattingStage : MonoBehaviour
             ct.rotation = Quaternion.Slerp(ct.rotation, look, 1f - Mathf.Exp(-7f * dt));
         }
 
+        // 中継カメラらしいゆっくりした手持ちの揺れ(打席の捕手視点では狙いがぶれないよう揺らさない)
+        _swayAmt = Mathf.MoveTowards(_swayAmt, _mode == CamMode.Catcher ? 0f : 1f, dt * 1.5f);
+        if (_swayAmt > 0f)
+        {
+            float t = Time.unscaledTime;
+            _sway = Quaternion.Euler((Mathf.PerlinNoise(t * 0.33f, 1.7f) - 0.5f) * 0.9f * _swayAmt,
+                                     (Mathf.PerlinNoise(3.1f, t * 0.27f) - 0.5f) * 1.2f * _swayAmt,
+                                     (Mathf.PerlinNoise(t * 0.2f, 5.3f) - 0.5f) * 0.5f * _swayAmt);
+            ct.rotation = ct.rotation * _sway;
+        }
         for (int i = 0; i < _billboards.Count; i++)
         {
             if (_billboards[i] != null) _billboards[i].rotation = ct.rotation;
@@ -216,22 +238,17 @@ public class BattingStage : MonoBehaviour
         Sprite fenceSp = StadiumArt.Fence;
         Sprite white = SpriteFactory.White;
         float h = BattingConfig.FenceHeight;
-        for (float phi = -58f; phi <= 58.1f; phi += 2f)
-        {
-            float rf = BattingConfig.FenceRadius(Mathf.Min(Mathf.Abs(phi), 45f));
-            float rad = phi * Mathf.Deg2Rad;
-            float segW = 2f * Mathf.PI * rf * (2f / 360f) * 1.08f;
-            Vector3 dir = new Vector3(Mathf.Sin(rad), 0f, Mathf.Cos(rad));
-            Vector3 face = new Vector3(0f, phi, 0f);
-            var fence = BattingSprites.Make("Fence", Root, fenceSp, Color.white, OrderFence,
-                dir * rf + Vector3.up * (h * 0.5f), face, Vector3.one);
-            fence.drawMode = SpriteDrawMode.Tiled;
-            fence.size = new Vector2(segW, h);
-            BattingSprites.Make("FenceTop", Root, white, new Color(0.98f, 0.85f, 0.25f), OrderFence + 1,
-                dir * rf + Vector3.up * h, face, new Vector3(segW, 0.22f, 1f));
-            BattingSprites.Make("FencePad", Root, white, new Color(0.04f, 0.14f, 0.10f), OrderFence + 1,
-                dir * (rf - 0.05f) + Vector3.up * (h - 0.35f), face, new Vector3(segW, 0.5f, 1f));
-        }
+        // なめらかに曲がった1枚の壁(板を並べた段差をなくす)。下は暗く、上はラバーに照明が当たる
+        System.Func<float, float> fr = phi => BattingConfig.FenceRadius(Mathf.Min(Mathf.Abs(phi), 45f));
+        StadiumMesh.CurvedWall(Root, "Fence", fenceSp.texture, OrderFence, -58f, 58f, 0.5f, fr, 0f, h,
+            new Color(0.55f, 0.62f, 0.60f), new Color(1.05f, 1.1f, 1.05f), 4f);
+        // 上のクッション(つや) + 黄色のライン(少し光る)
+        StadiumMesh.CurvedWall(Root, "FencePad", null, OrderFence + 1, -58f, 58f, 0.5f, fr, h - 0.62f, h - 0.08f,
+            new Color(0.03f, 0.11f, 0.08f), new Color(0.07f, 0.22f, 0.16f), 4f, 0.04f);
+        StadiumMesh.CurvedWall(Root, "FencePadGloss", null, OrderFence + 2, -58f, 58f, 0.5f, fr, h - 0.42f, h - 0.22f,
+            new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, 0.16f), 4f, 0.05f);
+        StadiumMesh.CurvedWall(Root, "FenceTop", null, OrderFence + 2, -58f, 58f, 0.5f, fr, h - 0.08f, h + 0.16f,
+            new Color(1.0f, 0.78f, 0.18f), new Color(1.25f, 1.05f, 0.4f), 4f, 0.02f);
     }
 
     // ------------------------------------------------------------
@@ -318,6 +335,19 @@ public class BattingStage : MonoBehaviour
         _ballSeam = BattingSprites.Make("Seam", _ball.transform, BattingSprites.Ring, new Color(0.85f, 0.2f, 0.2f, 0.85f),
             OrderBall + 1, Vector3.zero, Vector3.zero, Vector3.one * 0.72f);
         _billboards.Add(_ball.transform);
+        // 球の軌跡(なめらかな光の帯。点の残像の代わり)
+        _ballTrail = _ball.gameObject.AddComponent<TrailRenderer>();
+        _ballTrail.time = 0.24f;
+        _ballTrail.minVertexDistance = 0.04f;
+        _ballTrail.numCapVertices = 4;
+        _ballTrail.alignment = LineAlignment.View;
+        _ballTrail.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 0f));
+        _ballTrail.sharedMaterial = StadiumMesh.Mat(SpriteFactory.Circle.texture);
+        _ballTrail.textureMode = LineTextureMode.Stretch;
+        _ballTrail.sortingOrder = OrderBall - 2;
+        _ballTrail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _ballTrail.emitting = false;
+        BuildHitSparks();
         _shadow = BattingSprites.Make("BallShadow", Root, SpriteFactory.Circle, new Color(0f, 0f, 0f, 0.35f), OrderShadow,
             Vector3.zero, new Vector3(90f, 0f, 0f), Vector3.one * 0.2f);
         HideBall();
@@ -340,6 +370,7 @@ public class BattingStage : MonoBehaviour
         float dist = (pos - Cam.transform.position).magnitude;
         float dia = Mathf.Max(BattingConfig.BallRadius * 2f, dist * 0.013f);
         _ball.transform.localScale = Vector3.one * dia;
+        if (_ballTrail != null) _ballTrail.widthMultiplier = dia * 0.85f;
 
         _shadow.transform.position = new Vector3(pos.x, 0.02f, pos.z);
         _shadow.transform.localScale = new Vector3(dia * 1.1f, dia * 1.1f, 1f);
@@ -353,8 +384,53 @@ public class BattingStage : MonoBehaviour
         StartCoroutine(FlashRoutine(pos, color, size));
     }
 
+    // 打った瞬間に飛び散る火花(光の粒)
+    private void BuildHitSparks()
+    {
+        var go = new GameObject("HitSparks");
+        go.transform.SetParent(Root, false);
+        _hitSparks = go.AddComponent<ParticleSystem>();
+        _hitSparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = _hitSparks.main;
+        main.playOnAwake = false;
+        main.loop = false;
+        main.duration = 1f;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.55f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(5f, 15f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.10f);
+        main.gravityModifier = 1.4f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 300;
+        main.useUnscaledTime = true;
+        var em = _hitSparks.emission; em.enabled = false;
+        var shape = _hitSparks.shape; shape.shapeType = ParticleSystemShapeType.Sphere; shape.radius = 0.05f;
+        var col = _hitSparks.colorOverLifetime; col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                  new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.5f), new GradientAlphaKey(0f, 1f) });
+        col.color = g;
+        var r = _hitSparks.GetComponent<ParticleSystemRenderer>();
+        r.renderMode = ParticleSystemRenderMode.Stretch;
+        r.velocityScale = 0.035f;
+        r.lengthScale = 1.2f;
+        r.sharedMaterial = StadiumMesh.Mat(SpriteFactory.Circle.texture);
+        r.sortingOrder = OrderBall + 6;
+    }
+
+    public void Sparks(Vector3 pos, Color color, int count)
+    {
+        if (_hitSparks == null) return;
+        var ep = new ParticleSystem.EmitParams { position = pos, applyShapeToPosition = true };
+        for (int i = 0; i < count; i++)
+        {
+            ep.startColor = Color.Lerp(color, Color.white, Random.Range(0.2f, 0.8f));
+            _hitSparks.Emit(ep, 1);
+        }
+    }
+
     private IEnumerator FlashRoutine(Vector3 pos, Color color, float size)
     {
+        Sparks(pos, color, Mathf.RoundToInt(14f + 26f * size));
         var sr = BattingSprites.Make("Flash", Root, BattingSprites.Ring, color, OrderBall + 5,
             pos, Vector3.zero, Vector3.one * size * 0.3f);
         sr.transform.rotation = Cam.transform.rotation;
@@ -753,25 +829,30 @@ public class BattingStage : MonoBehaviour
     // ------------------------------------------------------------
     private class TrailDot { public SpriteRenderer Sr; public float Born; }
     private readonly List<TrailDot> _trail = new List<TrailDot>();
-    private float _lastTrail;
     private const float TrailLife = 0.55f;
 
     public void AddTrail(Vector3 pos, Color col)
     {
-        if (Time.time - _lastTrail < 0.022f) return;
-        _lastTrail = Time.time;
-        float dist = (pos - Cam.transform.position).magnitude;
-        float dia = Mathf.Max(BattingConfig.BallRadius * 2f * 0.7f, dist * 0.009f);
-        var sr = BattingSprites.Make("Trail", Root, SpriteFactory.Circle, col, OrderBall - 2,
-            pos, Vector3.zero, Vector3.one * dia);
-        sr.transform.rotation = Cam.transform.rotation;
-        _trail.Add(new TrailDot { Sr = sr, Born = Time.time });
+        // 光の帯(TrailRenderer)の色を球種の色に。明るめにしてブルームで光らせる
+        if (_ballTrail == null) return;
+        if (!_ballTrail.emitting || _trailCol != col)
+        {
+            _trailCol = col;
+            var g = new Gradient();
+            Color hot = new Color(col.r * 1.6f + 0.3f, col.g * 1.6f + 0.3f, col.b * 1.6f + 0.3f);
+            g.SetKeys(new[] { new GradientColorKey(hot, 0f), new GradientColorKey(col, 1f) },
+                      new[] { new GradientAlphaKey(0.85f, 0f), new GradientAlphaKey(0f, 1f) });
+            _ballTrail.colorGradient = g;
+            _ballTrail.emitting = true;
+        }
     }
+    private Color _trailCol;
 
     public void ClearTrail()
     {
         for (int i = 0; i < _trail.Count; i++) if (_trail[i].Sr != null) Destroy(_trail[i].Sr.gameObject);
         _trail.Clear();
+        if (_ballTrail != null) { _ballTrail.emitting = false; _ballTrail.Clear(); }
     }
 
     private void UpdateTrail()
