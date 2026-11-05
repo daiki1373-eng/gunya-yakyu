@@ -325,7 +325,7 @@ public class RagdollPlayer : MonoBehaviour
             }
         }
         // 表情の絵は打席の最初にまとめて作っておく(試合中のカクつき防止。2回目以降はキャッシュ)
-        for (int e = 0; e < 5; e++) CharacterArt.Head(_species, _skin, _hatColor, _gear, (Expr)e, _variant);
+        for (int e = 0; e < 7; e++) CharacterArt.Head(_species, _skin, _hatColor, _gear, (Expr)e, _variant);
         ApplyExpression(Expr.Normal);
     }
 
@@ -346,8 +346,12 @@ public class RagdollPlayer : MonoBehaviour
     }
 
     // 表情を一定時間だけ変える(時間が過ぎたら通常顔に戻る)
+    // 表情が変わったとき(顔のアップ演出用)
+    public static event System.Action<RagdollPlayer, Expr, float> ExpressionChanged;
+
     public void SetExpression(Expr e, float seconds)
     {
+        if (ExpressionChanged != null) ExpressionChanged(this, e, seconds);
         ApplyExpression(e);
         _exprTimer = seconds;
     }

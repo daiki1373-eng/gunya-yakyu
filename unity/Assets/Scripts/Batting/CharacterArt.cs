@@ -8,7 +8,7 @@ using UnityEngine;
 // 輪郭線は「一回り大きい同じ形を濃い色で先に塗る」方式で付ける(軽い)。
 // 頭は「直径1ユニット」になるよう PPU を決めてあるので、scale=頭の直径 で置ける。
 // ============================================================
-public enum Expr { Normal, Focus, Surprise, Happy, Dizzy }
+public enum Expr { Normal, Focus, Surprise, Happy, Dizzy, Sad, Angry }
 public enum Headgear { Cap, Helmet }
 
 public static class CharacterArt
@@ -209,6 +209,7 @@ public static class CharacterArt
                 Eye(cv, 0.45f, 0.05f, 0.20f, 0.19f, 0.2f, 0.55f, lid);
                 Eye(cv, 0.86f, 0.06f, 0.10f, 0.17f, 0.2f, 0.55f, lid);
                 break;
+            case Expr.Angry:
             case Expr.Focus:
                 Eye(cv, 0.45f, 0.02f, 0.18f, 0.11f, 0.8f, 1.05f, lid);
                 Eye(cv, 0.86f, 0.03f, 0.095f, 0.10f, 0.8f, 1.05f, lid);
@@ -228,6 +229,14 @@ public static class CharacterArt
             case Expr.Focus:
                 cv.Line(X(0.28f), Y(0.30f), X(0.64f), Y(0.17f), S(w), col);
                 cv.Line(X(0.76f), Y(0.18f), X(0.95f), Y(0.26f), S(w * 0.8f), col);
+                break;
+            case Expr.Sad:
+                cv.Line(X(0.28f), Y(0.20f), X(0.64f), Y(0.32f), S(w), col);
+                cv.Line(X(0.76f), Y(0.32f), X(0.95f), Y(0.22f), S(w * 0.8f), col);
+                break;
+            case Expr.Angry:
+                cv.Line(X(0.28f), Y(0.36f), X(0.64f), Y(0.13f), S(w * 1.15f), col);
+                cv.Line(X(0.76f), Y(0.14f), X(0.95f), Y(0.28f), S(w * 0.9f), col);
                 break;
             case Expr.Surprise:
                 cv.Arc(X(0.47f), Y(0.30f), S(0.18f), S(0.08f), 20f, 160f, S(w), col);
@@ -266,6 +275,10 @@ public static class CharacterArt
                 cv.Ellipse(X(mx), Y(my), S(0.10f + 0.035f), S(0.13f + 0.035f), Ink);
                 cv.Ellipse(X(mx), Y(my), S(0.10f), S(0.13f), m);
                 break;
+            case Expr.Sad:
+                cv.Arc(X(mx), Y(my - 0.09f), S(0.13f), S(0.09f), 40f, 140f, S(0.05f), Ink);
+                break;
+            case Expr.Angry:
             case Expr.Focus:
                 // 歯を食いしばる
                 cv.RoundRect(X(mx - 0.15f), Y(my - 0.05f), X(mx + 0.15f), Y(my + 0.05f), S(0.04f), Ink);

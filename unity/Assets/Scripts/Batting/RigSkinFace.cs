@@ -24,12 +24,14 @@ public partial class RigSkin
     private float[] _fBw;
 
     // 表情の重み(0〜1)
-    private readonly float[] _ew = new float[5];
+    private readonly float[] _ew = new float[7];
     private float _blink, _blinkNext = 2f, _t;
-    private float _surpriseAge, _happyAge, _focusAge;
+    private float _surpriseAge, _happyAge, _focusAge, _sadAge, _angryAge;
+    private bool _laughBase;          // 元絵がもともと大笑いしている(喜びとの差を大きくする)
+    private Color[] _fCol;
 
     // 記号
-    private SpriteRenderer _sweat, _bang, _blushA, _blushB;
+    private SpriteRenderer _sweat, _bang, _blushA, _blushB, _gloom, _anger, _tear;
     private SpriteRenderer[] _shock, _spark, _stars;
 
     private void BuildFace(Sprite spr)
@@ -55,6 +57,7 @@ public partial class RigSkin
             Vector2 sz = Has("mouthSz") ? J("mouthSz") : Vector2.zero;
             _mouthSz = new Vector2(Mathf.Max(sz.x * 0.6f, _io * 0.32f), Mathf.Max(sz.y * 0.8f, _io * 0.2f));
         }
+        _laughBase = _hasMouth && Has("mouthSz") && (J("mouthSz").y > _io * 0.42f || J("mouthSz").x > _io * 0.95f);
         _hasBrows = Has("browL") && Has("browR");
         if (_hasBrows) { _browL = J("browL"); _browR = J("browR"); }
         _warpable = _eyes.Count > 0;
@@ -104,7 +107,9 @@ public partial class RigSkin
         go.layer = gameObject.layer;
         _fMesh = new Mesh { name = "RigFace" };
         _fMesh.MarkDynamic();
-        _fMesh.vertices = _fV; _fMesh.uv = uv; _fMesh.triangles = tris;
+        _fCol = new Color[n];
+        for (int i = 0; i < n; i++) _fCol[i] = Color.white;
+        _fMesh.vertices = _fV; _fMesh.uv = uv; _fMesh.triangles = tris; _fMesh.colors = _fCol;
         go.AddComponent<MeshFilter>().sharedMesh = _fMesh;
         _fMr = go.AddComponent<MeshRenderer>();
         _fMr.sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
@@ -123,6 +128,8 @@ public partial class RigSkin
         new Look { EyeY = 1.4f,  EyeX = 1.3f, MouthX = 0.85f, MouthY = 1.9f, Brow = -0.18f, HeadX = 0.92f, HeadY = 1.12f },  // Surprise
         new Look { EyeY = 0.25f, EyeX = 1.1f, MouthX = 1.3f,  MouthY = 1.55f, Brow = -0.06f, HeadX = 1.05f, HeadY = 1.0f },  // Happy
         new Look { EyeY = 0.3f,  EyeX = 1.15f, MouthX = 1.15f, MouthY = 1.35f, Brow = -0.1f, HeadX = 1f,    HeadY = 1f },     // Dizzy
+        new Look { EyeY = 0.6f,  EyeX = 0.95f, MouthX = 0.7f,  MouthY = 0.55f, Brow = -0.1f, HeadX = 1.03f, HeadY = 0.93f },  // Sad
+        new Look { EyeY = 0.68f, EyeX = 1.02f, MouthX = 1.2f,  MouthY = 1.4f,  Brow = 0.22f, HeadX = 1.05f, HeadY = 0.97f },  // Angry
     };
     private Look _now;
 
@@ -130,14 +137,16 @@ public partial class RigSkin
     {
         _t += dt;
         int cur = (int)_p.CurrentExpr;
-        for (int e = 0; e < 5; e++) _ew[e] = Mathf.MoveTowards(_ew[e], e == cur ? 1f : 0f, dt * 9f);
+        for (int e = 0; e < 7; e++) _ew[e] = Mathf.MoveTowards(_ew[e], e == cur ? 1f : 0f, dt * 9f);
         _surpriseAge = cur == (int)Expr.Surprise ? _surpriseAge + dt : 0f;
         _happyAge = cur == (int)Expr.Happy ? _happyAge + dt : 0f;
         _focusAge = cur == (int)Expr.Focus ? _focusAge + dt : 0f;
+        _sadAge = cur == (int)Expr.Sad ? _sadAge + dt : 0f;
+        _angryAge = cur == (int)Expr.Angry ? _angryAge + dt : 0f;
 
         // 重みで混ぜる
         var L = new Look { EyeY = 1, EyeX = 1, MouthX = 1, MouthY = 1, Brow = 0, HeadX = 1, HeadY = 1 };
-        for (int e = 1; e < 5; e++)
+        for (int e = 1; e < 7; e++)
         {
             float k = _ew[e]; if (k <= 0f) continue;
             var o = Looks[e];
@@ -148,7 +157,9 @@ public partial class RigSkin
         // 驚きは最初にびよんと伸びる / 喜びは弾む
         float pop = _surpriseAge > 0f ? Mathf.Exp(-_surpriseAge * 6f) * Mathf.Sin(_surpriseAge * 30f) * 0.08f : 0f;
         L.HeadY += pop; L.HeadX -= pop * 0.6f;
-        if (_happyAge > 0f) { float b = Mathf.Abs(Mathf.Sin(_happyAge * 11f)) * 0.04f * _ew[(int)Expr.Happy]; L.HeadY += b; L.HeadX -= b * 0.5f; }
+        // 喜びは弾む(もともと大笑いの絵は大きく弾ませてのけぞる)
+        float hk = _laughBase ? 2.2f : 1f;
+        if (_happyAge > 0f) { float b = Mathf.Abs(Mathf.Sin(_happyAge * 11f)) * 0.04f * hk * _ew[(int)Expr.Happy]; L.HeadY += b; L.HeadX -= b * 0.5f; }
 
         // まばたき(普段だけ)
         if (_ew[0] > 0.9f)
@@ -161,7 +172,10 @@ public partial class RigSkin
 
         var hb = _bones[_headBone];
         hb.Sq = new Vector2(L.HeadX, L.HeadY);
-        hb.Extra = _ew[(int)Expr.Dizzy] * Mathf.Sin(_t * 7f) * 9f;
+        hb.Extra = _ew[(int)Expr.Dizzy] * Mathf.Sin(_t * 7f) * 9f
+                 + _ew[(int)Expr.Angry] * Mathf.Sin(_t * 46f) * 3.5f                     // 怒り: ぶるぶる震える
+                 + _ew[(int)Expr.Sad] * 7f * _p.Facing                                     // がっかり: うなだれる
+                 + (_laughBase ? _ew[(int)Expr.Happy] * Mathf.Sin(_happyAge * 5.5f) * 6f : 0f);   // 大笑い: のけぞって揺れる
     }
 
     private static float Smooth(float a, float b, float x)
@@ -198,7 +212,8 @@ public partial class RigSkin
     private bool FaceActive()
     {
         var L = _now;
-        return Mathf.Abs(L.EyeY - 1f) + Mathf.Abs(L.EyeX - 1f) + Mathf.Abs(L.MouthX - 1f) + Mathf.Abs(L.MouthY - 1f) + Mathf.Abs(L.Brow) > 0.02f;
+        return Mathf.Abs(L.EyeY - 1f) + Mathf.Abs(L.EyeX - 1f) + Mathf.Abs(L.MouthX - 1f) + Mathf.Abs(L.MouthY - 1f) + Mathf.Abs(L.Brow) > 0.02f
+            || _ew[(int)Expr.Sad] + _ew[(int)Expr.Angry] > 0.01f;
     }
 
     private void FaceDraw()
@@ -245,7 +260,31 @@ public partial class RigSkin
         }
         _fMesh.vertices = _fV;
         _fMesh.RecalculateBounds();
+        TintFace();
     }
+
+    // がっかり: 顔の上半分が青ざめる / 怒り: 顔が赤くなる(網目の頂点色)
+    private void TintFace()
+    {
+        float ws = _ew[(int)Expr.Sad], wa = _ew[(int)Expr.Angry];
+        if (ws + wa <= 0.001f && !_tinted) return;
+        _tinted = ws + wa > 0.001f;
+        float eyeY = 0f; foreach (var e in _eyes) eyeY += e.y; eyeY /= Mathf.Max(1, _eyes.Count);
+        Color blue = new Color(0.5f, 0.62f, 1f), red = new Color(1f, 0.55f, 0.5f);
+        float pulse = 0.85f + 0.15f * Mathf.Sin(_t * 9f);
+        for (int v = 0; v < _fPx.Length; v++)
+        {
+            Vector2 p = _fPx[v];
+            float top = Mathf.Clamp01((eyeY + _io * 0.25f - p.y) / (_io * 0.9f));      // 目より上ほど強い
+            float r = Vector2.Distance(p, _faceC) / (_io * 1.4f);
+            float edge = 1f - Smooth(0.6f, 1f, r);                                        // 網目の端では元の色
+            Color c = Color.Lerp(Color.white, blue, ws * top * 0.75f * edge);
+            c = Color.Lerp(c, red, wa * 0.55f * pulse * edge);
+            _fCol[v] = c;
+        }
+        _fMesh.colors = _fCol;
+    }
+    private bool _tinted;
 
     // ---------------- 漫画の記号 ----------------
     private SpriteRenderer Mark(Sprite s, string name)
@@ -266,8 +305,11 @@ public partial class RigSkin
         _blushB = Mark(FaceMarks.Blush, "BlushB");
         _shock = new SpriteRenderer[3];
         for (int i = 0; i < 3; i++) _shock[i] = Mark(FaceMarks.Line, "Shock" + i);
-        _spark = new SpriteRenderer[2];
-        for (int i = 0; i < 2; i++) _spark[i] = Mark(FaceMarks.Sparkle, "Spark" + i);
+        _spark = new SpriteRenderer[6];
+        for (int i = 0; i < 6; i++) _spark[i] = Mark(FaceMarks.Sparkle, "Spark" + i);
+        _gloom = Mark(FaceMarks.Gloom, "Gloom");
+        _anger = Mark(FaceMarks.Anger, "Anger");
+        _tear = Mark(FaceMarks.Sweat, "Tear");
         _stars = new SpriteRenderer[3];
         for (int i = 0; i < 3; i++) _stars[i] = Mark(FaceMarks.Star, "Star" + i);
     }
@@ -320,6 +362,29 @@ public partial class RigSkin
             float sx = (i == 0 ? sd : -sd);
             Place(_spark[i], _faceC + new Vector2(sx * io * 1.5f, -io * (0.8f + 0.5f * i)), 0.9f * tw, wh, _t * 90f);
         }
+        // 喜びの最初にキラキラが顔のまわりへはじける
+        for (int i = 2; i < 6; i++)
+        {
+            float a = (i - 2) * 90f + 45f;
+            float u = Mathf.Clamp01(_happyAge / 0.5f);
+            Vector2 dir = new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad));
+            Place(_spark[i], _faceC + dir * io * (0.6f + 1.3f * u), 0.7f * (1f - u * 0.6f), wh * (1f - u), _t * 120f);
+        }
+        // がっかり: おでこに縦線 + 目から涙
+        float wsd = _ew[(int)Expr.Sad];
+        Vector2 eyeC = _faceC; if (_eyes.Count > 0) { eyeC = Vector2.zero; foreach (var e in _eyes) eyeC += e; eyeC /= _eyes.Count; }
+        Place(_gloom, eyeC + new Vector2(0f, -io * 0.75f), 1.1f, wsd * 0.9f);
+        if (_eyes.Count > 0)
+        {
+            Vector2 te = _eyes[_eyes.Count - 1];
+            float drop = Mathf.Repeat(_sadAge, 0.9f) / 0.9f;
+            Place(_tear, te + new Vector2(0f, io * (0.25f + 0.7f * drop)), 0.32f, wsd * (1f - drop * 0.7f), 180f);
+        }
+        else _tear.enabled = false;
+        // 怒り: こめかみに怒りマーク(脈打つ)
+        float wan = _ew[(int)Expr.Angry];
+        float beat = 1f + 0.15f * Mathf.Abs(Mathf.Sin(_angryAge * 9f));
+        Place(_anger, _faceC + new Vector2(sd * io * 1.1f, -io * 1.05f), 0.8f * beat, wan);
         // 目が回る: 頭の上を星が回る
         float wd = _ew[(int)Expr.Dizzy];
         for (int i = 0; i < 3; i++)
@@ -341,6 +406,38 @@ public static class FaceMarks
     public static Sprite Line { get { return _line ?? (_line = Make(LineF)); } }
     public static Sprite Sparkle { get { return _sparkle ?? (_sparkle = Make(SparkleF)); } }
     public static Sprite Star { get { return _star ?? (_star = Make(StarF)); } }
+    private static Sprite _gloom, _anger;
+    public static Sprite Gloom { get { return _gloom ?? (_gloom = Make(GloomF)); } }
+    public static Sprite Anger { get { return _anger ?? (_anger = Make(AngerF)); } }
+
+    private static Color GloomF(float x, float y)
+    {
+        // 縦線4本(上ほど濃い)
+        for (int k = 0; k < 4; k++)
+        {
+            float cx = -0.6f + k * 0.4f;
+            float len = (k == 1 || k == 2) ? 0.9f : 0.6f;
+            if (Mathf.Abs(x - cx) < 0.05f && y < 0.9f && y > 0.9f - len * 1.6f)
+                return new Color(0.25f, 0.3f, 0.75f, Mathf.Clamp01((y - (0.9f - len * 1.6f)) / (len * 1.6f)) * 0.9f);
+        }
+        return new Color(0, 0, 0, 0);
+    }
+
+    private static Color AngerF(float x, float y)
+    {
+        // 怒りマーク: 4つの角に、中心を向いた曲がった線
+        float best = 9f;
+        for (int k = 0; k < 4; k++)
+        {
+            float sx = (k & 1) == 0 ? 1f : -1f, sy = (k & 2) == 0 ? 1f : -1f;
+            float cx = sx * 0.62f, cy = sy * 0.62f;
+            float r = Mathf.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+            // 中心側の四分円だけ
+            if ((x - cx) * sx > 0.05f || (y - cy) * sy > 0.05f) continue;
+            best = Mathf.Min(best, Mathf.Abs(r - 0.42f) - 0.09f);
+        }
+        return Fill(best, new Color(0.95f, 0.15f, 0.15f, 1f), 0.07f);
+    }
 
     private delegate Color Shape(float x, float y);   // x,y は -1〜1
 

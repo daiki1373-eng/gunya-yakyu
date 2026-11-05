@@ -3,7 +3,7 @@ using System.Collections;
 using System.IO;
 using UnityEngine;
 
-// 確認用: 指定キャラを並べて表情5種を撮り、Recordings/faces/<id>.png(横に5枚)に保存する。エディタ専用。
+// 確認用: 指定キャラの表情7種を撮り、Recordings/faces/<id>.png(横に7枚)に保存する。エディタ専用。
 // FaceShot.Run(new[]{"monk","dog"}) を再生中に呼ぶ。
 public class FaceShot : MonoBehaviour
 {
@@ -29,12 +29,12 @@ public class FaceShot : MonoBehaviour
             var p = RagdollPlayer.Create(null, "Shot_" + id, new Vector2(500f, 0f), 1f, stats, Color.white, Color.red, true);
             yield return null;
             if (p.Skin == null) { Destroy(p.gameObject); continue; }
-            var sheet = new Texture2D(S * 5, S, TextureFormat.RGB24, false);
-            for (int e = 0; e < 5; e++)
+            var sheet = new Texture2D(S * 7, S, TextureFormat.RGB24, false);
+            for (int e = 0; e < 7; e++)
             {
                 p.SetExpression((Expr)e, 99f);
                 float t0 = Time.realtimeSinceStartup;
-                while (Time.realtimeSinceStartup - t0 < (e == 0 ? 0.3f : 0.55f)) yield return null;
+                while (Time.realtimeSinceStartup - t0 < (e == 0 ? 0.6f : 0.8f)) yield return null;
                 Vector3 fw = p.Skin.FaceWorld();
                 var cg = new GameObject("cam"); var cam = cg.AddComponent<Camera>();
                 cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.25f, 0.45f, 0.3f);

@@ -89,6 +89,7 @@ public class AtBatController : MonoBehaviour
         _stage = BattingStage.Create(transform);
         GameAudio.Init(gameObject);
         _ui = BattingUI.Build(transform);
+        FaceCutIn.Create(this);
         _cursor = MeetCursor.Create(_stage.Root);
 
         _pitcherStats = SpecialCharacters.Panta();
@@ -671,18 +672,19 @@ public class AtBatController : MonoBehaviour
         {
             case PitchEnd.Ball:
                 _gs.Balls++;
-                if (_gs.Balls >= 4) { _gs.ApplyWalk(); _ui.ShowResult("フォアボール"); over = true; key = "Walk"; }
+                if (_gs.Balls >= 4) { _gs.ApplyWalk(); _ui.ShowResult("フォアボール"); over = true; key = "Walk"; _pitcher.SetExpression(Expr.Angry, 1.6f); _batter.SetExpression(Expr.Happy, 1.2f); }
                 break;
             case PitchEnd.HitByPitch:
                 _gs.ApplyWalk();
                 _ui.ShowResult("デッドボール");
                 Music("bgm-hit-by-pitch", 7f);
+                _batter.SetExpression(Expr.Angry, 1.8f);
                 over = true;
                 key = "HitByPitch";
                 break;
             case PitchEnd.CalledStrike:
                 _gs.Strikes++;
-                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("見逃し三振！"); _pitcher.SetExpression(Expr.Happy, 1.5f); _batter.SetExpression(Expr.Surprise, 1.2f); over = true; key = "StrikeoutLooking"; Music("bgm-strikeout"); }
+                if (_gs.Strikes >= 3) { _gs.ApplyStrikeout(); _ui.ShowResult("見逃し三振！"); _pitcher.SetExpression(Expr.Happy, 1.5f); _batter.SetExpression(Expr.Sad, 1.8f); over = true; key = "StrikeoutLooking"; Music("bgm-strikeout"); }
                 break;
             case PitchEnd.SwingMiss:
                 _gs.Strikes++;
@@ -1377,6 +1379,7 @@ public class AtBatController : MonoBehaviour
         }
         GameAudio.Haptic();
         Music(play.Quirk == QuirkKind.BadThrow || play.Quirk == QuirkKind.Slip ? "bgm-error" : "bgm-rare-play", 9f);
+        if (play.Quirk == QuirkKind.BadThrow || play.Quirk == QuirkKind.Slip) StartCoroutine(LaterExpression(_pitcher, Expr.Angry, 0.6f, 1.8f));
         if (FreezeKind == -50) { FreezeKind = -99; StartCoroutine(FreezeSoon(0.45f)); }
         switch (play.Quirk)
         {
@@ -1394,6 +1397,14 @@ public class AtBatController : MonoBehaviour
         }
     }
 
+    private IEnumerator LaterExpression(RagdollPlayer who, Expr e, float delay, float seconds)
+    {
+        yield return new WaitForSeconds(delay);
+        if (who != null) who.SetExpression(e, seconds);
+    }
+
+    public bool Replaying { get { return _replaying; } }
+
     private void ShowPlayResult(PlayResult play)
     {
         string label = FieldingModel.Label(play.Kind);
@@ -1409,9 +1420,11 @@ public class AtBatController : MonoBehaviour
                  && (_outcome.Rank == HitRank.Perfect || play.Bases >= 2)) Music("bgm-pitcher-hit", 7f);
         else if (!_gs.UserBatting && play.IsOut && play.Quirk == QuirkKind.None
                  && (play.Kind == PlayKind.FlyOut || play.Kind == PlayKind.LineOut) && play.Distance > 62f) Music("bgm-fineplay", 8f);
+        if (play.IsOut && play.Quirk == QuirkKind.None) { _batter.SetExpression(Expr.Sad, 1.5f); _pitcher.SetExpression(Expr.Happy, 1.2f); }
         if (play.Kind == PlayKind.HomeRun)
         {
             _pitcher.Flop(0.7f * BattingConfig.GunyaLevel);
+            StartCoroutine(LaterExpression(_pitcher, Expr.Sad, 1.2f, 1.8f));
             GameAudio.Play(Sfx.BigCheer, 1f);
             Say(Commentary.ForHomeRun(), new Color(1f, 0.85f, 0.2f), true);
         }
