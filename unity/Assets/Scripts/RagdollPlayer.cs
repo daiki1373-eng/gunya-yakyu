@@ -34,6 +34,22 @@ public class RagdollPlayer : MonoBehaviour
     // 登場演出中だけ「立っている」補助を入れる(脚をまっすぐ・腰を持ち上げる)
     public bool StandAssist;
 
+    // 元絵をそのまま体にする(Tools/chara-rig のリグがあるキャラ)。false で従来のぐにゃ体
+    public static bool UseRigSkin = true;
+    public RigSkin Skin { get; private set; }
+    public bool BatThrown { get; private set; }
+    public float HeadPopScale { get; private set; }
+
+    // 元絵の体を使うときは、ラグドールの絵(胴・腕・脚・顔・飾り)を消して当たり判定だけ残す
+    private void HideBodyArt(bool keepBat)
+    {
+        foreach (var rb in _allParts)
+        {
+            if (keepBat && rb == Bat) continue;
+            foreach (var sr in rb.GetComponentsInChildren<SpriteRenderer>(true)) sr.enabled = false;
+        }
+    }
+
     public float Facing { get; private set; } // +1: 右向き, -1: 左向き
     public PlayerStats Stats { get; private set; }
 
@@ -63,6 +79,11 @@ public class RagdollPlayer : MonoBehaviour
         if (stats.HasLook) { uniform = stats.LookJersey; accent = stats.LookTrim; pinstripe = stats.LookStripe; }
         player.Build(rootPos, facing, stats, uniform, accent, isBatter);
         if (pinstripe) player.AddPinstripes();
+        if (UseRigSkin && !string.IsNullOrEmpty(stats.CharaId))
+        {
+            player.Skin = RigSkin.TryAttach(player, stats.CharaId);
+            if (player.Skin != null) player.HideBodyArt(!player.Skin.HasPaintedBat);
+        }
         return player;
     }
 
@@ -335,6 +356,7 @@ public class RagdollPlayer : MonoBehaviour
 
     private void LateUpdate()
     {
+        HeadPopScale = _headPop > 0f ? 1f + 0.18f * Mathf.Sin(Mathf.Clamp01(_headPop / 0.25f) * Mathf.PI) : 1f;
         if (!_realHead || _headSr == null) return;
         if (_headBaseScale == Vector3.zero) _headBaseScale = _headSr.transform.localScale;
         if (_headPop > 0f)
@@ -515,6 +537,7 @@ public class RagdollPlayer : MonoBehaviour
     {
         if (Bat == null) return;
         foreach (var j in Bat.GetComponents<HingeJoint2D>()) j.enabled = false;
+        BatThrown = true;
         float f = Facing;
         Bat.velocity = new Vector2(-f * Random.Range(2.5f, 4.5f) * power, Random.Range(4.5f, 7f) * power);
         Bat.angularVelocity = Random.Range(500f, 900f) * power * (Random.value < 0.5f ? -1f : 1f);
