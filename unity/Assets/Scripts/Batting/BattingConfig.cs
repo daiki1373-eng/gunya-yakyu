@@ -16,6 +16,16 @@ public static class BattingConfig
     // (P2でスイング・捕球・送球・走塁の全てに掛ける)
     public static float GunyaLevel = 1.0f;
 
+    // ---- テンポ(判定時間・球速・能力には影響しない) ----------------
+    public const float PitchReadySeconds = 0.16f;
+    public const float PitchResultSeconds = 0.28f;
+    public const float AtBatResultSeconds = 0.40f;
+    public const float ChangeSeconds = 0.45f;
+    public const float RunnerAnimationSeconds = 0.85f;
+    public const float LiveBallPlaybackSpeed = 1.35f;
+    public const float ReplaySeconds = 2.8f;
+    public const float OpponentStealChance = 0.12f;
+
     // ---- ストライクゾーン(ホームプレート上の面 z=0) ---------------
     public const float ZoneHalfW = 0.45f;
     public const float ZoneBottom = 0.65f;
@@ -74,7 +84,7 @@ public static class BattingConfig
     public const float SprayMax = 62f;         // タイミング最大ズレでの打球方向(度)
 
     // ---- チームカラー(自作) ------------------------------------------
-    // 自チーム=ホーム(白地に赤)、相手=ビジター(紺地)。
+    // 自チーム=白地に赤、相手=紺地。先攻・後攻にかかわらず同じ色。
     public static readonly Color UserJersey = new Color(0.95f, 0.95f, 0.96f);
     public static readonly Color UserAccent = new Color(0.80f, 0.14f, 0.14f);
     public static readonly Color OppJersey = new Color(0.20f, 0.28f, 0.55f);

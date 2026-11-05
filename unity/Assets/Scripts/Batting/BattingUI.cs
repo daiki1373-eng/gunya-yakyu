@@ -20,7 +20,8 @@ public class BattingUI
     private RectTransform _meterRoot, _meterMarker;
     private Image _meterGood, _meterPerfect;
     private const float MeterW = 440f;
-    private RectTransform _swingRect;
+    private RectTransform _swingRect, _stealRect;
+    private Text _stealLabel;
     private Image _swingImg;
     private Font _font;
     private float _swingPulseUntil;
@@ -177,6 +178,19 @@ public class BattingUI
         _swingLabel = label;
         label.fontStyle = FontStyle.Bold;
 
+        var steal = NewImage(canvasGo.transform, "StealButton", Color.white);
+        steal.sprite = UiKit.ButtonRed;
+        steal.type = Image.Type.Sliced;
+        _stealRect = steal.rectTransform;
+        _stealRect.anchorMin = _stealRect.anchorMax = new Vector2(1f, 0f);
+        _stealRect.pivot = new Vector2(1f, 0f);
+        _stealRect.sizeDelta = new Vector2(118f, 54f);
+        _stealRect.anchoredPosition = new Vector2(-238f, 24f);
+        _stealLabel = NewText(_stealRect, "Label", new Vector2(0.5f, 0.5f), Vector2.zero,
+            new Vector2(118f, 54f), 23, TextAnchor.MiddleCenter, Color.white);
+        _stealLabel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        ShowSteal(false, false);
+
         // 実況字幕(大きく弾むように出す)
         _comm = NewText(canvasGo.transform, "Commentary", new Vector2(0.5f, 0.5f), new Vector2(0f, 210f),
             new Vector2(900f, 90f), 60, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.35f));
@@ -217,21 +231,34 @@ public class BattingUI
         return img;
     }
 
-    public void SetCount(int inning, bool top, int balls, int strikes, int outs, int runs, int oppRuns)
+    public void SetCount(int inning, bool top, int balls, int strikes, int outs, int runs, int oppRuns, bool? userBatting = null)
     {
         _count.text = inning + (top ? "回表" : "回裏");
         _scoreTxt[0].text = runs.ToString();
         _scoreTxt[1].text = oppRuns.ToString();
-        // 攻撃中のチームのチップを明るく
-        _teamChip[0].color = top ? new Color(0.90f, 0.18f, 0.18f) : new Color(0.45f, 0.12f, 0.12f);
-        _teamChip[1].color = top ? new Color(0.10f, 0.18f, 0.45f) : new Color(0.18f, 0.34f, 0.90f);
-        int[] v = { balls, strikes, outs };
+        // 表・裏と自チームの攻撃は別々に扱う。
+        bool attacking = userBatting ?? top;
+        _teamChip[0].color = attacking ? new Color(0.90f, 0.18f, 0.18f) : new Color(0.45f, 0.12f, 0.12f);
+        _teamChip[1].color = attacking ? new Color(0.10f, 0.18f, 0.45f) : new Color(0.18f, 0.34f, 0.90f);
         for (int r = 0; r < 3; r++)
             for (int k = 0; k < _lamps[r].Length; k++)
-                _lamps[r][k].color = k < v[r] ? _lampOn[r] : new Color(1f, 1f, 1f, 0.15f);
+                _lamps[r][k].color = k < (r == 0 ? balls : (r == 1 ? strikes : outs)) ? _lampOn[r] : new Color(1f, 1f, 1f, 0.15f);
     }
 
     public void SetBatterLabel(string text) { _batter.text = text; }
+
+    public void ShowSteal(bool available, bool queued)
+    {
+        if (_stealRect == null) return;
+        _stealRect.gameObject.SetActive(available);
+        _stealLabel.text = queued ? "盗塁  ✓" : "盗塁";
+    }
+
+    public bool OverSteal(Vector2 screenPos)
+    {
+        return _stealRect != null && _stealRect.gameObject.activeSelf
+            && RectTransformUtility.RectangleContainsScreenPoint(_stealRect, screenPos, null);
+    }
 
     public void SetSwingLabel(string text) { if (_swingLabel != null) _swingLabel.text = text; }
 
