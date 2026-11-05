@@ -19,6 +19,7 @@ public class ClipRecorder : MonoBehaviour
     private int _channels = 2;
     private bool _on;
     private static int _pending;
+    private static bool _autoKeep = true;
 
     public static ClipRecorder Begin(string dir, float fps) { return Begin(dir, fps, 1); }
 
@@ -29,6 +30,8 @@ public class ClipRecorder : MonoBehaviour
         GameObject host = lis != null ? lis.gameObject : new GameObject("ClipRecorder");
         var r = host.AddComponent<ClipRecorder>();
         r.Dir = dir; r.Fps = fps; r.SuperSize = Mathf.Max(1, superSize);
+        // 録画そのものが重いので、録画中は画質の自動調整を止める
+        _autoKeep = GraphicsQuality.Auto; GraphicsQuality.Auto = false;
         Directory.CreateDirectory(dir);
         foreach (var f in Directory.GetFiles(dir)) File.Delete(f);
         r._t0 = Time.realtimeSinceStartup; r._next = r._t0;
@@ -44,6 +47,7 @@ public class ClipRecorder : MonoBehaviour
         if (r == null) return "none";
         Current = null;
         r._on = false;
+        GraphicsQuality.Auto = _autoKeep;
         r.StopAllCoroutines();
         for (int i = 0; i < 300 && _pending > 0; i++) System.Threading.Thread.Sleep(10);   // 書き込みの終わりを待つ
         string info;

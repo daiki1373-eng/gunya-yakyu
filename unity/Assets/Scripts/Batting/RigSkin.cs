@@ -432,6 +432,8 @@ public partial class RigSkin : MonoBehaviour
     private void LateUpdate()
     {
         if (_mesh == null || _p == null) return;
+        // 低画質では遠くの選手の変形を1フレームおきに
+        if (_p.Light && GraphicsQuality.Level == 0 && ((Time.frameCount + GetInstanceID()) & 1) == 0) return;
         FaceState(Time.timeScale > 0f ? Time.deltaTime : Mathf.Min(Time.unscaledDeltaTime, 0.05f));   // 一時停止中も表情は動かす
         Pose();
         AttachBat();

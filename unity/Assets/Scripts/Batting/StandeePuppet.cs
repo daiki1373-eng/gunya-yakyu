@@ -92,7 +92,8 @@ public class StandeePuppet : MonoBehaviour
         if (RigSkin.CanRig(id))
         {
             BuildBones();
-            _body.localScale = Vector3.one * (height / RigSkin.TargetHeight);
+            _baseScale = height / RigSkin.TargetHeight;
+            _body.localScale = Vector3.one * _baseScale;
             _up.enabled = _legL.enabled = _legR.enabled = false;
             var body = new RigBody
             {
@@ -170,6 +171,8 @@ public class StandeePuppet : MonoBehaviour
 
     private static void Rot(Transform t, float deg) { t.localRotation = Quaternion.Euler(0f, 0f, deg); }
     private float _headPop = 1f;
+    private float _dirX;          // -1=画面の左へ / +1=右へ走っている
+    private float _baseScale = 1f;
 
     public void Catch() { _act = 1; _actT = 0f; _actDur = 0.45f; }
     public void Throw() { _act = 2; _actT = 0f; _actDur = 0.50f; }
@@ -181,6 +184,11 @@ public class StandeePuppet : MonoBehaviour
         float g = BattingConfig.GunyaLevel;
         Vector3 pos = _root != null ? _root.position : transform.position;
         float speed = _hasLast ? Vector3.Distance(pos, _last) / dt : 0f;
+        // 画面の左右どちらへ走っているか(体をその向きへ傾け、少し横を向いたように細くする)
+        float vx = 0f;
+        var cam = Camera.main;
+        if (_hasLast && cam != null) vx = Vector3.Dot((pos - _last) / dt, cam.transform.right);
+        _dirX = Mathf.MoveTowards(_dirX, Mathf.Clamp(vx / 6f, -1f, 1f), dt * 4f);
         _last = pos; _hasLast = true;
         _run = Mathf.MoveTowards(_run, Mathf.Clamp01(speed / 4f), dt * 6f);
         if (DebugRun >= 0f) { _run = DebugRun; speed = 6f * DebugRun; }
@@ -271,6 +279,10 @@ public class StandeePuppet : MonoBehaviour
             _actT += dt;
             if (_actT >= _actDur) _act = 0;
         }
+        // 走る向きへ体を傾け、横を向いたように少し細く
+        float turn = Mathf.Abs(_dirX);
+        pelR -= _dirX * 6f; chest -= _dirX * 9f;
+        _body.localScale = new Vector3(_baseScale * (1f - 0.16f * turn), _baseScale, _baseScale);
         _pel.localPosition = new Vector3(0f, pelY, 0f);
         Rot(_pel, pelR);
         Rot(_chest, chest);

@@ -21,9 +21,8 @@ public static class Bootstrap
         Physics2D.maxRotationSpeed = 1800f;
         QualitySettings.vSyncCount = 0;
         Application.targetFrameRate = 60;
-        // 輪郭のギザギザを消す(MSAA)・斜めから見た地面をくっきり(異方性フィルタ)
-        QualitySettings.antiAliasing = Application.isMobilePlatform ? 2 : 4;
-        QualitySettings.anisotropicFiltering = AnisotropicFiltering.ForceEnable;
+        // 輪郭のギザギザを消す(MSAA)・斜めから見た地面をくっきり(異方性フィルタ)。重いと自動で画質を下げる
+        GraphicsQuality.Init();
 
         // 既定は新しい打席システム(捕手後方視点・パワプロ式)。
         // 旧・横視点の試作(GameController)に戻すには UseLegacySideView を true にする。

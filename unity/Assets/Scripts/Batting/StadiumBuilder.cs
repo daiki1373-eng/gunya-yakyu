@@ -255,8 +255,13 @@ public class StadiumBuilder : MonoBehaviour
 
             // ---- 下段 ----
             if (center)
-                StadiumMesh.ConeBand(_root, "BackScreen", null, OLower, a, b, 0.5f, r0, h0, rBack, h0 + rise0,
-                    new Color(0.05f, 0.13f, 0.10f), new Color(0.025f, 0.07f, 0.05f), 8f, 8f);
+            {
+                // バックスクリーン: 打者の目のため暗い無地。縦の継ぎ目だけうっすら入れて、のっぺりさせない
+                StadiumMesh.ConeBand(_root, "BackScreen", StadiumArt.Fence.texture, OLower, a, b, 0.5f, r0, h0, rBack, h0 + rise0,
+                    new Color(0.30f, 0.34f, 0.33f), new Color(0.16f, 0.18f, 0.18f), 3f, 27f);
+                StadiumMesh.CurvedWall(_root, "BackScreenTop", null, OLowerAisle, a, b, 0.5f, rBack, h0 + rise0 - 0.4f, h0 + rise0 + 0.1f,
+                    new Color(0.02f, 0.03f, 0.03f), new Color(0.05f, 0.07f, 0.06f), 4f, 0.05f);
+            }
             else
             {
                 var lo = StadiumMesh.ConeBand(_root, "LowerStand", StadiumArt.Crowd(side, 0).texture, OLower, a, b, 0.5f,

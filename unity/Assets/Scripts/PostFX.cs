@@ -40,6 +40,7 @@ public class PostFX : MonoBehaviour
     private void OnRenderImage(RenderTexture src, RenderTexture dst)
     {
         if (!Enabled || _mat == null) { Graphics.Blit(src, dst); return; }
+        int q = GraphicsQuality.Level;
         _mat.SetVector("_Threshold", new Vector4(Threshold, Knee, 6f, 0f));
         _mat.SetFloat("_Intensity", Intensity);
         _mat.SetFloat("_Exposure", Exposure);
@@ -53,14 +54,23 @@ public class PostFX : MonoBehaviour
         if (QualitySettings.activeColorSpace == ColorSpace.Gamma) _mat.EnableKeyword("UNITY_COLORSPACE_GAMMA");
         else _mat.DisableKeyword("UNITY_COLORSPACE_GAMMA");
 
+        if (q == 0)
+        {
+            // 低画質: にじみなし、色調・ビネットだけ(1回で済む)
+            _mat.SetTexture("_BloomTex", Texture2D.blackTexture);
+            Graphics.Blit(src, dst, _mat, 3);
+            return;
+        }
         var fmt = src.format;
-        int w = src.width / 2, h = src.height / 2;
+        int div = q == 2 ? 2 : 4;
+        int maxLevels = q == 2 ? Levels : 3;
+        int w = src.width / div, h = src.height / div;
         int n = 0;
         RenderTexture cur = RenderTexture.GetTemporary(w, h, 0, fmt);
         cur.filterMode = FilterMode.Bilinear;
         Graphics.Blit(src, cur, _mat, 0);
         _down[n++] = cur;
-        for (; n < Levels; n++)
+        for (; n < maxLevels; n++)
         {
             w = Mathf.Max(1, w / 2); h = Mathf.Max(1, h / 2);
             if (w < 4 || h < 4) break;
