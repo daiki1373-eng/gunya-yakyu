@@ -4,58 +4,60 @@
 <title>甲子園への道</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;touch-action:manipulation}
-html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;color:#fff}
-#stage{position:absolute;left:50%;top:50%;width:960px;height:540px;margin:-270px 0 0 -480px;background:#000;overflow:hidden}
+html,body{margin:0;height:100%;background:#172c27;overflow:hidden;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;color:#fff7e7}
+#stage{position:absolute;left:50%;top:50%;width:960px;height:540px;margin:-270px 0 0 -480px;background:#72956a;overflow:hidden}
 #cv{position:absolute;left:0;top:0;width:960px;height:540px;image-rendering:auto}
 #stage:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;background:linear-gradient(transparent 80%,rgba(25,43,39,.05))}
-#rot{display:none;position:fixed;inset:0;z-index:999;background:#0a1a4a;font-size:26px;text-align:center;align-items:center;justify-content:center;line-height:1.8}
-#hud{position:absolute;inset:0;display:none;pointer-events:none;z-index:10;text-shadow:2px 2px 0 #000;font-weight:bold}
-.hb{position:absolute;background:rgba(0,0,70,.85);border:2px solid #fff;padding:5px 9px}
+#rot{display:none;position:fixed;inset:0;z-index:999;background:#173e33;font-size:26px;text-align:center;align-items:center;justify-content:center;line-height:1.8}
+#hud{position:absolute;inset:0;display:none;pointer-events:none;z-index:10;text-shadow:0 1px 2px #102a23;font-weight:bold}
+.hb{position:absolute;background:rgba(24,59,47,.94);border:1px solid #d8d1a9;border-radius:9px;padding:6px 10px;box-shadow:0 3px 12px #132b2630}
 #sb{left:8px;top:8px;min-width:200px;font-size:18px;line-height:24px}
 #sb div{display:flex;justify-content:space-between;gap:8px}#sb .cur{color:#ffe14a}
-#sb .inn{justify-content:center;border-top:1px solid #88a;margin-top:2px;padding-top:2px;color:#9df}
+#sb .inn{justify-content:center;border-top:1px solid #6e8d75;margin-top:3px;padding-top:3px;color:#e4d4a4}
 #cnt{right:8px;top:8px;font-size:16px;line-height:22px}#cnt .cr{display:flex;gap:10px;align-items:center}
-.gg{display:inline-block;width:54px;height:7px;background:#222;border:1px solid #99a;vertical-align:middle}.gg i{display:block;height:100%;background:linear-gradient(90deg,#f80,#ffe14a)}
-.lamp{display:inline-block;width:14px;height:14px;border-radius:50%;margin-left:3px;background:#222;border:1px solid #99a;vertical-align:-2px}
-.lamp.on.s{background:#fd2}.lamp.on.b{background:#3d3}.lamp.on.o{background:#f33}
+.gg{display:inline-block;width:54px;height:7px;background:#12291f;border:1px solid #89a084;vertical-align:middle}.gg i{display:block;height:100%;background:linear-gradient(90deg,#cd9154,#f1d37c)}
+.lamp{display:inline-block;width:14px;height:14px;border-radius:50%;margin-left:3px;background:#19382e;border:1px solid #93a48a;vertical-align:-2px}
+.lamp.on.s{background:#efd46f;box-shadow:0 0 5px #efd46f55}.lamp.on.b{background:#91cb81}.lamp.on.o{background:#ec8b71}
 .dia{position:relative;width:70px;height:52px}
-.bs{position:absolute;width:15px;height:15px;transform:rotate(45deg);border:2px solid #fff;background:#223}.bs.on{background:#fd2}
-.tel{position:absolute;left:250px;width:460px;text-align:center;padding:5px 10px;font-size:19px;border:2px solid #fff;display:none}
-#tel1{top:8px;background:linear-gradient(#2d55c4,#163080)}
-#tel2{top:56px;background:rgba(0,0,0,.8);font-size:17px;color:#ffe9a0}
-#flash{position:absolute;left:0;right:0;top:190px;text-align:center;font-size:56px;font-style:italic;color:#ffe14a;text-shadow:3px 3px 0 #b00,-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000;opacity:0}
+.bs{position:absolute;width:15px;height:15px;transform:rotate(45deg);border:2px solid #e8e5cc;background:#1d3c31}.bs.on{background:#efd46f}
+.tel{position:absolute;left:250px;width:460px;text-align:center;padding:6px 10px;font-size:19px;border:1px solid #d6c8a1;border-radius:8px;display:none}
+#tel1{top:8px;background:linear-gradient(#38664d,#244a38)}
+#tel2{top:56px;background:rgba(27,48,36,.9);font-size:17px;color:#f3dfab}
+#flash{position:absolute;left:0;right:0;top:190px;text-align:center;font-size:56px;font-style:italic;color:#ffe8a5;text-shadow:0 3px 0 #30553e,0 5px 14px #102a2380;opacity:0}
 #flash.show{animation:fl 1.1s ease-out}
-@keyframes fl{0%{opacity:0;transform:scale(1.7)}14%{opacity:1;transform:scale(1)}78%{opacity:1}100%{opacity:0}}
-#info{position:absolute;left:300px;width:360px;bottom:6px;text-align:center;font-size:14px;background:rgba(0,0,0,.6);padding:3px;border-radius:4px}
+@keyframes fl{0%{opacity:0;transform:translateY(10px) scale(.94)}18%{opacity:1;transform:translateY(-2px) scale(1.025)}32%{transform:translateY(0) scale(1)}78%{opacity:1}100%{opacity:0}}
+#info{position:absolute;left:300px;width:360px;bottom:6px;text-align:center;font-size:14px;background:rgba(25,49,35,.84);padding:4px;border-radius:6px}
 #bl{position:absolute;left:10px;bottom:10px}
 #br{position:absolute;right:10px;bottom:10px;display:grid;grid-template-columns:124px 124px;gap:6px}
-.gb{pointer-events:auto;width:124px;height:64px;border:3px solid #fff;border-radius:10px;color:#fff;font-weight:bold;font-size:21px;font-family:inherit;text-shadow:1px 1px 0 #000;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.5)}
-.gb:active{filter:brightness(1.35)}
-.gb.st{background:#74a;width:110px}.gb.st.on{background:#fc2;color:#000;text-shadow:none}
+.gb{pointer-events:auto;width:124px;height:64px;border:2px solid #ede6cc;border-radius:12px;color:#fff9e9;font-weight:bold;font-size:21px;font-family:inherit;text-shadow:0 1px 2px #18332980;cursor:pointer;box-shadow:0 4px 0 #193d30,0 5px 13px #17352935;transition:transform .1s,filter .1s}
+.gb:active{filter:brightness(1.12);transform:translateY(2px)}
+.gb.st{background:#64765c;width:110px}.gb.st.on{background:#ead18b;color:#244333;text-shadow:none}
 #ui{position:absolute;inset:0;display:none;z-index:20}
-.pn{position:absolute;background:linear-gradient(#183488,#0b1c52);border:3px solid #fff;border-radius:10px;padding:14px 16px;box-shadow:0 0 0 3px #0a1440,6px 6px 0 rgba(0,0,0,.4);overflow:auto}
-.pn h2{margin:0 0 8px;font-size:24px;color:#ffe14a;text-shadow:2px 2px 0 #000}
-.mb{display:block;width:100%;margin:6px 0;padding:10px 12px;font-weight:bold;font-size:20px;font-family:inherit;color:#fff;border:3px solid #fff;border-radius:8px;background:linear-gradient(#3e63d4,#1b2f8c);text-shadow:1px 1px 0 #000;cursor:pointer}
-.mb:active{filter:brightness(1.3)}.mb[disabled]{opacity:.4;pointer-events:none}.mb.go{background:linear-gradient(#e44,#a11)}
-.ttl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.logo{font-size:84px;font-weight:900;color:#ffe14a;text-shadow:4px 4px 0 #c00,-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000,6px 6px 0 #000;letter-spacing:6px;font-style:italic}
-.sub{font-size:22px;margin:4px 0 18px;text-shadow:2px 2px 0 #000}.mn{width:300px}
+.pn{position:absolute;background:linear-gradient(145deg,#2e5742,#193b2f);border:2px solid #e7dab1;border-radius:14px;padding:14px 16px;box-shadow:0 9px 28px #102b2859;overflow:auto}
+.pn h2{margin:0 0 8px;font-size:24px;color:#f2d88d;text-shadow:0 1px 2px #18372b}
+.mb{display:block;width:100%;margin:7px 0;padding:10px 12px;font-weight:bold;font-size:20px;font-family:inherit;color:#fff8e7;border:2px solid #d8d1aa;border-radius:10px;background:linear-gradient(#467658,#2d563f);text-shadow:0 1px 2px #18372b;cursor:pointer;box-shadow:0 3px 0 #19382b;transition:transform .1s,filter .1s}
+.mb:active{filter:brightness(1.13);transform:translateY(2px)}.mb[disabled]{opacity:.4;pointer-events:none}.mb.go{background:linear-gradient(#b97649,#8f5232)}
+.ttl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(0deg,#183c32b0,transparent 80%);padding-top:6px}
+.title-kicker{font-size:15px;letter-spacing:5px;font-weight:bold;color:#f5e8bf;margin-bottom:12px;text-shadow:0 2px 5px #163d32}
+.logo{font-size:72px;font-weight:900;color:#fff0c7;text-shadow:0 3px 0 #31523a,0 7px 18px #17392e80;letter-spacing:5px;font-style:normal}
+.sub{font-size:19px;margin:9px 0 23px;color:#fff4d6;text-shadow:0 2px 4px #153b2d}.mn{width:300px}
+.mn .mb:first-child{background:linear-gradient(#f2d495,#dcba76);color:#254733;text-shadow:none;border-color:#fff0c7;box-shadow:0 3px 0 #9c814c}.title-note{font-size:13px;margin-top:15px;color:#e0e6ca;letter-spacing:1px}
 .st{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:16px}.st span{width:76px}.st b{width:56px;text-align:right}
 .bar{flex:1;height:12px;background:#000;border:1px solid #9ac}.bar i{display:block;height:100%}
-.warn{background:#a11;padding:4px 8px;margin:6px 0;border:2px solid #fff;font-size:16px}
+.warn{background:#975139;padding:4px 8px;margin:6px 0;border:1px solid #edd5af;border-radius:5px;font-size:16px}
 .tx{font-size:15px;line-height:1.55}
 .sch{border:3px solid #678;border-radius:8px;padding:6px 10px;margin:5px 0;font-size:15px;cursor:pointer;background:rgba(255,255,255,.07)}.sch.on{border-color:#ffe14a;background:rgba(255,225,74,.18)}
-label{display:block;margin:7px 0;font-size:16px}input,select{font-size:18px;font-family:inherit;padding:5px;width:100%;margin-top:3px}
+label{display:block;margin:7px 0;font-size:16px}input,select{font-size:18px;font-family:inherit;padding:5px;width:100%;margin-top:3px;color:#213e30;background:#fff5df;border:1px solid #c6c39c;border-radius:5px;accent-color:#e3be6c}
 table{border-collapse:collapse;width:100%;font-size:16px}td,th{border:1px solid #89a;padding:3px 6px;text-align:center}
 #lyr{position:absolute;left:0;right:0;bottom:30px;text-align:center;font-size:34px;font-weight:bold;text-shadow:3px 3px 0 #000;letter-spacing:4px}
-#mute{position:absolute;right:6px;top:140px;z-index:70;width:38px;height:38px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.5);color:#fff;font-size:18px}
-#form-ui{z-index:45;left:175px;top:30px;width:610px;height:480px;pointer-events:auto;background:linear-gradient(#194956,#102e3b)}
+#mute{position:absolute;right:6px;top:140px;z-index:70;width:38px;height:38px;border-radius:50%;border:1px solid #e1d8b5;background:rgba(26,56,42,.88);color:#fff;font-size:18px}
+#form-ui{z-index:45;left:175px;top:30px;width:610px;height:480px;pointer-events:auto;background:linear-gradient(#315b45,#1b3d30)}
 #form-ui h2{font-size:22px;margin:0 0 7px}#form-ui .form-controls{width:292px}#form-ui label{font-size:14px;margin:9px 0}#form-ui output{float:right;color:#ffe39a;font-variant-numeric:tabular-nums}#form-ui input{padding:0;margin:3px 0;height:17px;accent-color:#f1c662}#form-ui select{font-size:16px;padding:5px;margin:0}
-#form-ui button{cursor:pointer;font-family:inherit}#form-ui .form-tabs,#form-ui .form-stage,#form-ui .form-tools{display:flex;gap:5px;margin:8px 0}#form-ui .form-tabs button,#form-ui .form-stage button,#form-ui .form-tools button,#form-play{flex:1;padding:6px 0;font-size:13px;font-weight:bold;color:white;background:#315c6e;border:1px solid #8ca9a8;border-radius:5px}#form-ui .form-tabs button.on,#form-ui .form-stage button.on{background:#d5ad48;color:#17333c}
+#form-ui button{cursor:pointer;font-family:inherit}#form-ui .form-tabs,#form-ui .form-stage,#form-ui .form-tools{display:flex;gap:5px;margin:8px 0}#form-ui .form-tabs button,#form-ui .form-stage button,#form-ui .form-tools button,#form-play{flex:1;padding:6px 0;font-size:13px;font-weight:bold;color:#fff5dc;background:#436b50;border:1px solid #9daa86;border-radius:5px}#form-ui .form-tabs button.on,#form-ui .form-stage button.on{background:#e2c483;color:#254333}
 #form-ui .form-sliders{height:240px;overflow:auto;padding:0 3px}#form-ui .form-sliders:has(.form-stage) label{margin:15px 0}#form-ui .form-tools{position:absolute;left:14px;bottom:57px;width:292px;height:29px;margin:0}#form-preview{position:absolute;right:12px;top:64px;width:250px;height:300px;border-radius:10px;background:#bdd4bf}#form-play{position:absolute;right:12px;top:372px;width:250px}#form-ui .form-close{position:absolute;bottom:8px;left:14px;width:576px;font-size:18px;margin:0;padding:7px}
 #form-ui .form-sliders:not(:has(.form-stage)) label{margin:3px 0;font-size:13px;line-height:16px}#form-ui .form-sliders:not(:has(.form-stage)) input{display:block;height:14px;margin:1px 0}
 
-#gl{position:absolute;inset:0;width:960px;height:540px}#pause{position:absolute;right:6px;top:186px;z-index:70;width:38px;height:38px;border-radius:50%;border:2px solid white;background:#173d50c9;color:white;font-size:18px;display:none}#pause-ui{position:absolute;inset:0;z-index:80;background:#0c2333b8;backdrop-filter:blur(5px)}#pause-ui[hidden]{display:none}#pause-ui:not([hidden]){display:grid;place-items:center}#pause-ui>div{width:300px;text-align:center;font-size:28px}
+#gl{position:absolute;inset:0;width:960px;height:540px}#pause{position:absolute;right:6px;top:186px;z-index:70;width:38px;height:38px;border-radius:50%;border:1px solid #e1d8b5;background:#1a382ae0;color:white;font-size:18px;display:none}#pause-ui{position:absolute;inset:0;z-index:80;background:#173b2cb8;backdrop-filter:blur(5px)}#pause-ui[hidden]{display:none}#pause-ui:not([hidden]){display:grid;place-items:center}#pause-ui>div{width:300px;text-align:center;font-size:28px}
 </style></head><body>
 <div id="stage"><canvas id="cv" width="960" height="540"></canvas><canvas id="gl" width="960" height="540" hidden></canvas>
 <div id="hud"><div id="sb" class="hb"></div><div id="cnt" class="hb"></div><div id="tel1" class="tel"></div><div id="tel2" class="tel"></div><div id="flash"></div><div id="info"></div><div id="bl"></div><div id="br"></div></div>
@@ -289,7 +291,9 @@ function drawBatter(t){
 // All motion is presentation-only; the pitch clock and collision endpoint stay in the engine.
 function pitchRig(u,form){
  const poses=form.poses,w=cl(u,0,1),smooth=w*w*(3-2*w),segment=w<.5?0:1,v=w<.5?w*2:(w-.5)*2;
- const mix=k=>poses[segment][k]+(poses[segment+1][k]-poses[segment][k])*v;
+ // Ease at the gathered pose instead of snapping limb velocity between keyframes.
+ // Angles stay unwrapped, so custom multi-turn forms retain their full rotations.
+ const eased=v*v*(3-2*v),mix=k=>poses[segment][k]+(poses[segment+1][k]-poses[segment][k])*eased;
  const loose=(form.loose||0)/100,body=mix('body')+Math.sin(w*Math.PI*2)*loose*48;
  const arm=mix('arm')+(form.windmill||0)*360*smooth,leg=mix('leg'),h=28*cl((form.stretch||1)*(1+Math.sin(w*Math.PI)*loose*.28),.4,3.2);
  const yaw=Math.cos((form.twist||0)*Math.PI*2*smooth),legA=(leg-10)*rad;
@@ -520,7 +524,7 @@ bl.vis=false;const items=r.mv.map(m=>{let it=f.runners.find(x=>x.id===m.r);if(!i
 const md=Math.max(0,...items.map(it=>Math.abs(it.b-it.a)));if(md>0)await tween((500+md*380)*SF(),u=>items.forEach(it=>{it.u=u}));items.forEach(it=>{if(it.out)it.vis=false});await sleep(350)}
 /* LIVE_CONTROLS */
 async function finishPlay(r,bt,pt,off,def,k){await playAnim(r,off,def);const{runs,outs}=applyRes(r,bt,pt,k);if(outs>0)addGauge(k==='me'?'you':'me',GGAIN.out*outs);updHUD();
-tel2(runs>0?`${runs}点が入りました！ ${G.sc.me}-${G.sc.you}`:pick(['打球は…','守備陣が落ち着いて処理！','次の打者へ！']));V.mode='bat';V.f=null;await sleep(1100);G.fx=null}
+tel2(runs>0?`${runs}点が入りました！ ${G.sc.me}-${G.sc.you}`:pick(['帽子を直して、次の一球！','ぐにゃっと構えて、気持ちはまっすぐ。','ひざは笑っても、顔は真剣。']));V.mode='bat';V.f=null;await sleep(1100);G.fx=null}
 async function contact(h,bt,off,def){if(h.q>=.72)V.bat.bendT=nw();V.pit.hit=true;V.spark=nw();sndHit(h.q);const r=resolveHit(h,bt,def);await sleep(120);
 if(r.foul){await playAnim(r,off,def);V.mode='bat';V.f=null;return{t:'foul',r,bunt:h.bunt}}return{t:'play',r}}
 function cpuSteal(){const B=G.bases;if(G.outs>=2)return false;const i=B[1]&&!B[2]?1:(B[0]&&!B[1]?0:-1);return i>=0&&R()<.04+B[i].speed/900}
@@ -567,7 +571,7 @@ return{win:G.sc.me>G.sc.you,me:G.sc.me,you:G.sc.you,opp:opp.name,label,called:G.
 const ui=h=>{const u=$('#ui');u.innerHTML=h;u.style.display='block'},uiOff=()=>{const u=$('#ui');u.style.display='none';u.innerHTML=''};
 let HM='main',MSG='',NG=null;
 function title(){V.mode='yard';hudOff();const has=!!localStorage.getItem(KEY);
-ui(`<div class="ttl"><div class="logo">甲子園への道</div><div class="sub">〜 白球に夢をのせて 〜</div><div class="mn"><button class="mb" onclick="newGame()">はじめから</button>${has?'<button class="mb" onclick="loadGame()">つづきから</button>':''}<button class="mb" onclick="help()">あそびかた</button></div></div>`)}
+ui(`<div class="ttl"><div class="title-kicker">ぐにゃぐにゃ野球、開幕。</div><div class="logo">甲子園への道</div><div class="sub">しなる投球、よろける守備。でも、一球は本気。</div><div class="mn"><button class="mb" onclick="newGame()">はじめから</button>${has?'<button class="mb" onclick="loadGame()">つづきから</button>':''}<button class="mb" onclick="help()">あそびかた</button></div><div class="title-note">全力で投げて、ちょっとよろけて、また一球。</div></div>`)}
 function help(){ui(`<div class="pn" style="left:60px;top:30px;width:840px;height:480px"><h2>あそびかた</h2><div class="tx">
 球が来たらタイミングよくボタンを押す！ボタンが打法です：通常打ち／長打狙い(強振・当たりにくい)／流し打ち(逆方向)／バント(送りに)。早いと引っ張り、遅いと流れます。ストライクゾーンの枠は出ません。球をよく見よう。<br>
 球種ボタンを押して投げます。<b>ボタンの中のタップ位置がコース指定</b>（上=高め・左右=内外。画面には出ません）。制球が低いとバラけます。「投球フォーム」で構え・踏み込み・リリースの腕／体／脚に加え、全身回転・腕回転・横ひねり・胴の長さ・ジャンプを変更できます（見た目のみ・今のプレイ中に有効）。<br>

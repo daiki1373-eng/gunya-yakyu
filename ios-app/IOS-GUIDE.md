@@ -55,7 +55,7 @@ npm run build
 npm run ios:sync
 ```
 
-`src/game.html` がゲーム本体、`src/renderer3d.js` が3D描画、`src/live-play.js` が守備・走塁、`src/live-controls.js` が操作とアニメーションです。`npm run build` で、Three.jsとネイティブ連携を含むオフラインHTMLを `www/index.html` と `../landscape/claude-v.html` に同じ内容で出力します。生成済みHTMLを直接編集しても、次のビルドで上書きされます。
+`src/game.html` がゲーム本体、`src/renderer3d.js` が3D描画とカメラ、`src/characters.js` がキャラクターとぐにゃぐにゃの動き、`src/ballpark.js` が球場、`src/live-play.js` が守備・走塁、`src/live-controls.js` が操作とアニメーションです。`npm run build` で、Three.jsとネイティブ連携を含むオフラインHTMLを `www/index.html` と `../landscape/claude-v.html` に同じ内容で出力します。生成済みHTMLを直接編集しても、次のビルドで上書きされます。
 
 `npm run ios:sync` でネイティブ側のWebアセットとプラグインを同期します。GitHub ActionsにもWebテストと署名なしiOSシミュレータービルドの設定があります。認証情報を使う配信ジョブは作成していません。
 
