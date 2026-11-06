@@ -41,6 +41,15 @@ public class BattingStage : MonoBehaviour
     private Vector3 _followTarget;
     private Vector3 _camVel;
     private Quaternion _catcherRot;
+    public float PlaybackSpeed { get; private set; } = 1f;
+    private float _motionTime;
+
+    public void SetPlaybackSpeed(float speed)
+    {
+        PlaybackSpeed = Mathf.Clamp(speed, 0.05f, 2f);
+        foreach (var puppet in _standees.Values)
+            if (puppet != null) puppet.PlaybackSpeed = PlaybackSpeed;
+    }
 
     public static BattingStage Create(Transform parent)
     {
@@ -106,11 +115,32 @@ public class BattingStage : MonoBehaviour
         _mode = CamMode.Follow;
         _followTarget = ballPos;
         _camVel = Vector3.zero;
-        Vector3 b = ballPos;
-        Vector3 fwd = Vector3.forward;
-        Cam.transform.position = new Vector3(b.x, 3.5f * (FollowDist / 18f), b.z - FollowDist);
-        Cam.transform.rotation = Quaternion.LookRotation(b + fwd * 4f + Vector3.up * 0.5f - Cam.transform.position, Vector3.up);
+        Vector3 pos, lookAt;
+        FollowFraming(ballPos, FollowDist, out pos, out lookAt);
+        Cam.transform.position = pos;
+        Cam.transform.rotation = Quaternion.LookRotation(lookAt - pos, Vector3.up);
         _sway = Quaternion.identity;
+    }
+
+    // 柵の手前で追走をやめ、スタンドを見渡す位置へ。打球が場外へ伸びても
+    // カメラと注視点は球場内のままなので、屋根の裏や暗い球場外へ入らない。
+    public static void FollowFraming(Vector3 ball, float distance, out Vector3 position, out Vector3 lookAt)
+    {
+        Vector3 flat = new Vector3(ball.x, 0f, ball.z);
+        Vector3 direction = flat.sqrMagnitude > 4f ? flat.normalized : Vector3.forward;
+        float angle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+        float fence = BattingConfig.FenceRadius(angle);
+        if (flat.magnitude >= fence - 6f)
+        {
+            position = direction * (fence - 26f);
+            position.y = Mathf.Clamp(ball.y + 12f, 25f, 48f);
+            lookAt = direction * (fence + 8f);
+            lookAt.y = Mathf.Clamp(ball.y, 7f, 38f);
+            return;
+        }
+        position = ball - direction * distance + Vector3.up * (3.5f * (distance / 18f) + Mathf.Min(ball.y, 25f) * 0.25f);
+        position.y = Mathf.Max(position.y, 2.5f);
+        lookAt = ball + direction * 4f + Vector3.up * 0.5f;
     }
 
     private GameObject _zoneRoot;
@@ -152,6 +182,7 @@ public class BattingStage : MonoBehaviour
     private void LateUpdate()
     {
         if (Cam == null) return;
+        _motionTime += Time.deltaTime * PlaybackSpeed;
         var ct = Cam.transform;
         float dt = Time.unscaledDeltaTime > 0f ? Mathf.Min(Time.unscaledDeltaTime, 0.05f) : 0.016f;
         // 前のフレームの手持ちカメラの揺れを外してから計算する
@@ -179,13 +210,9 @@ public class BattingStage : MonoBehaviour
         }
         else
         {
-            Vector3 b = _followTarget;
-            Vector3 flat = new Vector3(b.x, 0f, b.z);
-            Vector3 fwd = flat.sqrMagnitude > 4f ? flat.normalized : Vector3.forward;
-            Vector3 desired = b - fwd * FollowDist + Vector3.up * (3.5f * (FollowDist / 18f) + Mathf.Min(b.y, 25f) * 0.25f);
-            desired.y = Mathf.Max(desired.y, 2.5f);
+            Vector3 desired, lookAt;
+            FollowFraming(_followTarget, FollowDist, out desired, out lookAt);
             ct.position = Vector3.SmoothDamp(ct.position, desired, ref _camVel, 0.32f, Mathf.Infinity, dt);
-            Vector3 lookAt = b + fwd * 4f + Vector3.up * 0.5f;
             Quaternion look = Quaternion.LookRotation(lookAt - ct.position, Vector3.up);
             ct.rotation = Quaternion.Slerp(ct.rotation, look, 1f - Mathf.Exp(-7f * dt));
         }
@@ -204,7 +231,6 @@ public class BattingStage : MonoBehaviour
         {
             if (_billboards[i] != null) _billboards[i].rotation = ct.rotation;
         }
-        UpdateTrail();
         UpdateShadows();
 
         if (Time.unscaledTime < _shakeUntil)
@@ -458,6 +484,7 @@ public class BattingStage : MonoBehaviour
     // ------------------------------------------------------------
     private Transform[] _fielderRigs;
     private bool[] _fielderBusy;
+    private Coroutine[] _fielderTumbles, _fielderPops, _runnerTumbles;
     private Vector2[] _fielderLast;
     private Transform[] _runners, _runnerRigs;
     private bool[] _runnerBusy;
@@ -536,7 +563,7 @@ public class BattingStage : MonoBehaviour
         // キャラの立ち姿(切り抜き画像)。SetDollSkin で差し替える。ふだんは非表示
         _standees[root] = StandeePuppet.Create(rig, root, 4);
         _billboards.Add(root);
-        AddShadow(root, 0.9f * s);
+        AddShadow(root, 0.9f * s, uniform);
         return root;
     }
 
@@ -594,6 +621,8 @@ public class BattingStage : MonoBehaviour
 
     private void RecolorDoll(Transform root, Color jersey, Color accent)
     {
+        for (int i = 0; i < _shadows.Count; i++)
+            if (_shadows[i].Target == root && _shadows[i].Ring != null) _shadows[i].Ring.color = TeamColor(jersey);
         DollInfo info;
         bool has = _dollInfo.TryGetValue(root, out info);
         foreach (var sr in root.GetComponentsInChildren<SpriteRenderer>(true))
@@ -613,11 +642,16 @@ public class BattingStage : MonoBehaviour
     }
 
     // ---- 足元の影(ナイター照明で数方向に薄く伸びる) --------------------
-    private class ShadowSet { public Transform Target; public Transform[] Parts; public bool UseZ; }
+    private class ShadowSet { public Transform Target; public Transform[] Parts; public SpriteRenderer Ring; }
     private readonly List<ShadowSet> _shadows = new List<ShadowSet>();
     private static readonly Vector2[] ShadowDirs = { new Vector2(0f, 0f), new Vector2(0.55f, 0.35f), new Vector2(-0.55f, 0.35f), new Vector2(0.0f, -0.6f) };
 
-    public void AddShadow(Transform target, float size)
+    private static Color TeamColor(Color jersey)
+    {
+        return jersey == BattingConfig.UserJersey ? new Color(1f, 0.24f, 0.20f, 0.9f) : new Color(0.25f, 0.65f, 1f, 0.9f);
+    }
+
+    public void AddShadow(Transform target, float size, Color? teamColor = null)
     {
         var set = new ShadowSet { Target = target, Parts = new Transform[ShadowDirs.Length] };
         for (int i = 0; i < ShadowDirs.Length; i++)
@@ -630,6 +664,9 @@ public class BattingStage : MonoBehaviour
                 new Vector3(size * 1.0f, size * 0.62f * len, 1f));
             set.Parts[i] = sr.transform;
         }
+        if (teamColor.HasValue)
+            set.Ring = BattingSprites.Make("TeamRing", Root, BattingSprites.Ring, TeamColor(teamColor.Value), OrderShadow + 1,
+                Vector3.zero, new Vector3(90f, 0f, 0f), new Vector3(size * 1.15f, size * 1.15f, 1f));
         _shadows.Add(set);
     }
 
@@ -641,11 +678,17 @@ public class BattingStage : MonoBehaviour
             if (set.Target == null)
             {
                 foreach (var p in set.Parts) if (p != null) Destroy(p.gameObject);
+                if (set.Ring != null) Destroy(set.Ring.gameObject);
                 _shadows.RemoveAt(i);
                 continue;
             }
             bool on = set.Target.gameObject.activeInHierarchy;
             Vector3 tp = set.Target.position;
+            if (set.Ring != null)
+            {
+                if (set.Ring.gameObject.activeSelf != on) set.Ring.gameObject.SetActive(on);
+                set.Ring.transform.position = new Vector3(tp.x, 0.05f, tp.z);
+            }
             for (int k = 0; k < set.Parts.Length; k++)
             {
                 var p = set.Parts[k];
@@ -664,6 +707,8 @@ public class BattingStage : MonoBehaviour
         _fielders = new Transform[n];
         _fielderRigs = new Transform[n];
         _fielderBusy = new bool[n];
+        _fielderTumbles = new Coroutine[n];
+        _fielderPops = new Coroutine[n];
         _fielderLast = new Vector2[n];
         for (int i = 2; i < n; i++)
         {
@@ -676,6 +721,7 @@ public class BattingStage : MonoBehaviour
         _runners = new Transform[4];
         _runnerRigs = new Transform[4];
         _runnerBusy = new bool[4];
+        _runnerTumbles = new Coroutine[4];
         _runnerLast = new Vector2[4];
         for (int i = 0; i < 4; i++)
         {
@@ -689,8 +735,11 @@ public class BattingStage : MonoBehaviour
 
     public void ResetFielders()
     {
+        if (_fielders == null) return;
         for (int i = 0; i < _fielders.Length; i++)
         {
+            StopMotion(_fielderTumbles, i);
+            StopMotion(_fielderPops, i);
             if (_fielders[i] == null) continue;
             Vector2 p = FieldingModel.Defaults[i].Pos;
             _fielders[i].position = new Vector3(p.x, 0f, p.y);
@@ -699,14 +748,30 @@ public class BattingStage : MonoBehaviour
             _fielderRigs[i].localRotation = Quaternion.identity;
             _fielderRigs[i].localPosition = Vector3.zero;
             _fielderRigs[i].localScale = Vector3.one;
+            var puppet = PuppetOf(_fielders[i]);
+            if (puppet != null) puppet.ResetMotion();
         }
     }
 
-    private static void Wobble(Transform rig, Vector2 now, ref Vector2 last)
+    private void StopMotion(Coroutine[] motions, int index)
+    {
+        if (motions == null || motions[index] == null) return;
+        StopCoroutine(motions[index]);
+        motions[index] = null;
+    }
+
+    private void OnDisable()
+    {
+        SetPlaybackSpeed(1f);
+        ResetFielders();
+        if (_runners != null) HideRunners();
+    }
+
+    private void Wobble(Transform rig, Vector2 now, ref Vector2 last)
     {
         bool moving = (now - last).sqrMagnitude > 1e-5f;
         last = now;
-        float a = moving ? Mathf.Sin(Time.time * 16f) * 3f * BattingConfig.GunyaLevel : 0f;
+        float a = moving ? Mathf.Sin(_motionTime * 16f) * 3f * BattingConfig.GunyaLevel : 0f;
         rig.localRotation = Quaternion.Euler(0f, 0f, a);
     }
 
@@ -721,13 +786,15 @@ public class BattingStage : MonoBehaviour
     public void Tumble(int index, float seconds)
     {
         if (index < 2 || index >= _fielders.Length || _fielders[index] == null) return;
-        StartCoroutine(TumbleRoutine(_fielderRigs[index], index, true, seconds));
+        StopMotion(_fielderTumbles, index);
+        _fielderTumbles[index] = StartCoroutine(TumbleRoutine(_fielderRigs[index], index, true, seconds));
     }
 
     public void TumbleRunner(int slot, float seconds)
     {
         if (slot < 0 || slot >= 4) return;
-        StartCoroutine(TumbleRoutine(_runnerRigs[slot], slot, false, seconds));
+        StopMotion(_runnerTumbles, slot);
+        _runnerTumbles[slot] = StartCoroutine(TumbleRoutine(_runnerRigs[slot], slot, false, seconds));
     }
 
     private IEnumerator TumbleRoutine(Transform rig, int idx, bool fielder, float seconds)
@@ -740,7 +807,7 @@ public class BattingStage : MonoBehaviour
         float t = 0f;
         while (t < down)
         {
-            t += Time.deltaTime;
+            t += Time.deltaTime * PlaybackSpeed;
             float u = Mathf.Clamp01(t / down);
             rig.localRotation = Quaternion.Euler(0f, 0f, angle * u);
             rig.localPosition = new Vector3(0f, Mathf.Sin(u * Mathf.PI) * 1.6f * g, 0f);
@@ -750,14 +817,14 @@ public class BattingStage : MonoBehaviour
         t = 0f;
         while (t < hold)
         {
-            t += Time.deltaTime;
+            t += Time.deltaTime * PlaybackSpeed;
             rig.localRotation = Quaternion.Euler(0f, 0f, angle + Mathf.Sin(t * 22f) * 6f * g);
             yield return null;
         }
         t = 0f;
         while (t < up)
         {
-            t += Time.deltaTime;
+            t += Time.deltaTime * PlaybackSpeed;
             rig.localRotation = Quaternion.Euler(0f, 0f, angle * (1f - Mathf.Clamp01(t / up)));
             yield return null;
         }
@@ -769,7 +836,8 @@ public class BattingStage : MonoBehaviour
     public void CatchPop(int index)
     {
         if (index < 2 || index >= _fielders.Length || _fielders[index] == null) return;
-        StartCoroutine(PopRoutine(_fielderRigs[index]));
+        StopMotion(_fielderPops, index);
+        _fielderPops[index] = StartCoroutine(PopRoutine(_fielderRigs[index]));
         var p = PuppetOf(_fielders[index]);
         if (p != null) p.Catch();
     }
@@ -781,7 +849,7 @@ public class BattingStage : MonoBehaviour
         const float dur = 0.30f;
         while (t < dur)
         {
-            t += Time.deltaTime;
+            t += Time.deltaTime * PlaybackSpeed;
             float u = Mathf.Clamp01(t / dur);
             float k = Mathf.Sin(u * Mathf.PI) * 0.28f * g;
             rig.localScale = new Vector3(1f - k * 0.5f, 1f + k, 1f);
@@ -793,7 +861,14 @@ public class BattingStage : MonoBehaviour
     // ---- 走者 ----
     public void HideRunners()
     {
-        for (int i = 0; i < 4; i++) _runners[i].gameObject.SetActive(false);
+        for (int i = 0; i < 4; i++)
+        {
+            StopMotion(_runnerTumbles, i);
+            _runnerBusy[i] = false;
+            _runnerRigs[i].localPosition = Vector3.zero;
+            _runnerRigs[i].localRotation = Quaternion.identity;
+            _runners[i].gameObject.SetActive(false);
+        }
     }
 
     public void ShowRunnersOnBases(bool[] bases)
@@ -827,10 +902,6 @@ public class BattingStage : MonoBehaviour
     // ------------------------------------------------------------
     // 投球の軌跡(変化球を目で追えるように、うっすら残像を残す)
     // ------------------------------------------------------------
-    private class TrailDot { public SpriteRenderer Sr; public float Born; }
-    private readonly List<TrailDot> _trail = new List<TrailDot>();
-    private const float TrailLife = 0.55f;
-
     public void AddTrail(Vector3 pos, Color col)
     {
         // 光の帯(TrailRenderer)の色を球種の色に。明るめにしてブルームで光らせる
@@ -850,24 +921,6 @@ public class BattingStage : MonoBehaviour
 
     public void ClearTrail()
     {
-        for (int i = 0; i < _trail.Count; i++) if (_trail[i].Sr != null) Destroy(_trail[i].Sr.gameObject);
-        _trail.Clear();
         if (_ballTrail != null) { _ballTrail.emitting = false; _ballTrail.Clear(); }
-    }
-
-    private void UpdateTrail()
-    {
-        for (int i = _trail.Count - 1; i >= 0; i--)
-        {
-            var d = _trail[i];
-            float u = (Time.time - d.Born) / TrailLife;
-            if (u >= 1f || d.Sr == null)
-            {
-                if (d.Sr != null) Destroy(d.Sr.gameObject);
-                _trail.RemoveAt(i);
-                continue;
-            }
-            var c = d.Sr.color; c.a = (1f - u) * 0.55f; d.Sr.color = c;
-        }
     }
 }

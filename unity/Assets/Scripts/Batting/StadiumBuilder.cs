@@ -463,11 +463,11 @@ public class StadiumBuilder : MonoBehaviour
             arr[i].color = i < count ? on : new Color(on.r * 0.18f, on.g * 0.18f, on.b * 0.18f, 1f);
     }
 
-    public void SetBoard(int inning, bool userBatting, int balls, int strikes, int outs, int runs, int oppRuns)
+    public void SetBoard(int inning, bool isTop, int balls, int strikes, int outs, int runs, int oppRuns)
     {
         if (_boardScore == null) return;
         _boardScore.text = "自 " + runs + "  -  " + oppRuns + " 相";
-        _boardCount.text = inning + "回" + (userBatting ? "表" : "裏");
+        _boardCount.text = inning + "回" + (isTop ? "表" : "裏");
         SetLamps(_lampB, "B", balls);
         SetLamps(_lampS, "S", strikes);
         SetLamps(_lampO, "O", outs);
