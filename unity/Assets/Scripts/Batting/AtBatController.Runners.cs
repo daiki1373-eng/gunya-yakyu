@@ -4,6 +4,8 @@ using UnityEngine;
 
 public partial class AtBatController
 {
+    // 確認用(通常は -1): DevStealAttempt=1 で企図できるときは必ず盗塁、DevStealSafe=1/0 で成功/失敗を固定
+    public static int DevStealAttempt = -1, DevStealSafe = -1;
     private int _stealFrom;
     private bool _stealInput;
     private readonly bool[] _oldBase = new bool[4];
@@ -26,7 +28,8 @@ public partial class AtBatController
         _stealFrom = 0;
         _stealInput = true;
         int from = EligibleSteal();
-        if ((!_gs.UserBatting || AutoPlay) && from > 0 && Random.value < BattingConfig.OpponentStealChance)
+        if ((!_gs.UserBatting || AutoPlay) && from > 0
+            && (DevStealAttempt == 1 || (DevStealAttempt != 0 && Random.value < BattingConfig.OpponentStealChance)))
             _stealFrom = from;
         _ui.ShowSteal(_gs.UserBatting && !AutoPlay && from > 0, false);
     }
@@ -54,7 +57,7 @@ public partial class AtBatController
         if (!_gs.CanSteal(from)) yield break;
         int speed = _onBase[from] != null ? CharaRoster.Stats(_onBase[from]).Speed : 45;
         float chance = Mathf.Clamp(0.64f + (speed - CatcherArm()) * 0.004f - (from == 2 ? 0.12f : 0f), 0.30f, 0.90f);
-        bool safe = Random.value < chance;
+        bool safe = DevStealSafe >= 0 ? DevStealSafe == 1 : Random.value < chance;
         CopyBases();
         _gs.ApplySteal(from, safe);
         UpdateOnBase(_oldBase);
