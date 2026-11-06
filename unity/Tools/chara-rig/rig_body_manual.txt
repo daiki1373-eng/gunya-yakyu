@@ -1,2 +1,5 @@
 # Aポーズの立ち絵(Resources/Chara/Body)の関節の手直し。書式は rig_manual.txt と同じ。
 # 双子は2人並んだ絵。prep_body.py が左の1人だけを切り出している
+# 脚がはっきりない絵は、下半身を胴と一緒に動かす(左右に割れないように)
+snowman flag nolegs
+deliveryrobot flag nolegs

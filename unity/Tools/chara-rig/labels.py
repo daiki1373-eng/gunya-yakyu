@@ -83,6 +83,7 @@ def main():
             dr.ellipse([(hc[0] - r) / STEP, (hc[1] - r) / STEP, (hc[0] + r) / STEP, (hc[1] + r) / STEP], fill=1)
         lab[np.asarray(poly) > 0] = 0
         for v, segs in seeds(j).items():
+            if v >= 3 and rig[cid].get('nolegs'): continue   # 脚がはっきりない絵は下半身も胴
             for a, b in segs: draw(lab, a, b, v, w, h)
         lab[~alpha] = np.where(lab[~alpha] >= 0, -1, -1)   # 種は不透明な画素だけ
         lab = grow(lab, alpha)                              # 1) 絵の中だけで広げる

@@ -12,6 +12,7 @@ public class CharaRig
     public float Scale = 1f;      // 体の大きさの補正(上半身だけの絵など)
     public bool FrontLeft;         // 前に出す腕(打者=振る腕/投手=投げる腕)が画像の左側
     public bool APose;             // Aポーズの立ち絵。腕脚をラグドールの向きそのままに向ける
+    public bool NoLegs;            // 脚がはっきりない絵。下半身を胴と一緒に動かす
     public readonly Dictionary<string, Vector2> J = new Dictionary<string, Vector2>();
 
     private static Dictionary<string, CharaRig> _all, _body;
@@ -49,7 +50,7 @@ public class CharaRig
             if (p.Length < 3) continue;
             CharaRig r;
             if (!all.TryGetValue(p[0], out r)) { r = new CharaRig { Id = p[0] + suffix }; all[p[0]] = r; }
-            if (p[1] == "flag") { if (p[2] == "frontL") r.FrontLeft = true; if (p[2] == "apose") r.APose = true; continue; }
+            if (p[1] == "flag") { if (p[2] == "frontL") r.FrontLeft = true; if (p[2] == "apose") r.APose = true; if (p[2] == "nolegs") r.NoLegs = true; continue; }
             if (p[1] == "scale") { r.Scale = float.Parse(p[2], inv); continue; }
             if (p[1] == "size" && p.Length >= 4) { r.Size = new Vector2(float.Parse(p[2], inv), float.Parse(p[3], inv)); continue; }
             if (p[1] == "box" && p.Length >= 6)

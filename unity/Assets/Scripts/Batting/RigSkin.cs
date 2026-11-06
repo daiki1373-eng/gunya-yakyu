@@ -43,6 +43,7 @@ public partial class RigSkin : MonoBehaviour
         public int Parent = -1;
         public Vector2 Pivot;          // 最初の姿勢でのワールド座標(関節)
         public float Rest;             // パーツの最初の角度
+        public bool Torso;             // 腰・胸・頭(Aポーズの絵では傾きを控えめにする)
         public float Offset;           // Aポーズの絵: 絵の腕脚の向きをラグドールの最初の向き(真下)へそろえる角度
         public int Gate;               // Aポーズの絵: 1=腕(肩より外側だけ) 2=脚(股より下だけ)。胴の画素が腕脚に引っぱられて裂けないように
         public float GateAt;           // 腕=肩のx / 脚=股のy(画素)
@@ -77,7 +78,8 @@ public partial class RigSkin : MonoBehaviour
     private bool _paintedBat;
 
     private int _headBone = 2;
-    private int _farmF = -1, _farmB = -1;
+    private int _farmF = -1, _farmB = -1, _chestBone = -1;
+    private float _breathPhase;
     private Vector2 _wristF, _wristB;
     private string _charaId;
     private Transform _batVis;
@@ -127,6 +129,7 @@ public partial class RigSkin : MonoBehaviour
         go.layer = body.Layer;
         var s = go.AddComponent<RigSkin>();
         s.UsesBodyArt = useBody;
+        s._breathPhase = Random.value * 6.28f;
         s._charaId = charaId;
         if (body.Light) s.Cell = 16;
         s.Build(body, rig, spr);
@@ -171,7 +174,13 @@ public partial class RigSkin : MonoBehaviour
         return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-GateBand, GateBand, d));
     }
 
-    private void Aim(int bone, Vector2 fromPx, Vector2 toPx)
+    // keep: Aポーズの開きを何割残すか(腕は少し体から離し、脚は軽く開いて立つ。ぴったり閉じると棒立ちに見える)
+    private const float KeepArm = 0.35f, KeepLeg = 0.5f;
+    // 胴・頭の傾きはラグドールの何割に従うか(正面の絵を大きく傾けると倒れて見える)。大きく倒れたときは全部従う
+    private const float TorsoFollow = 0.55f;
+
+    private void Aim(int bone, Vector2 fromPx, Vector2 toPx) { Aim(bone, fromPx, toPx, 0f); }
+    private void Aim(int bone, Vector2 fromPx, Vector2 toPx, float keep)
     {
         if (!_rig.APose || bone < 0) return;
         var b = _bones[bone];
@@ -179,7 +188,7 @@ public partial class RigSkin : MonoBehaviour
         Vector2 d = ToWorldRest(toPx) - ToWorldRest(fromPx);
         if (d.sqrMagnitude < 1e-8f) return;
         float img = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
-        b.Offset = Mathf.DeltaAngle(img, b.Rest - 90f);
+        b.Offset = Mathf.DeltaAngle(img, b.Rest - 90f) * (1f - keep);
     }
 
     // 画素 → 最初の姿勢でのワールド座標
@@ -211,13 +220,17 @@ public partial class RigSkin : MonoBehaviour
         Vector2 waist = Vector2.Lerp(pel, neck, 0.25f);
 
         int iPel = AddBone(p.Pelvis, -1, pel, 2);
+        _bones[iPel].Torso = true;
         if (Has("hipL") && Has("hipR")) Seg(iPel, J("hipL"), J("hipR"));
         Seg(iPel, pel, waist);
         int iChest = AddBone(p.Chest, iPel, waist, 3);
+        _bones[iChest].Torso = true;
+        _chestBone = iChest;
         Seg(iChest, waist, neck);
         if (Has("shoulderL") && Has("shoulderR")) Seg(iChest, J("shoulderL"), J("shoulderR"));
         if (Has("chest")) Seg(iChest, J("chest"), neck);
         int iHead = AddBone(p.Head, iChest, neck, 7);
+        _bones[iHead].Torso = true;
         _headBone = iHead;
         Vector2 head = Has("head") ? J("head") : neck + (neck - pel) * 0.5f;
         Seg(iHead, Vector2.Lerp(neck, head, 0.15f), head);
@@ -228,8 +241,11 @@ public partial class RigSkin : MonoBehaviour
         int farmB = Arm(armB, p.ArmBU, p.ArmBF, iChest, 1);
         _farmB = farmB;
         if (farmB >= 0 && Has("wrist" + armB)) _wristB = ToWorldRest(J("wrist" + armB));
-        Leg(F, p.LegFU, p.LegFF, iPel, 5);
-        Leg(B, p.LegBU, p.LegBF, iPel, 0);
+        if (!rig.NoLegs)   // 脚がはっきりない絵(雪だるま・車輪のロボ)は下半身を胴と一緒に動かす
+        {
+            Leg(F, p.LegFU, p.LegFF, iPel, 5);
+            Leg(B, p.LegBU, p.LegBF, iPel, 0);
+        }
 
         // バット(元絵に描かれた持ち物)
         if (Has("batGrip") && Has("batTip"))
@@ -264,13 +280,13 @@ public partial class RigSkin : MonoBehaviour
         if (!Has("shoulder" + s) || !Has("elbow" + s) || up == null) return -1;
         Vector2 sh = J("shoulder" + s), el = J("elbow" + s);
         int u = AddBone(up, parent, sh, layer);
-        Aim(u, sh, el);
+        Aim(u, sh, el, KeepArm);
         GateArm(u, sh.x); _bones[u].Code = s == "L" ? 1 : 2;
         if (!Has("wrist" + s) || fore == null) { Seg(u, sh, el + (el - sh) * 0.6f); return -1; }
         Vector2 wr = J("wrist" + s);
         Seg(u, Vector2.Lerp(sh, el, 0.1f), el);
         int fo = AddBone(fore, u, el, layer);
-        Aim(fo, el, wr);
+        Aim(fo, el, wr, KeepArm);
         GateArm(fo, sh.x); _bones[fo].Code = s == "L" ? 1 : 2;
         Seg(fo, el, wr + (wr - el) * 0.35f);
         return fo;
@@ -281,13 +297,13 @@ public partial class RigSkin : MonoBehaviour
         if (!Has("hip" + s) || !Has("knee" + s) || up == null) return;
         Vector2 hp = J("hip" + s), kn = J("knee" + s);
         int u = AddBone(up, parent, hp, layer);
-        Aim(u, hp, kn);
+        Aim(u, hp, kn, KeepLeg);
         GateLeg(u, hp.y); _bones[u].Code = s == "L" ? 3 : 4;
         if (!Has("ankle" + s) || fore == null) { Seg(u, hp, kn + (kn - hp) * 0.6f); return; }
         Vector2 an = J("ankle" + s);
         Seg(u, Vector2.Lerp(hp, kn, 0.1f), kn);
         int fo = AddBone(fore, u, kn, layer);
-        Aim(fo, kn, an);
+        Aim(fo, kn, an, KeepLeg);
         GateLeg(fo, hp.y); _bones[fo].Code = s == "L" ? 3 : 4;
         Seg(fo, kn, an + (an - kn) * 0.25f);
     }
@@ -718,6 +734,8 @@ public partial class RigSkin : MonoBehaviour
         {
             var bo = _bones[b];
             float a = (bo.Tr != null ? Mathf.DeltaAngle(bo.Rest, AngOf(bo.Tr)) : 0f) + bo.Offset;
+            if (bo.Torso && _rig.APose)
+                a *= Mathf.Lerp(TorsoFollow, 1f, Mathf.InverseLerp(35f, 85f, Mathf.Abs(a)));
             if (bo.IsBat)
             {
                 float pa = _bones[bo.Parent].Ang;
@@ -735,6 +753,8 @@ public partial class RigSkin : MonoBehaviour
             }
             else bo.Cur = Apply(bo.Parent, bo.Pivot);
             bo.Scale = (b == _headBone) ? _p.HeadPop() : 1f;
+            // Aポーズの体は胸がゆっくり上下する(息づかい)。止まって見えないように
+            if (b == _chestBone && _rig.APose) bo.Sq = new Vector2(1f, 1f + 0.014f * Mathf.Sin(Time.time * 2.3f + _breathPhase));
             float angle = (bo.Ang + bo.Extra) * Mathf.Deg2Rad;
             float cos = Mathf.Cos(angle), sin = Mathf.Sin(angle);
             bo.AxisX = new Vector2(cos, sin) * (bo.Scale * bo.Sq.x);

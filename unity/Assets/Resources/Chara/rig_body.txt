@@ -221,6 +221,7 @@ deliveryman browR 272 132
 deliveryman browRSz 20 3
 deliveryrobot size 512 768
 deliveryrobot box 20 75 491 704
+deliveryrobot flag nolegs
 deliveryrobot flag frontR
 deliveryrobot flag apose
 deliveryrobot neck 256 381
@@ -1019,6 +1020,7 @@ sleepyhead browR 270 128
 sleepyhead browRSz 16 3
 snowman size 512 768
 snowman box 37 75 473 704
+snowman flag nolegs
 snowman flag frontL
 snowman flag apose
 snowman neck 254 294
