@@ -131,6 +131,8 @@ public partial class AppShell : MonoBehaviour
         t2.color = new Color(1f, 0.95f, 0.78f);
         UiKit.Style(t1, TelopFx.Kind.Logo);
         UiKit.Style(t2, TelopFx.Kind.Logo);
+        t1.gameObject.AddComponent<JellyText>().Amp = 2.5f;
+        t2.gameObject.AddComponent<JellyText>().Amp = 2f;
 
         var play = UiKit.Btn(_home, "Play", "試合", new Vector2(300f, 70f), true, StartGame, 32);
         UiKit.Place(play.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, 10f), new Vector2(300f, 70f));
@@ -170,6 +172,7 @@ public partial class AppShell : MonoBehaviour
             c.CountText.text = "";
             c.Frame.raycastTarget = false;
             if (i == 2) c.Root.SetAsLastSibling();
+            _titleCards.Add(c.Root);
         }
         var logo1 = UiKit.Txt(_title, "Logo1", "ぐにゃぐにゃ", 64, UiKit.GoldLight, TextAnchor.MiddleCenter);
         UiKit.Place(logo1.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -22f), new Vector2(800f, 80f));
@@ -178,8 +181,12 @@ public partial class AppShell : MonoBehaviour
         logo2.color = new Color(1f, 0.95f, 0.78f);
         UiKit.Style(logo1, TelopFx.Kind.Logo);
         UiKit.Style(logo2, TelopFx.Kind.Logo);
+        _logo1 = logo1.gameObject.AddComponent<JellyText>();
+        _logo2 = logo2.gameObject.AddComponent<JellyText>();
+        _logo2.Amp = 3f; _logo2.Wave = 0.025f;
         var cont = UiKit.Btn(_title, "Continue", "つづきから", new Vector2(320f, 74f), true, OnContinue, 34);
         UiKit.Place(cont.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 28f), new Vector2(320f, 74f));
+        _titleCont = cont.GetComponent<RectTransform>();
 
         // 名前入力(初回だけ)
         _namePanel = UiKit.Fill(UiKit.Rect(_title, "NamePanel"));
@@ -209,11 +216,13 @@ public partial class AppShell : MonoBehaviour
     public void ShowTitle()
     {
         Only(_title);
+        bool intro = !_titleIntroDone;
         _namePanel.gameObject.SetActive(false);
         _menuBtn.SetActive(false);
         MenuOpen = true;
         AtBatController.InputBlocked = true;
-        BgmPlayer.PlayBase(BgmPlayer.Home);
+        if (intro) StartCoroutine(TitleIntro());   // 曲はロゴが叩きつけられた瞬間に始める
+        else BgmPlayer.PlayBase(BgmPlayer.Home);
     }
 
     private void OnContinue()
@@ -481,6 +490,7 @@ public partial class AppShell : MonoBehaviour
         float t = Time.unscaledTime;
         if (_homeRays != null) _homeRays.localRotation = Quaternion.Euler(0f, 0f, t * 6f);
         if (_titleRays != null) _titleRays.localRotation = Quaternion.Euler(0f, 0f, -t * 5f);
+        TitleIdle(t);
         if (_gachaRays != null) _gachaRays.localRotation = Quaternion.Euler(0f, 0f, -t * 8f);
         if (_cards.gameObject.activeSelf)
         {

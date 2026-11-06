@@ -204,18 +204,10 @@ public partial class AtBatController : MonoBehaviour
         while (HoldStart) yield return null;
         BuildTeams();   // 所持カードは試合開始時点のもので組む
         _gameStartT = Time.unscaledTime;
-        _ui.ShowResult("PLAY BALL");
         BgmPlayer.PlayBase(BgmPlayer.Match);
-        BgmPlayer.Jingle("bgm-playball", 7f);
         RefreshHud();
-        // 開幕: 球場全体を映して花火を上げる(タップで飛ばせる)
-        _stage.SetShot(new Vector3(0f, 9f, -14f), new Vector3(0f, 40f, 130f), 0.3f, true);
-        _stage.SetShot(new Vector3(0f, 5f, -9f), new Vector3(0f, 30f, 130f), 1.6f, false);
-        _stage.Stadium.LaunchFireworks(8);
-        GameAudio.Play(Sfx.Cheer, 0.7f);
-        _introSkip = false; _skipQueued = false;
-        yield return StartCoroutine(IntroWait(IntroEnabled ? 1.2f : 0.35f));
-        _ui.ShowResult("");
+        // 開幕: 球場の全景と花火 → 対戦カード → PLAY BALL(タップで飛ばせる)
+        yield return StartCoroutine(Opening(true));
         _stage.SetCameraMode(CamMode.Catcher);
         while (true)
         {

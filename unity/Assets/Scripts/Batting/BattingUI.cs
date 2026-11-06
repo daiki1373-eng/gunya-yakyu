@@ -606,6 +606,7 @@ public class BattingUI
     public void Tick()
     {
         TickCard();
+        TickVersus();
         if (_comm != null && _comm.text.Length > 0)
         {
             float u = (Time.unscaledTime - _commStart) / CommDur;
@@ -617,6 +618,152 @@ public class BattingUI
         }
         if (_swingImg != null && Time.unscaledTime > _swingPulseUntil)
             _swingImg.color = new Color(1f, 1f, 1f, 0.80f);
+    }
+
+    // ---- 試合開始の対戦カード(両チームの帯が左右から滑り込み、真ん中に VS) ----
+    private RectTransform _vsRoot, _vsLeft, _vsRight;
+    private Text _vsLeftName, _vsRightName, _vsLeftSide, _vsRightSide, _vsMark;
+    private Image[] _vsLeftHeads = new Image[4], _vsRightHeads = new Image[4];
+    private Image _vsFlash;
+    private float _vsT = -99f;
+    private bool _vsOn;
+    private const float VsSlide = 1500f;
+
+    private void BuildVersus()
+    {
+        if (_vsRoot != null) return;
+        var canvas = _swingRect.parent;
+        var go = new GameObject("Versus");
+        go.transform.SetParent(canvas, false);
+        _vsRoot = go.AddComponent<RectTransform>();
+        _vsRoot.anchorMin = Vector2.zero; _vsRoot.anchorMax = Vector2.one;
+        _vsRoot.offsetMin = Vector2.zero; _vsRoot.offsetMax = Vector2.zero;
+        var dim = NewImage(_vsRoot, "Dim", new Color(0f, 0f, 0f, 0.35f));
+        dim.raycastTarget = false;
+        var dr = dim.rectTransform; dr.anchorMin = Vector2.zero; dr.anchorMax = Vector2.one; dr.offsetMin = dr.offsetMax = Vector2.zero;
+        _vsLeft = VsBand("Left", new Color(0.80f, 0.12f, 0.12f, 0.95f), new Vector2(-30f, 88f), true,
+            out _vsLeftName, out _vsLeftSide, _vsLeftHeads);
+        _vsRight = VsBand("Right", new Color(0.14f, 0.26f, 0.72f, 0.95f), new Vector2(30f, -92f), false,
+            out _vsRightName, out _vsRightSide, _vsRightHeads);
+        TelopFx fx;
+        _vsMark = NewTelop(_vsRoot, "VS", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -2f),
+            96, TextAnchor.MiddleCenter, new Color(1f, 0.9f, 0.4f), TelopFx.Kind.Stamp, out fx);
+        fx.Rotation = -8f; fx.PopScale = 3f;
+        _vsFlash = NewImage(_vsRoot, "Flash", new Color(1f, 1f, 1f, 0f));
+        _vsFlash.raycastTarget = false;
+        var fr = _vsFlash.rectTransform; fr.anchorMin = Vector2.zero; fr.anchorMax = Vector2.one; fr.offsetMin = fr.offsetMax = Vector2.zero;
+        _vsRoot.gameObject.SetActive(false);
+    }
+
+    // チームの帯: 斜めの色帯 + 金の線 + 顔4つ + チーム名 + 先攻/後攻
+    private RectTransform VsBand(string name, Color c, Vector2 pos, bool left, out Text teamName, out Text side, Image[] heads)
+    {
+        var band = NewImage(_vsRoot, name, c);
+        band.raycastTarget = false;
+        var r = band.rectTransform;
+        r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+        r.pivot = new Vector2(0.5f, 0.5f);
+        r.sizeDelta = new Vector2(1300f, 150f);
+        r.anchoredPosition = pos;
+        r.localRotation = Quaternion.Euler(0f, 0f, -6f);
+        foreach (float y in new[] { 75f, -75f })
+        {
+            var ln = NewImage(r, "Line", new Color(1f, 0.82f, 0.3f, 1f));
+            ln.raycastTarget = false;
+            var lr = ln.rectTransform; lr.anchorMin = lr.anchorMax = new Vector2(0.5f, 0.5f);
+            lr.sizeDelta = new Vector2(1300f, 4f); lr.anchoredPosition = new Vector2(0f, y);
+        }
+        float dir = left ? -1f : 1f;      // 顔の並び: 左チームは右寄り(中央の VS 側)、右チームは左寄り
+        for (int i = 0; i < 4; i++)
+        {
+            var ring = NewImage(r, "Ring" + i, new Color(1f, 0.85f, 0.35f, 1f));
+            ring.sprite = SpriteFactory.Circle; ring.raycastTarget = false;
+            var rr = ring.rectTransform; rr.anchorMin = rr.anchorMax = new Vector2(0.5f, 0.5f);
+            rr.sizeDelta = new Vector2(104f, 104f);
+            rr.anchoredPosition = new Vector2(-dir * (110f + i * 112f), 0f);
+            var h = NewImage(rr, "Head", Color.white);
+            h.raycastTarget = false; h.preserveAspect = true;
+            var hr = h.rectTransform; hr.anchorMin = hr.anchorMax = new Vector2(0.5f, 0.5f); hr.sizeDelta = new Vector2(96f, 96f);
+            heads[i] = h;
+        }
+        teamName = NewText(r, "Name", new Vector2(0.5f, 0.5f), new Vector2(-dir * 240f, 46f), new Vector2(520f, 50f),
+            38, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, Color.white);
+        teamName.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);
+        teamName.rectTransform.anchoredPosition = new Vector2(left ? 40f : -40f, 16f);
+        TelopFx.Apply(teamName, TelopFx.Kind.Heading);
+        side = NewText(r, "Side", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 30f),
+            22, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, new Color(1f, 0.9f, 0.5f));
+        side.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);
+        side.rectTransform.anchoredPosition = new Vector2(left ? 40f : -40f, -34f);
+        return r;
+    }
+
+    public void ShowVersus(string leftName, Sprite[] leftHeads, string rightName, Sprite[] rightHeads, bool leftFirst)
+    {
+        BuildVersus();
+        SetVsBand(_vsLeftName, _vsLeftSide, _vsLeftHeads, leftName, leftHeads, leftFirst);
+        SetVsBand(_vsRightName, _vsRightSide, _vsRightHeads, rightName, rightHeads, !leftFirst);
+        _vsMark.text = "";
+        _vsRoot.gameObject.SetActive(true);
+        _vsRoot.SetAsLastSibling();
+        _vsOn = true;
+        _vsT = Time.unscaledTime;
+        TickVersus();
+    }
+
+    private static void SetVsBand(Text name, Text side, Image[] heads, string team, Sprite[] faces, bool first)
+    {
+        name.text = team ?? "";
+        name.fontSize = 38;
+        while (name.fontSize > 22 && name.preferredWidth > 440f) name.fontSize--;
+        side.text = first ? "先攻" : "後攻";
+        for (int i = 0; i < heads.Length; i++)
+        {
+            bool has = faces != null && i < faces.Length && faces[i] != null;
+            heads[i].transform.parent.gameObject.SetActive(has);
+            if (has) heads[i].sprite = faces[i];
+        }
+    }
+
+    public void HideVersus(bool instant = false)
+    {
+        if (_vsRoot == null || !_vsOn) return;
+        _vsOn = false;
+        _vsT = instant ? -99f : Time.unscaledTime;
+        if (instant) _vsRoot.gameObject.SetActive(false);
+    }
+
+    private void TickVersus()
+    {
+        if (_vsRoot == null || !_vsRoot.gameObject.activeSelf) return;
+        float t = Time.unscaledTime - _vsT;
+        if (_vsOn)
+        {
+            float u = Mathf.Clamp01(t / 0.32f);
+            float e = 1f - (1f - u) * (1f - u) * (1f - u);
+            _vsLeft.anchoredPosition = new Vector2(Mathf.Lerp(-VsSlide, -30f, e), 88f);
+            _vsRight.anchoredPosition = new Vector2(Mathf.Lerp(VsSlide, 30f, e), -92f);
+            if (t >= 0.32f && _vsMark.text.Length == 0)
+            {
+                _vsMark.text = "VS";
+                _vsFlash.color = new Color(1f, 1f, 1f, 0.7f);
+            }
+            var fc = _vsFlash.color;
+            if (fc.a > 0f) { fc.a = Mathf.Max(0f, fc.a - Time.unscaledDeltaTime * 3f); _vsFlash.color = fc; }
+        }
+        else
+        {
+            float u = Mathf.Clamp01(t / 0.25f);
+            float e = u * u;
+            _vsLeft.anchoredPosition = new Vector2(Mathf.Lerp(-30f, -VsSlide, e), 88f);
+            _vsRight.anchoredPosition = new Vector2(Mathf.Lerp(30f, VsSlide, e), -92f);
+            _vsMark.color = new Color(_vsMark.color.r, _vsMark.color.g, _vsMark.color.b, 1f - u);
+            if (u >= 1f)
+            {
+                _vsRoot.gameObject.SetActive(false);
+                _vsMark.color = new Color(_vsMark.color.r, _vsMark.color.g, _vsMark.color.b, 1f);
+            }
+        }
     }
 
     // ---- 部品 ----

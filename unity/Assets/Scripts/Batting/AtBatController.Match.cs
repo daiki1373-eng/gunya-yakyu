@@ -128,8 +128,10 @@ public partial class AtBatController
         _introSeen.Clear();
         BuildTeams();
         _gameStartT = Time.unscaledTime;
-        BgmPlayer.Jingle("bgm-playball", 3f);
         _ui.ShowBanner("");
+        _ui.ShowResult("");
+        RefreshHud();
+        yield return StartCoroutine(Opening(false));
     }
 
     // 1球ぶんの結果をカウントと走者へ反映。打席が終わったら true。
