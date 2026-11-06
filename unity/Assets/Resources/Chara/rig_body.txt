@@ -1,0 +1,1289 @@
+# 自動生成(Tools/chara-rig/build.py)。手で直すときは rig_manual.txt を編集して再生成する
+alien size 512 768
+alien box 92 75 419 704
+alien flag frontR
+alien flag apose
+alien neck 255 269
+alien pelvis 253 410
+alien chest 254 319
+alien head 256 128
+alien shoulderL 305 270
+alien hipL 289 411
+alien elbowL 346 330
+alien wristL 397 414
+alien kneeL 309 528
+alien ankleL 320 645
+alien shoulderR 205 269
+alien hipR 218 410
+alien elbowR 166 331
+alien wristR 115 413
+alien kneeR 202 528
+alien ankleR 191 645
+alien eyeL 234 177
+alien eyeLSz 18 6
+alien eyeR 278 177
+alien eyeRSz 18 5
+alien mouth 256 212
+alien mouthSz 28 8
+alien browL 232 166
+alien browLSz 26 3
+alien browR 280 167
+alien browRSz 27 4
+bigeater size 512 768
+bigeater box 125 75 386 704
+bigeater flag frontR
+bigeater flag apose
+bigeater neck 261 209
+bigeater pelvis 253 377
+bigeater chest 258 268
+bigeater head 255 84
+bigeater shoulderL 322 208
+bigeater hipL 293 377
+bigeater elbowL 358 290
+bigeater wristL 369 390
+bigeater kneeL 309 513
+bigeater ankleL 324 642
+bigeater shoulderR 199 210
+bigeater hipR 212 377
+bigeater elbowR 168 296
+bigeater wristR 143 390
+bigeater kneeR 205 511
+bigeater ankleR 202 642
+bigeater eyeL 244 130
+bigeater eyeLSz 12 4
+bigeater eyeR 272 129
+bigeater eyeRSz 12 4
+bigeater mouth 259 156
+bigeater mouthSz 22 7
+bigeater browL 242 122
+bigeater browLSz 16 4
+bigeater browR 273 120
+bigeater browRSz 17 3
+carpenter size 512 768
+carpenter box 68 75 443 704
+carpenter flag frontL
+carpenter flag apose
+carpenter neck 256 201
+carpenter pelvis 252 367
+carpenter chest 254 259
+carpenter head 254 81
+carpenter shoulderL 318 202
+carpenter hipL 294 366
+carpenter elbowL 370 273
+carpenter wristL 420 362
+carpenter kneeL 320 501
+carpenter ankleL 334 643
+carpenter shoulderR 193 200
+carpenter hipR 210 368
+carpenter elbowR 139 276
+carpenter wristR 91 363
+carpenter kneeR 192 504
+carpenter ankleR 177 641
+carpenter eyeL 243 124
+carpenter eyeLSz 10 3
+carpenter eyeR 266 124
+carpenter eyeRSz 10 3
+carpenter mouth 255 148
+carpenter mouthSz 20 5
+carpenter browL 242 118
+carpenter browLSz 14 3
+carpenter browR 268 118
+carpenter browRSz 15 3
+cat size 512 768
+cat box 53 75 458 704
+cat flag frontR
+cat flag apose
+cat neck 284 367
+cat pelvis 282 495
+cat chest 283 412
+cat head 286 236
+cat shoulderL 346 370
+cat hipL 325 496
+cat elbowL 384 419
+cat wristL 429 479
+cat kneeL 347 567
+cat ankleL 352 651
+cat shoulderR 222 365
+cat hipR 238 495
+cat elbowR 180 412
+cat wristR 134 478
+cat kneeR 216 557
+cat ankleR 204 653
+chef size 512 768
+chef box 91 75 420 704
+chef flag frontR
+chef flag apose
+chef neck 256 225
+chef pelvis 258 378
+chef chest 256 279
+chef head 256 116
+chef shoulderL 314 225
+chef hipL 295 378
+chef elbowL 358 299
+chef wristL 399 390
+chef kneeL 322 512
+chef ankleL 350 648
+chef shoulderR 197 226
+chef hipR 220 377
+chef elbowR 152 298
+chef wristR 111 389
+chef kneeR 188 498
+chef ankleR 162 648
+chef eyeL 244 155
+chef eyeLSz 9 3
+chef eyeR 267 154
+chef eyeRSz 10 4
+chef mouth 256 176
+chef mouthSz 17 4
+chef browL 242 149
+chef browLSz 14 3
+chef browR 268 148
+chef browRSz 14 3
+crow size 512 768
+crow box 37 75 473 704
+crow flag frontR
+crow flag apose
+crow neck 257 301
+crow pelvis 257 454
+crow chest 257 354
+crow head 254 132
+crow shoulderL 333 302
+crow hipL 305 453
+crow elbowL 387 366
+crow wristL 439 461
+crow kneeL 325 545
+crow ankleL 334 648
+crow shoulderR 180 300
+crow hipR 208 454
+crow elbowR 121 365
+crow wristR 70 460
+crow kneeR 187 543
+crow ankleR 176 645
+dad size 512 768
+dad box 103 75 407 704
+dad flag frontR
+dad flag apose
+dad neck 256 214
+dad pelvis 255 378
+dad chest 255 272
+dad head 255 85
+dad shoulderL 315 216
+dad hipL 295 378
+dad elbowL 347 302
+dad wristL 360 402
+dad kneeL 325 518
+dad ankleL 351 648
+dad shoulderR 196 213
+dad hipR 215 378
+dad elbowR 163 302
+dad wristR 152 401
+dad kneeR 185 515
+dad ankleR 159 648
+dad eyeL 243 132
+dad eyeLSz 12 4
+dad eyeR 269 132
+dad eyeRSz 12 4
+dad mouth 254 157
+dad mouthSz 24 5
+dad browL 241 124
+dad browLSz 17 3
+dad browR 271 125
+dad browRSz 17 3
+deliveryman size 512 768
+deliveryman box 86 75 425 704
+deliveryman flag frontL
+deliveryman flag apose
+deliveryman neck 256 222
+deliveryman pelvis 251 384
+deliveryman chest 254 279
+deliveryman head 253 98
+deliveryman shoulderL 312 222
+deliveryman hipL 289 385
+deliveryman elbowL 360 298
+deliveryman wristL 400 386
+deliveryman kneeL 314 514
+deliveryman ankleL 340 643
+deliveryman shoulderR 200 223
+deliveryman hipR 214 383
+deliveryman elbowR 158 304
+deliveryman wristR 109 387
+deliveryman kneeR 192 511
+deliveryman ankleR 180 645
+deliveryman eyeL 240 142
+deliveryman eyeLSz 13 5
+deliveryman eyeR 270 141
+deliveryman eyeRSz 13 4
+deliveryman mouth 256 169
+deliveryman mouthSz 22 6
+deliveryman browL 237 133
+deliveryman browLSz 18 3
+deliveryman browR 272 132
+deliveryman browRSz 20 3
+deliveryrobot size 512 768
+deliveryrobot box 20 75 491 704
+deliveryrobot flag frontR
+deliveryrobot flag apose
+deliveryrobot neck 256 381
+deliveryrobot pelvis 255 595
+deliveryrobot chest 255 456
+deliveryrobot head 256 252
+deliveryrobot shoulderL 157 381
+deliveryrobot hipL 185 597
+deliveryrobot elbowL 106 427
+deliveryrobot wristL 50 524
+deliveryrobot kneeL 155 392
+deliveryrobot ankleL 139 633
+deliveryrobot shoulderR 354 380
+deliveryrobot hipR 325 592
+deliveryrobot elbowR 404 415
+deliveryrobot wristR 457 523
+doctor size 512 768
+doctor box 143 75 367 704
+doctor flag frontL
+doctor flag apose
+doctor neck 257 224
+doctor pelvis 256 386
+doctor chest 257 280
+doctor head 252 108
+doctor shoulderL 315 224
+doctor hipL 295 386
+doctor elbowL 339 307
+doctor wristL 351 404
+doctor kneeL 300 515
+doctor ankleL 310 644
+doctor shoulderR 198 224
+doctor hipR 218 385
+doctor elbowR 172 306
+doctor wristR 160 404
+doctor kneeR 209 515
+doctor ankleR 203 643
+doctor eyeL 242 149
+doctor eyeLSz 10 3
+doctor eyeR 266 149
+doctor eyeRSz 10 3
+doctor mouth 254 172
+doctor mouthSz 20 5
+doctor browL 240 143
+doctor browLSz 15 3
+doctor browR 268 143
+doctor browRSz 15 3
+dog size 512 768
+dog box 74 75 437 704
+dog flag frontR
+dog flag apose
+dog neck 237 352
+dog pelvis 227 508
+dog chest 233 406
+dog head 195 171
+dog shoulderL 306 348
+dog hipL 274 509
+dog elbowL 348 400
+dog wristL 378 493
+dog kneeL 298 594
+dog ankleL 315 648
+dog shoulderR 168 356
+dog hipR 180 507
+dog elbowR 133 409
+dog wristR 105 487
+dog kneeR 178 578
+dog ankleR 193 648
+dog eyeL 184 233
+dog eyeLSz 30 13
+dog eyeR 253 229
+dog eyeRSz 35 14
+dog mouth 214 286
+dog mouthSz 54 27
+dog browL 180 210
+dog browLSz 38 7
+dog browR 256 208
+dog browRSz 45 9
+dogu size 512 768
+dogu box 17 75 494 704
+dogu flag frontR
+dogu flag apose
+dogu neck 257 376
+dogu pelvis 253 542
+dogu chest 256 434
+dogu head 256 197
+dogu shoulderL 354 377
+dogu hipL 321 541
+dogu elbowL 396 413
+dogu wristL 459 507
+dogu kneeL 341 658
+dogu ankleL 341 661
+dogu shoulderR 160 375
+dogu hipR 186 544
+dogu elbowR 111 415
+dogu wristR 52 505
+dogu kneeR 166 579
+dogu ankleR 176 663
+dogu eyeL 211 253
+dogu eyeLSz 38 17
+dogu eyeR 300 254
+dogu eyeRSz 37 17
+dogu mouth 256 322
+dogu mouthSz 61 20
+dogu browL 211 226
+dogu browLSz 53 7
+dogu browR 302 227
+dogu browRSz 49 7
+dragon size 512 768
+dragon box 25 75 486 704
+dragon flag frontL
+dragon flag apose
+dragon neck 252 326
+dragon pelvis 252 499
+dragon chest 252 386
+dragon head 258 100
+dragon shoulderL 324 326
+dragon hipL 307 501
+dragon elbowL 379 379
+dragon wristL 416 457
+dragon kneeL 333 572
+dragon ankleL 347 645
+dragon shoulderR 181 325
+dragon hipR 197 497
+dragon elbowR 129 380
+dragon wristR 93 459
+dragon kneeR 178 569
+dragon ankleR 166 638
+farmer size 512 768
+farmer box 114 75 396 704
+farmer flag frontR
+farmer flag apose
+farmer neck 259 214
+farmer pelvis 250 376
+farmer chest 256 271
+farmer head 255 87
+farmer shoulderL 313 212
+farmer hipL 288 375
+farmer elbowL 350 289
+farmer wristL 377 388
+farmer kneeL 308 501
+farmer ankleL 333 642
+farmer shoulderR 205 216
+farmer hipR 213 377
+farmer elbowR 173 295
+farmer wristR 136 386
+farmer kneeR 204 503
+farmer ankleR 202 644
+farmer eyeL 244 135
+farmer eyeLSz 11 5
+farmer eyeR 271 133
+farmer eyeRSz 11 5
+farmer mouth 258 160
+farmer mouthSz 20 6
+farmer browL 242 125
+farmer browLSz 15 3
+farmer browR 272 123
+farmer browRSz 17 3
+fisherman size 512 768
+fisherman box 70 75 440 704
+fisherman flag frontL
+fisherman flag apose
+fisherman neck 259 293
+fisherman pelvis 257 468
+fisherman chest 258 354
+fisherman head 237 126
+fisherman shoulderL 331 291
+fisherman hipL 309 470
+fisherman elbowL 378 336
+fisherman wristL 410 415
+fisherman kneeL 322 548
+fisherman ankleL 338 629
+fisherman shoulderR 187 295
+fisherman hipR 204 465
+fisherman elbowR 140 350
+fisherman wristR 100 418
+fisherman kneeR 194 545
+fisherman ankleR 202 632
+fisherman eyeL 218 186
+fisherman eyeLSz 30 13
+fisherman eyeR 279 184
+fisherman eyeRSz 30 14
+fisherman mouth 247 234
+fisherman mouthSz 48 17
+fisherman browL 213 164
+fisherman browLSz 38 9
+fisherman browR 282 162
+fisherman browRSz 40 7
+fortuneteller size 512 768
+fortuneteller box 110 75 400 704
+fortuneteller flag frontL
+fortuneteller flag apose
+fortuneteller neck 256 218
+fortuneteller pelvis 254 381
+fortuneteller chest 255 275
+fortuneteller head 258 121
+fortuneteller shoulderL 304 218
+fortuneteller hipL 291 381
+fortuneteller elbowL 329 295
+fortuneteller wristL 366 383
+fortuneteller kneeL 307 514
+fortuneteller ankleL 323 642
+fortuneteller shoulderR 208 218
+fortuneteller hipR 217 381
+fortuneteller elbowR 185 296
+fortuneteller wristR 148 384
+fortuneteller kneeR 207 509
+fortuneteller ankleR 193 641
+fortuneteller eyeL 244 155
+fortuneteller eyeLSz 12 4
+fortuneteller eyeR 271 153
+fortuneteller eyeRSz 11 4
+fortuneteller mouth 258 177
+fortuneteller mouthSz 20 5
+fortuneteller browL 242 147
+fortuneteller browLSz 16 3
+fortuneteller browR 272 146
+fortuneteller browRSz 16 3
+ghost size 512 768
+ghost box 50 76 460 703
+ghost flag frontL
+ghost flag apose
+ghost neck 256 257
+ghost pelvis 256 413
+ghost chest 256 311
+ghost head 258 114
+ghost shoulderL 311 257
+ghost hipL 295 412
+ghost elbowL 363 315
+ghost wristL 428 382
+ghost kneeL 318 528
+ghost ankleL 334 648
+ghost shoulderR 201 257
+ghost hipR 217 414
+ghost elbowR 151 314
+ghost wristR 81 382
+ghost kneeR 191 530
+ghost ankleR 174 647
+ghost eyeL 234 164
+ghost eyeLSz 20 8
+ghost eyeR 278 164
+ghost eyeRSz 19 8
+ghost mouth 257 200
+ghost mouthSz 33 11
+ghost browL 232 151
+ghost browLSz 28 6
+ghost browR 281 151
+ghost browRSz 28 5
+grandma size 512 768
+grandma box 54 75 457 704
+grandma flag frontR
+grandma flag apose
+grandma neck 258 266
+grandma pelvis 250 417
+grandma chest 255 319
+grandma head 241 116
+grandma shoulderL 319 265
+grandma hipL 293 416
+grandma elbowL 367 331
+grandma wristL 423 405
+grandma kneeL 321 525
+grandma ankleL 348 636
+grandma shoulderR 196 268
+grandma hipR 206 418
+grandma elbowR 151 332
+grandma wristR 86 403
+grandma kneeR 181 526
+grandma ankleR 176 631
+grandma eyeL 226 171
+grandma eyeLSz 22 9
+grandma eyeR 273 167
+grandma eyeRSz 22 9
+grandma mouth 250 204
+grandma mouthSz 39 6
+grandma browL 221 157
+grandma browLSz 28 8
+grandma browR 275 152
+grandma browRSz 33 5
+guard size 512 768
+guard box 136 75 375 704
+guard flag frontL
+guard flag apose
+guard neck 251 211
+guard pelvis 264 360
+guard chest 256 263
+guard head 259 88
+guard shoulderL 305 212
+guard hipL 298 363
+guard elbowL 332 292
+guard wristL 356 386
+guard kneeL 290 503
+guard ankleL 294 643
+guard shoulderR 198 209
+guard hipR 229 358
+guard elbowR 168 286
+guard wristR 159 390
+guard kneeR 205 501
+guard ankleR 177 648
+guard eyeL 243 132
+guard eyeLSz 11 3
+guard eyeR 268 133
+guard eyeRSz 10 3
+guard mouth 254 156
+guard mouthSz 22 5
+guard browL 242 125
+guard browLSz 17 3
+guard browR 269 127
+guard browRSz 14 3
+heroine size 512 768
+heroine box 114 75 397 704
+heroine flag frontR
+heroine flag apose
+heroine neck 258 227
+heroine pelvis 254 377
+heroine chest 256 280
+heroine head 259 121
+heroine shoulderL 300 228
+heroine hipL 289 376
+heroine elbowL 338 302
+heroine wristL 380 382
+heroine kneeL 304 507
+heroine ankleL 329 639
+heroine shoulderR 214 227
+heroine hipR 219 377
+heroine elbowR 175 302
+heroine wristR 131 381
+heroine kneeR 206 505
+heroine ankleR 181 639
+heroine eyeL 242 157
+heroine eyeLSz 14 5
+heroine eyeR 274 156
+heroine eyeRSz 14 6
+heroine mouth 258 184
+heroine mouthSz 22 7
+heroine browL 240 148
+heroine browLSz 20 3
+heroine browR 276 146
+heroine browRSz 20 3
+housewife size 512 768
+housewife box 120 75 390 704
+housewife flag frontL
+housewife flag apose
+housewife neck 255 217
+housewife pelvis 254 388
+housewife chest 255 277
+housewife head 255 98
+housewife shoulderL 301 218
+housewife hipL 292 388
+housewife elbowL 332 292
+housewife wristL 372 380
+housewife kneeL 303 522
+housewife ankleL 313 648
+housewife shoulderR 209 216
+housewife hipR 216 388
+housewife elbowR 176 294
+housewife wristR 139 382
+housewife kneeR 210 520
+housewife ankleR 198 648
+housewife eyeL 241 140
+housewife eyeLSz 12 5
+housewife eyeR 269 140
+housewife eyeRSz 12 4
+housewife mouth 255 166
+housewife mouthSz 20 5
+housewife browL 238 132
+housewife browLSz 18 3
+housewife browR 272 131
+housewife browRSz 18 3
+legend-grandpa size 512 768
+legend-grandpa box 46 75 465 704
+legend-grandpa flag frontL
+legend-grandpa flag apose
+legend-grandpa neck 255 260
+legend-grandpa pelvis 253 407
+legend-grandpa chest 254 311
+legend-grandpa head 258 86
+legend-grandpa shoulderL 331 263
+legend-grandpa hipL 300 408
+legend-grandpa elbowL 384 334
+legend-grandpa wristL 439 420
+legend-grandpa kneeL 322 530
+legend-grandpa ankleL 330 645
+legend-grandpa shoulderR 179 256
+legend-grandpa hipR 206 406
+legend-grandpa elbowR 126 334
+legend-grandpa wristR 72 420
+legend-grandpa kneeR 189 534
+legend-grandpa ankleR 180 642
+legend-grandpa eyeL 232 153
+legend-grandpa eyeLSz 20 6
+legend-grandpa eyeR 280 151
+legend-grandpa eyeRSz 18 5
+legend-grandpa mouth 258 187
+legend-grandpa mouthSz 43 8
+legend-grandpa browL 230 143
+legend-grandpa browLSz 31 7
+legend-grandpa browR 282 141
+legend-grandpa browRSz 31 5
+magician size 512 768
+magician box 103 75 407 704
+magician flag frontR
+magician flag apose
+magician neck 259 217
+magician pelvis 254 366
+magician chest 257 269
+magician head 245 111
+magician shoulderL 308 216
+magician hipL 290 365
+magician elbowL 342 286
+magician wristL 386 367
+magician kneeL 296 504
+magician ankleL 314 651
+magician shoulderR 209 218
+magician hipR 219 367
+magician elbowR 172 289
+magician wristR 124 366
+magician kneeR 220 501
+magician ankleR 217 646
+magician eyeL 241 151
+magician eyeLSz 8 3
+magician eyeR 263 150
+magician eyeRSz 9 3
+magician mouth 252 169
+magician mouthSz 15 5
+magician browL 240 145
+magician browLSz 12 3
+magician browR 264 144
+magician browRSz 15 3
+mannequin size 512 768
+mannequin box 88 75 422 704
+mannequin flag frontR
+mannequin flag apose
+mannequin neck 256 210
+mannequin pelvis 254 365
+mannequin chest 255 264
+mannequin head 255 84
+mannequin shoulderL 309 210
+mannequin hipL 290 365
+mannequin elbowL 355 283
+mannequin wristL 401 367
+mannequin kneeL 309 498
+mannequin ankleL 326 646
+mannequin shoulderR 202 209
+mannequin hipR 219 365
+mannequin elbowR 157 281
+mannequin wristR 110 366
+mannequin kneeR 201 502
+mannequin ankleR 183 648
+mannequin eyeL 243 130
+mannequin eyeLSz 11 3
+mannequin eyeR 268 129
+mannequin eyeRSz 10 3
+mannequin mouth 256 155
+mannequin mouthSz 22 7
+mannequin browL 242 123
+mannequin browLSz 16 3
+mannequin browR 270 122
+mannequin browRSz 16 3
+monk size 512 768
+monk box 73 75 438 704
+monk flag frontR
+monk flag apose
+monk neck 256 199
+monk pelvis 254 390
+monk chest 255 266
+monk head 252 66
+monk shoulderL 316 199
+monk hipL 294 388
+monk elbowL 355 280
+monk wristL 406 371
+monk kneeL 304 522
+monk ankleL 312 660
+monk shoulderR 196 199
+monk hipR 214 392
+monk elbowR 156 284
+monk wristR 106 371
+monk kneeR 203 518
+monk ankleR 199 659
+monk eyeL 242 116
+monk eyeLSz 10 3
+monk eyeR 264 115
+monk eyeRSz 10 3
+monk mouth 254 139
+monk mouthSz 17 5
+monk browL 241 110
+monk browLSz 14 3
+monk browR 266 110
+monk browRSz 14 3
+ninja size 512 768
+ninja box 112 75 399 704
+ninja flag frontL
+ninja flag apose
+ninja neck 273 230
+ninja pelvis 273 383
+ninja chest 273 283
+ninja head 272 121
+ninja shoulderL 325 230
+ninja hipL 310 382
+ninja elbowL 358 310
+ninja wristL 382 395
+ninja kneeL 322 522
+ninja ankleL 340 645
+ninja shoulderR 222 230
+ninja hipR 237 383
+ninja elbowR 188 308
+ninja wristR 159 395
+ninja kneeR 219 520
+ninja ankleR 202 645
+ninja eyeL 261 159
+ninja eyeLSz 11 3
+ninja eyeR 286 160
+ninja eyeRSz 10 3
+ninja mouth 273 183
+ninja mouthSz 22 7
+ninja browL 260 153
+ninja browLSz 15 3
+ninja browR 287 153
+ninja browRSz 16 3
+ojisan size 512 768
+ojisan box 42 75 468 704
+ojisan flag frontR
+ojisan flag apose
+ojisan neck 255 225
+ojisan pelvis 254 410
+ojisan chest 255 290
+ojisan head 255 82
+ojisan shoulderL 340 225
+ojisan hipL 309 410
+ojisan elbowL 389 304
+ojisan wristL 442 400
+ojisan kneeL 328 535
+ojisan ankleL 333 651
+ojisan shoulderR 170 226
+ojisan hipR 200 409
+ojisan elbowR 121 306
+ojisan wristR 70 399
+ojisan kneeR 181 537
+ojisan ankleR 176 650
+ojisan eyeL 237 135
+ojisan eyeLSz 16 4
+ojisan eyeR 273 135
+ojisan eyeRSz 16 4
+ojisan mouth 256 164
+ojisan mouthSz 42 9
+ojisan browL 235 125
+ojisan browLSz 24 4
+ojisan browR 276 125
+ojisan browRSz 25 5
+pumpkin size 512 768
+pumpkin box 96 75 414 704
+pumpkin flag frontL
+pumpkin flag apose
+pumpkin neck 254 239
+pumpkin pelvis 252 392
+pumpkin chest 254 292
+pumpkin head 257 116
+pumpkin shoulderL 313 239
+pumpkin hipL 289 392
+pumpkin elbowL 350 310
+pumpkin wristL 393 397
+pumpkin kneeL 307 515
+pumpkin ankleL 326 650
+pumpkin shoulderR 196 239
+pumpkin hipR 216 392
+pumpkin elbowR 159 312
+pumpkin wristR 117 397
+pumpkin kneeR 201 518
+pumpkin ankleR 183 651
+pumpkin eyeL 245 163
+pumpkin eyeLSz 8 3
+pumpkin eyeR 268 163
+pumpkin eyeRSz 10 3
+pumpkin mouth 255 188
+pumpkin mouthSz 20 7
+pumpkin browL 245 157
+pumpkin browLSz 14 3
+pumpkin browR 269 156
+pumpkin browRSz 15 4
+rainman size 512 768
+rainman box 101 75 409 704
+rainman flag frontL
+rainman flag apose
+rainman neck 257 216
+rainman pelvis 251 372
+rainman chest 255 270
+rainman head 254 90
+rainman shoulderL 309 216
+rainman hipL 286 371
+rainman elbowL 348 288
+rainman wristL 389 375
+rainman kneeL 302 510
+rainman ankleL 318 648
+rainman shoulderR 204 216
+rainman hipR 217 372
+rainman elbowR 164 290
+rainman wristR 122 376
+rainman kneeR 208 511
+rainman ankleR 197 650
+rainman eyeL 243 136
+rainman eyeLSz 11 4
+rainman eyeR 269 136
+rainman eyeRSz 11 4
+rainman mouth 256 161
+rainman mouthSz 18 5
+rainman browL 242 128
+rainman browLSz 15 3
+rainman browR 270 128
+rainman browRSz 16 3
+robot size 512 768
+robot box 73 75 438 704
+robot flag frontR
+robot flag apose
+robot neck 245 351
+robot pelvis 245 488
+robot chest 245 399
+robot head 231 222
+robot shoulderL 323 352
+robot hipL 298 489
+robot elbowL 384 407
+robot wristL 393 502
+robot kneeL 311 518
+robot ankleL 319 646
+robot shoulderR 168 350
+robot hipR 192 488
+robot elbowR 117 404
+robot wristR 102 492
+robot kneeR 182 518
+robot ankleR 191 643
+robot-gold size 512 768
+robot-gold box 45 75 466 704
+robot-gold flag frontR
+robot-gold flag apose
+robot-gold neck 253 270
+robot-gold pelvis 254 405
+robot-gold chest 254 317
+robot-gold head 259 155
+robot-gold shoulderL 312 270
+robot-gold hipL 292 406
+robot-gold elbowL 359 334
+robot-gold wristL 395 421
+robot-gold kneeL 311 527
+robot-gold ankleL 326 651
+robot-gold shoulderR 195 270
+robot-gold hipR 217 405
+robot-gold elbowR 150 333
+robot-gold wristR 115 419
+robot-gold kneeR 199 520
+robot-gold ankleR 183 651
+rookie size 512 768
+rookie box 102 75 409 704
+rookie flag frontL
+rookie flag apose
+rookie neck 255 255
+rookie pelvis 254 412
+rookie chest 255 310
+rookie head 256 108
+rookie shoulderL 317 253
+rookie hipL 296 410
+rookie elbowL 353 333
+rookie wristL 384 425
+rookie kneeL 319 532
+rookie ankleL 334 642
+rookie shoulderR 193 256
+rookie hipR 212 413
+rookie elbowR 158 334
+rookie wristR 125 426
+rookie kneeR 190 532
+rookie ankleR 177 642
+rookie eyeL 235 163
+rookie eyeLSz 18 7
+rookie eyeR 275 162
+rookie eyeRSz 17 7
+rookie mouth 256 194
+rookie mouthSz 30 8
+rookie browL 232 150
+rookie browLSz 26 6
+rookie browR 278 149
+rookie browRSz 26 5
+salaryman size 512 768
+salaryman box 123 75 387 704
+salaryman flag frontL
+salaryman flag apose
+salaryman neck 256 209
+salaryman pelvis 256 371
+salaryman chest 256 266
+salaryman head 255 84
+salaryman shoulderL 314 210
+salaryman hipL 294 370
+salaryman elbowL 343 295
+salaryman wristL 370 392
+salaryman kneeL 305 514
+salaryman ankleL 320 657
+salaryman shoulderR 197 208
+salaryman hipR 218 371
+salaryman elbowR 167 296
+salaryman wristR 141 393
+salaryman kneeR 206 513
+salaryman ankleR 193 654
+salaryman eyeL 244 129
+salaryman eyeLSz 9 3
+salaryman eyeR 268 129
+salaryman eyeRSz 10 3
+salaryman mouth 256 153
+salaryman mouthSz 18 6
+salaryman browL 243 123
+salaryman browLSz 14 3
+salaryman browR 269 122
+salaryman browRSz 14 3
+santa size 512 768
+santa box 51 75 459 704
+santa flag frontR
+santa flag apose
+santa neck 255 234
+santa pelvis 257 409
+santa chest 256 295
+santa head 248 110
+santa shoulderL 328 233
+santa hipL 305 409
+santa elbowL 378 299
+santa wristL 432 390
+santa kneeL 333 544
+santa ankleL 350 652
+santa shoulderR 182 235
+santa hipR 208 409
+santa elbowR 129 297
+santa wristR 78 389
+santa kneeR 172 541
+santa ankleR 161 652
+santa eyeL 234 154
+santa eyeLSz 15 5
+santa eyeR 269 153
+santa eyeRSz 15 4
+santa mouth 252 186
+santa mouthSz 33 8
+santa browL 232 144
+santa browLSz 22 4
+santa browR 270 142
+santa browRSz 22 3
+slacker size 512 768
+slacker box 77 75 434 704
+slacker flag frontR
+slacker flag apose
+slacker neck 256 199
+slacker pelvis 256 365
+slacker chest 256 257
+slacker head 255 74
+slacker shoulderL 317 199
+slacker hipL 294 366
+slacker elbowL 364 273
+slacker wristL 411 356
+slacker kneeL 307 507
+slacker ankleL 322 650
+slacker shoulderR 195 199
+slacker hipR 219 365
+slacker elbowR 150 273
+slacker wristR 100 356
+slacker kneeR 204 503
+slacker ankleR 189 648
+slacker eyeL 244 120
+slacker eyeLSz 10 3
+slacker eyeR 267 119
+slacker eyeRSz 10 3
+slacker mouth 256 143
+slacker mouthSz 17 5
+slacker browL 243 115
+slacker browLSz 14 3
+slacker browR 268 114
+slacker browRSz 14 3
+sleepyhead size 512 768
+sleepyhead box 97 75 414 704
+sleepyhead flag frontR
+sleepyhead flag apose
+sleepyhead neck 255 211
+sleepyhead pelvis 251 368
+sleepyhead chest 254 266
+sleepyhead head 254 93
+sleepyhead shoulderL 313 213
+sleepyhead hipL 289 369
+sleepyhead elbowL 354 291
+sleepyhead wristL 393 383
+sleepyhead kneeL 310 503
+sleepyhead ankleL 328 646
+sleepyhead shoulderR 197 209
+sleepyhead hipR 214 368
+sleepyhead elbowR 155 290
+sleepyhead wristR 117 381
+sleepyhead kneeR 198 501
+sleepyhead ankleR 188 645
+sleepyhead eyeL 243 135
+sleepyhead eyeLSz 11 3
+sleepyhead eyeR 268 134
+sleepyhead eyeRSz 11 3
+sleepyhead mouth 255 160
+sleepyhead mouthSz 20 5
+sleepyhead browL 241 129
+sleepyhead browLSz 15 3
+sleepyhead browR 270 128
+sleepyhead browRSz 16 3
+snowman size 512 768
+snowman box 37 75 473 704
+snowman flag frontL
+snowman flag apose
+snowman neck 254 294
+snowman pelvis 253 478
+snowman chest 254 359
+snowman head 257 132
+snowman shoulderL 336 293
+snowman hipL 317 479
+snowman elbowL 380 350
+snowman wristL 438 436
+snowman kneeL 335 539
+snowman ankleL 335 644
+snowman shoulderR 173 295
+snowman hipR 188 478
+snowman elbowR 130 348
+snowman wristR 72 436
+snowman kneeR 159 533
+snowman ankleR 180 643
+snowman eyeL 228 190
+snowman eyeLSz 26 7
+snowman eyeR 281 187
+snowman eyeRSz 25 7
+snowman mouth 256 233
+snowman mouthSz 40 14
+snowman browL 224 172
+snowman browLSz 37 6
+snowman browR 285 170
+snowman browRSz 35 4
+stationstaff size 512 768
+stationstaff box 120 75 391 704
+stationstaff flag frontR
+stationstaff flag apose
+stationstaff neck 254 211
+stationstaff pelvis 263 378
+stationstaff chest 257 269
+stationstaff head 258 88
+stationstaff shoulderL 307 213
+stationstaff hipL 302 377
+stationstaff elbowL 334 291
+stationstaff wristL 364 384
+stationstaff kneeL 316 504
+stationstaff ankleL 325 640
+stationstaff shoulderR 202 208
+stationstaff hipR 224 378
+stationstaff elbowR 163 288
+stationstaff wristR 141 380
+stationstaff kneeR 195 499
+stationstaff ankleR 165 641
+stationstaff eyeL 245 132
+stationstaff eyeLSz 10 3
+stationstaff eyeR 270 133
+stationstaff eyeRSz 10 4
+stationstaff mouth 257 156
+stationstaff mouthSz 18 5
+stationstaff browL 244 125
+stationstaff browLSz 15 3
+stationstaff browR 272 126
+stationstaff browRSz 15 3
+student size 512 768
+student box 133 75 378 704
+student flag frontL
+student flag apose
+student neck 251 211
+student pelvis 255 386
+student chest 253 272
+student head 261 88
+student shoulderL 306 213
+student hipL 292 386
+student elbowL 330 297
+student wristL 360 390
+student kneeL 293 518
+student ankleL 294 653
+student shoulderR 197 208
+student hipR 218 386
+student elbowR 173 294
+student wristR 150 392
+student kneeR 207 515
+student ankleR 196 652
+student eyeL 246 132
+student eyeLSz 10 3
+student eyeR 270 133
+student eyeRSz 10 3
+student mouth 256 155
+student mouthSz 18 5
+student browL 245 124
+student browLSz 14 3
+student browR 272 126
+student browRSz 14 3
+sumo size 512 768
+sumo box 66 75 445 704
+sumo flag frontR
+sumo flag apose
+sumo neck 256 209
+sumo pelvis 258 432
+sumo chest 256 287
+sumo head 254 92
+sumo shoulderL 347 208
+sumo hipL 321 432
+sumo elbowL 402 304
+sumo wristL 418 417
+sumo kneeL 345 543
+sumo ankleL 353 644
+sumo shoulderR 164 209
+sumo hipR 194 432
+sumo elbowR 108 304
+sumo wristR 94 416
+sumo kneeR 162 541
+sumo ankleR 159 645
+sumo eyeL 241 132
+sumo eyeLSz 13 4
+sumo eyeR 269 133
+sumo eyeRSz 13 4
+sumo mouth 254 159
+sumo mouthSz 27 6
+sumo browL 239 124
+sumo browLSz 20 3
+sumo browR 271 125
+sumo browRSz 20 3
+suntan size 512 768
+suntan box 115 75 395 704
+suntan flag frontL
+suntan flag apose
+suntan neck 255 211
+suntan pelvis 253 364
+suntan chest 254 265
+suntan head 255 82
+suntan shoulderL 320 211
+suntan hipL 294 364
+suntan elbowL 356 292
+suntan wristL 375 385
+suntan kneeL 312 507
+suntan ankleL 332 648
+suntan shoulderR 190 211
+suntan hipR 213 365
+suntan elbowR 156 294
+suntan wristR 135 386
+suntan kneeR 197 503
+suntan ankleR 178 646
+suntan eyeL 242 128
+suntan eyeLSz 12 4
+suntan eyeR 268 128
+suntan eyeRSz 12 3
+suntan mouth 255 155
+suntan mouthSz 20 6
+suntan browL 240 120
+suntan browLSz 17 3
+suntan browR 270 121
+suntan browRSz 17 3
+tanuki size 512 768
+tanuki box 12 75 498 704
+tanuki flag frontL
+tanuki flag apose
+tanuki neck 255 317
+tanuki pelvis 258 522
+tanuki chest 256 389
+tanuki head 257 157
+tanuki shoulderL 348 317
+tanuki hipL 329 506
+tanuki elbowL 398 373
+tanuki wristL 457 430
+tanuki kneeL 334 498
+tanuki ankleL 332 655
+tanuki shoulderR 162 317
+tanuki hipR 186 539
+tanuki elbowR 107 375
+tanuki wristR 52 433
+tanuki kneeR 159 516
+tanuki ankleR 182 646
+tanuki eyeL 223 210
+tanuki eyeLSz 28 7
+tanuki eyeR 289 210
+tanuki eyeRSz 27 8
+tanuki mouth 258 266
+tanuki mouthSz 57 33
+tanuki browL 219 191
+tanuki browLSz 41 7
+tanuki browR 292 190
+tanuki browRSz 40 6
+teacher size 512 768
+teacher box 130 75 382 704
+teacher flag frontR
+teacher flag apose
+teacher neck 256 209
+teacher pelvis 256 370
+teacher chest 256 265
+teacher head 254 81
+teacher shoulderL 313 210
+teacher hipL 297 369
+teacher elbowL 340 290
+teacher wristL 356 382
+teacher kneeL 308 505
+teacher ankleL 322 644
+teacher shoulderR 200 207
+teacher hipR 215 371
+teacher elbowR 171 288
+teacher wristR 156 381
+teacher kneeR 201 504
+teacher ankleR 186 645
+teacher eyeL 245 128
+teacher eyeLSz 9 3
+teacher eyeR 268 128
+teacher eyeRSz 10 3
+teacher mouth 256 150
+teacher mouthSz 18 5
+teacher browL 244 123
+teacher browLSz 14 3
+teacher browR 269 122
+teacher browRSz 14 3
+thirdtwin size 512 768
+thirdtwin box 111 75 400 704
+thirdtwin flag frontR
+thirdtwin flag apose
+thirdtwin neck 264 202
+thirdtwin pelvis 270 353
+thirdtwin chest 266 254
+thirdtwin head 267 75
+thirdtwin shoulderL 321 205
+thirdtwin hipL 309 353
+thirdtwin elbowL 352 288
+thirdtwin wristL 380 376
+thirdtwin kneeL 314 497
+thirdtwin ankleL 317 641
+thirdtwin shoulderR 206 198
+thirdtwin hipR 231 353
+thirdtwin elbowR 166 278
+thirdtwin wristR 150 373
+thirdtwin kneeR 196 484
+thirdtwin ankleR 163 640
+thirdtwin eyeL 254 122
+thirdtwin eyeLSz 10 3
+thirdtwin eyeR 277 123
+thirdtwin eyeRSz 10 3
+thirdtwin mouth 266 145
+thirdtwin mouthSz 20 6
+thirdtwin browL 253 116
+thirdtwin browLSz 14 3
+thirdtwin browR 279 117
+thirdtwin browRSz 13 3
+twins size 512 768
+twins box 148 76 363 704
+twins flag frontR
+twins flag apose
+twins neck 258 218
+twins pelvis 248 382
+twins chest 255 276
+twins head 244 82
+twins shoulderL 314 215
+twins hipL 286 383
+twins elbowL 340 305
+twins wristL 332 405
+twins kneeL 297 515
+twins ankleL 314 644
+twins shoulderR 202 221
+twins hipR 210 382
+twins elbowR 180 310
+twins wristR 165 405
+twins kneeR 212 516
+twins ankleR 212 644
+twins eyeL 238 134
+twins eyeLSz 11 4
+twins eyeR 264 131
+twins eyeRSz 11 3
+twins mouth 253 157
+twins mouthSz 24 8
+twins browL 236 127
+twins browLSz 15 3
+twins browR 265 124
+twins browRSz 18 3
