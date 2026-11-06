@@ -608,6 +608,8 @@ public class BattingStage : MonoBehaviour
     public void SetFielderSkin(int index, Sprite cut)
     {
         if (index < 0 || index >= _fielders.Length) return;
+        StandeePuppet stand;
+        if (_fielders[index] != null && _standees.TryGetValue(_fielders[index], out stand)) stand.WithGlove = true;
         SetDollSkin(_fielders[index], cut);
     }
 

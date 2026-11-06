@@ -112,7 +112,11 @@ public class StandeePuppet : MonoBehaviour
                 HeadPop = () => _headPop
             };
             _skin = RigSkin.TryAttach(body, id);
-            if (_skin != null) return;
+            if (_skin != null)
+            {
+                if (WithGlove) _skin.AttachGlove(CharaCatalog.GloveArt(id));
+                return;
+            }
         }
         _up.enabled = true;
         Vector2 b = cut.bounds.size;
@@ -191,6 +195,7 @@ public class StandeePuppet : MonoBehaviour
 
     private static void Rot(Transform t, float deg) { t.localRotation = Quaternion.Euler(0f, 0f, deg); }
     private float _headPop = 1f;
+    public bool WithGlove;        // 守備の選手はグローブの絵を付ける(走者は付けない)
     private float _dirX;          // -1=画面の左へ / +1=右へ走っている
     private float _baseScale = 1f;
 

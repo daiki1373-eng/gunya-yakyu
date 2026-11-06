@@ -43,6 +43,10 @@ public partial class RigSkin : MonoBehaviour
         public int Parent = -1;
         public Vector2 Pivot;          // 最初の姿勢でのワールド座標(関節)
         public float Rest;             // パーツの最初の角度
+        public float Offset;           // Aポーズの絵: 絵の腕脚の向きをラグドールの最初の向き(真下)へそろえる角度
+        public int Gate;               // Aポーズの絵: 1=腕(肩より外側だけ) 2=脚(股より下だけ)。胴の画素が腕脚に引っぱられて裂けないように
+        public float GateAt;           // 腕=肩のx / 脚=股のy(画素)
+        public int Code;               // 部品の番号(0=胴 1=画像の左腕 2=右腕 3=左脚 4=右脚)。BodyLabel の値と同じ
         public readonly List<Vector2> Seg = new List<Vector2>();   // 画素座標の線分(2点ずつ)
         public int Layer;
         public bool IsBat;
@@ -73,8 +77,9 @@ public partial class RigSkin : MonoBehaviour
     private bool _paintedBat;
 
     private int _headBone = 2;
-    private int _farmF = -1;
-    private Vector2 _wristF;
+    private int _farmF = -1, _farmB = -1;
+    private Vector2 _wristF, _wristB;
+    private string _charaId;
     private Transform _batVis;
     private Vector3 _batVisLocal;
     private Vector2 _batOffFrozen;
@@ -89,8 +94,21 @@ public partial class RigSkin : MonoBehaviour
 
     public static RigSkin TryAttach(RagdollPlayer p, string charaId) { return TryAttach(RigBody.From(p), charaId); }
 
+    // Aポーズの立ち絵(Resources/Chara/Body + rig_body.txt)があれば、決めポーズの元絵(Cut)より優先して体にする。
+    // 腕と脚が胴から離れて描かれているので、大きく振っても絵が伸びにくい。false で全員を元絵の体に戻す。
+    public static bool UseBodyArt = true;
+    public bool UsesBodyArt { get; private set; }
+
+    private static bool BodyOk(string charaId)
+    {
+        if (!UseBodyArt) return false;
+        var rig = CharaRig.GetBody(charaId);
+        return rig != null && rig.Has("pelvis") && rig.Has("neck") && CharaCatalog.Body(charaId) != null;
+    }
+
     public static bool CanRig(string charaId)
     {
+        if (BodyOk(charaId)) return true;
         var rig = CharaRig.Get(charaId);
         return rig != null && rig.Has("pelvis") && rig.Has("neck") && CharaCatalog.Cut(charaId) != null;
     }
@@ -98,8 +116,9 @@ public partial class RigSkin : MonoBehaviour
     public static RigSkin TryAttach(RigBody body, string charaId)
     {
         if (!CanRig(charaId)) return null;
-        var rig = CharaRig.Get(charaId);
-        var spr = CharaCatalog.Cut(charaId);
+        bool useBody = BodyOk(charaId);
+        var rig = useBody ? CharaRig.GetBody(charaId) : CharaRig.Get(charaId);
+        var spr = useBody ? CharaCatalog.Body(charaId) : CharaCatalog.Cut(charaId);
         var go = new GameObject("RigSkin");
         go.transform.SetParent(body.Space, false);
         go.transform.localPosition = Vector3.zero;
@@ -107,6 +126,8 @@ public partial class RigSkin : MonoBehaviour
         go.transform.localScale = Vector3.one;
         go.layer = body.Layer;
         var s = go.AddComponent<RigSkin>();
+        s.UsesBodyArt = useBody;
+        s._charaId = charaId;
         if (body.Light) s.Cell = 16;
         s.Build(body, rig, spr);
         return s;
@@ -129,6 +150,37 @@ public partial class RigSkin : MonoBehaviour
     }
 
     private void Seg(int bone, Vector2 a, Vector2 b) { _bones[bone].Seg.Add(a); _bones[bone].Seg.Add(b); }
+
+    // Aポーズの絵: 絵の骨(from→to)が、ラグドールの最初の姿勢の向き(パーツの下向き)と重なるように角度をそろえる。
+    // ラグドールが腕を下ろしていれば絵の腕も下り、バットを構えれば絵の腕も同じ向きに上がる。
+    private void GateArm(int bone, float shoulderX) { if (_rig.APose && bone >= 0) { _bones[bone].Gate = 1; _bones[bone].GateAt = shoulderX; } }
+    private void GateLeg(int bone, float hipY) { if (_rig.APose && bone >= 0) { _bones[bone].Gate = 2; _bones[bone].GateAt = hipY; } }
+
+    // 腕は肩より外側、脚は股より下の画素だけに付ける(境目は ±GateBand 画素でなめらかに)
+    private const float GateBand = 7f;
+    private float GateWeight(Bone b, Vector2 px)
+    {
+        float d;
+        if (b.Gate == 1)
+        {
+            float side = Mathf.Sign(b.GateAt - _cx);
+            d = (px.x - _cx) * side - Mathf.Abs(b.GateAt - _cx);
+        }
+        else if (b.Gate == 2) d = px.y - b.GateAt;
+        else return 1f;
+        return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-GateBand, GateBand, d));
+    }
+
+    private void Aim(int bone, Vector2 fromPx, Vector2 toPx)
+    {
+        if (!_rig.APose || bone < 0) return;
+        var b = _bones[bone];
+        if (b.Tr == null) return;
+        Vector2 d = ToWorldRest(toPx) - ToWorldRest(fromPx);
+        if (d.sqrMagnitude < 1e-8f) return;
+        float img = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+        b.Offset = Mathf.DeltaAngle(img, b.Rest - 90f);
+    }
 
     // 画素 → 最初の姿勢でのワールド座標
     private float _k, _m, _cx, _footY, _rootX, _groundY;
@@ -174,6 +226,8 @@ public partial class RigSkin : MonoBehaviour
         _farmF = farmF;
         if (farmF >= 0 && Has("wrist" + armF)) _wristF = ToWorldRest(J("wrist" + armF));
         int farmB = Arm(armB, p.ArmBU, p.ArmBF, iChest, 1);
+        _farmB = farmB;
+        if (farmB >= 0 && Has("wrist" + armB)) _wristB = ToWorldRest(J("wrist" + armB));
         Leg(F, p.LegFU, p.LegFF, iPel, 5);
         Leg(B, p.LegBU, p.LegBF, iPel, 0);
 
@@ -210,10 +264,14 @@ public partial class RigSkin : MonoBehaviour
         if (!Has("shoulder" + s) || !Has("elbow" + s) || up == null) return -1;
         Vector2 sh = J("shoulder" + s), el = J("elbow" + s);
         int u = AddBone(up, parent, sh, layer);
+        Aim(u, sh, el);
+        GateArm(u, sh.x); _bones[u].Code = s == "L" ? 1 : 2;
         if (!Has("wrist" + s) || fore == null) { Seg(u, sh, el + (el - sh) * 0.6f); return -1; }
         Vector2 wr = J("wrist" + s);
         Seg(u, Vector2.Lerp(sh, el, 0.1f), el);
         int fo = AddBone(fore, u, el, layer);
+        Aim(fo, el, wr);
+        GateArm(fo, sh.x); _bones[fo].Code = s == "L" ? 1 : 2;
         Seg(fo, el, wr + (wr - el) * 0.35f);
         return fo;
     }
@@ -223,10 +281,14 @@ public partial class RigSkin : MonoBehaviour
         if (!Has("hip" + s) || !Has("knee" + s) || up == null) return;
         Vector2 hp = J("hip" + s), kn = J("knee" + s);
         int u = AddBone(up, parent, hp, layer);
+        Aim(u, hp, kn);
+        GateLeg(u, hp.y); _bones[u].Code = s == "L" ? 3 : 4;
         if (!Has("ankle" + s) || fore == null) { Seg(u, hp, kn + (kn - hp) * 0.6f); return; }
         Vector2 an = J("ankle" + s);
         Seg(u, Vector2.Lerp(hp, kn, 0.1f), kn);
         int fo = AddBone(fore, u, kn, layer);
+        Aim(fo, kn, an);
+        GateLeg(fo, hp.y); _bones[fo].Code = s == "L" ? 3 : 4;
         Seg(fo, kn, an + (an - kn) * 0.25f);
     }
 
@@ -235,7 +297,8 @@ public partial class RigSkin : MonoBehaviour
     // 配列はキャッシュ側では不変。姿勢・頂点・非表示状態は各選手が持つ。
     private sealed class MeshData
     {
-        public Vector2[] Pixels, UV;
+        public Vector2[] Pixels, UV, UV2;     // UV2.x = 部品の番号(Aポーズの体のみ)
+        public Texture2D Labels;               // 画素ごとの部品の番号(Aポーズの体のみ)
         public int[] Bones, Triangles;
         public float[] Weights, PixelEdges;
         public bool[] Seams;
@@ -285,6 +348,195 @@ public partial class RigSkin : MonoBehaviour
     }
 
     // 画素 px の骨の重み(上位3本)を bi/bw の v 番目に書く
+    // Aポーズの絵: 胴(腰・胸・頭)と、腕2本・脚2本を別々の部品にする。
+    // 網目のマスごとにどの部品か決め、部品の境目では頂点を分ける(つながっていない)。
+    // 腕を真上に上げても胴の絵が引き伸ばされたり裂けたりせず、切り絵の人形のように関節で回る。
+    // 部品の中(肘・膝)はこれまでどおりなめらかに曲がる。重なりは骨の前後順(前の腕は胴の上、後ろの腕は胴の下)。
+    private int GroupOf(int b) { return _bones[b].Code; }
+
+    // 部品の塗り分け(Tools/chara-rig/labels.py が作る Resources/Chara/BodyLabel/<id>.png)。なければ実行時に骨からおおまかに作る
+    private static readonly Dictionary<string, Texture2D> LabelTex = new Dictionary<string, Texture2D>();
+    private static Texture2D LoadLabel(string id)
+    {
+        Texture2D t;
+        if (LabelTex.TryGetValue(id, out t) && t != null) return t;
+        t = Resources.Load<Texture2D>("Chara/BodyLabel/" + id);
+        if (t != null && !t.isReadable) t = null;
+        LabelTex[id] = t;
+        return t;
+    }
+
+    private const int LabelStep = 2;          // 部品の色分けは元絵の半分の細かさ(2画素ごと)
+    private static float GroupCode(int g) { return g * 32f / 255f; }
+
+    private MeshData BuildPartsMeshData(Sprite spr)
+    {
+        var box = _rig.Box;
+        int x0 = Mathf.Max(0, Mathf.FloorToInt(box.x / Cell) * Cell - Cell);
+        int y0 = Mathf.Max(0, Mathf.FloorToInt(box.y / Cell) * Cell - Cell);
+        int x1 = Mathf.Min((int)_rig.Size.x, Mathf.CeilToInt(box.z / Cell) * Cell + Cell);
+        int y1 = Mathf.Min((int)_rig.Size.y, Mathf.CeilToInt(box.w / Cell) * Cell + Cell);
+        int nx = (x1 - x0) / Cell + 1, ny = (y1 - y0) / Cell + 1;
+        int nb = _bones.Count;
+        var tex = spr.texture;
+        Rect tr = spr.textureRect;
+        var w = new float[nb];
+        var gsum = new float[8];
+
+        // 1) 画素ごとの部品(半分の細かさ)。用意された塗り分けがあればそれを使う
+        int lw = Mathf.CeilToInt(_rig.Size.x / LabelStep), lh = Mathf.CeilToInt(_rig.Size.y / LabelStep);
+        var label = new byte[lw * lh];
+        Texture2D lt = LoadLabel(_charaId);
+        if (lt != null && lt.width == lw && lt.height == lh)
+        {
+            var pc = lt.GetPixels32();
+            for (int ly = 0; ly < lh; ly++)
+                for (int lx = 0; lx < lw; lx++)
+                    label[ly * lw + lx] = (byte)Mathf.Clamp((pc[(lh - 1 - ly) * lw + lx].a + 16) / 32, 0, 7);
+        }
+        else
+        {
+            int lx0 = x0 / LabelStep, ly0 = y0 / LabelStep, lx1 = Mathf.Min(lw, x1 / LabelStep + 1), ly1 = Mathf.Min(lh, y1 / LabelStep + 1);
+            for (int ly = ly0; ly < ly1; ly++)
+                for (int lx = lx0; lx < lx1; lx++)
+                {
+                    var c = new Vector2((lx + 0.5f) * LabelStep, (ly + 0.5f) * LabelStep);
+                    RawWeights(c, _wScale, w, true);
+                    System.Array.Clear(gsum, 0, gsum.Length);
+                    for (int b = 0; b < nb; b++) gsum[GroupOf(b)] += w[b];
+                    int g = 0;
+                    for (int k = 1; k < gsum.Length; k++) if (gsum[k] > gsum[g]) g = k;
+                    label[ly * lw + lx] = (byte)g;
+                }
+            // 部品の番号の絵(アルファ8bit、上下は画像と逆)
+            lt = new Texture2D(lw, lh, TextureFormat.Alpha8, false);
+            lt.filterMode = FilterMode.Point;
+            lt.wrapMode = TextureWrapMode.Clamp;
+            var lpx = new byte[lw * lh];
+            for (int ly = 0; ly < lh; ly++)
+                for (int lx = 0; lx < lw; lx++) lpx[(lh - 1 - ly) * lw + lx] = (byte)(label[ly * lw + lx] * 32);
+            lt.LoadRawTextureData(lpx);
+            lt.Apply(false, true);
+            lt.hideFlags = HideFlags.DontSave;
+        }
+
+        // 2) マスごとに、含まれる部品の数だけ四角を重ねる(部品の境目では頂点を分ける)
+        var pixels = new List<Vector2>(nx * ny * 2);
+        var uvs = new List<Vector2>(nx * ny * 2);
+        var uv2 = new List<Vector2>(nx * ny * 2);
+        var bones = new List<int>(nx * ny * 6);
+        var weights = new List<float>(nx * ny * 6);
+        var map = new Dictionary<long, int>(nx * ny * 2);
+        var buckets = new List<int>[9];
+        for (int l = 0; l < 9; l++) buckets[l] = new List<int>();
+        var corner = new int[4];
+        int span = Cell / LabelStep;
+        for (int j = 0; j + 1 < ny; j++)
+            for (int i = 0; i + 1 < nx; i++)
+            {
+                int mask = 0;
+                int cx0 = (x0 + i * Cell) / LabelStep - 1, cy0 = (y0 + j * Cell) / LabelStep - 1;
+                for (int ly = Mathf.Max(0, cy0); ly <= Mathf.Min(lh - 1, cy0 + span + 1); ly++)
+                    for (int lx = Mathf.Max(0, cx0); lx <= Mathf.Min(lw - 1, cx0 + span + 1); lx++)
+                        mask |= 1 << label[ly * lw + lx];
+                for (int g = 0; g < 8; g++)
+                {
+                    if ((mask & (1 << g)) == 0) continue;
+                    int layer = 0;
+                    for (int q = 0; q < 4; q++)
+                    {
+                        int gi = (j + (q >> 1)) * nx + i + (q & 1);
+                        long key = (long)gi * 16 + g;
+                        int idx;
+                        if (!map.TryGetValue(key, out idx))
+                        {
+                            idx = pixels.Count;
+                            var px = new Vector2(x0 + (i + (q & 1)) * Cell, y0 + (j + (q >> 1)) * Cell);
+                            pixels.Add(px);
+                            uvs.Add(new Vector2((tr.x + px.x / _rig.Size.x * tr.width) / tex.width,
+                                                (tr.y + (1f - px.y / _rig.Size.y) * tr.height) / tex.height));
+                            uv2.Add(new Vector2(GroupCode(g), 0f));
+                            RawWeights(px, _wScale, w, false);   // 部品の中の骨だけで重みを付ける
+                            if (!PickTop3(w, g, bones, weights)) PickNearest(px, g, bones, weights);
+                            map[key] = idx;
+                        }
+                        corner[q] = idx;
+                        layer = Mathf.Max(layer, _bones[bones[idx * 3]].Layer);
+                    }
+                    var bucket = buckets[Mathf.Clamp(layer, 0, 8)];
+                    bucket.Add(corner[0]); bucket.Add(corner[2]); bucket.Add(corner[1]);
+                    bucket.Add(corner[1]); bucket.Add(corner[2]); bucket.Add(corner[3]);
+                }
+            }
+        var data = new MeshData { Pixels = pixels.ToArray(), UV = uvs.ToArray(), UV2 = uv2.ToArray(), Bones = bones.ToArray(), Weights = weights.ToArray(), Labels = lt };
+        var tris = new List<int>((nx - 1) * (ny - 1) * 8);
+        foreach (var bucket in buckets) tris.AddRange(bucket);
+        data.Triangles = tris.ToArray();
+        int nt = data.Triangles.Length / 3;
+        data.Seams = new bool[nt]; data.PixelEdges = new float[nt];
+        for (int t = 0; t < nt; t++)
+        {
+            int a = data.Triangles[t * 3], b = data.Triangles[t * 3 + 1], cc = data.Triangles[t * 3 + 2];
+            int ba = data.Bones[a * 3], bb = data.Bones[b * 3], bc = data.Bones[cc * 3];
+            data.Seams[t] = !(ba == bb && bb == bc);
+            data.PixelEdges[t] = Mathf.Max((data.Pixels[a] - data.Pixels[b]).sqrMagnitude,
+                Mathf.Max((data.Pixels[b] - data.Pixels[cc]).sqrMagnitude, (data.Pixels[cc] - data.Pixels[a]).sqrMagnitude));
+        }
+        return data;
+    }
+
+    // 骨ごとの生の重み(gated=true なら腕は肩の外・脚は股の下だけ)
+    private void RawWeights(Vector2 px, float scale, float[] w, bool gated)
+    {
+        int nb = _bones.Count;
+        for (int b = 0; b < nb; b++)
+        {
+            float d = 1e9f;
+            var sg = _bones[b].Seg;
+            for (int s = 0; s + 1 < sg.Count; s += 2) d = Mathf.Min(d, SegDistSquared(px, sg[s], sg[s + 1]));
+            float d2 = Mathf.Max(d, 9f) / (scale * scale);
+            w[b] = sg.Count == 0 ? 0f : 1f / (d2 * d2 * d2);
+            if (gated && _bones[b].Gate != 0) w[b] *= GateWeight(_bones[b], px);
+        }
+    }
+
+    // 部品 g に骨がない(腕が推定できなかった等)ときは胴の一番近い骨に付ける
+    private void PickNearest(Vector2 px, int g, List<int> bones, List<float> weights)
+    {
+        int best = 0; float bd = float.MaxValue;
+        for (int b = 0; b < _bones.Count; b++)
+        {
+            var sg = _bones[b].Seg;
+            for (int k = 0; k + 1 < sg.Count; k += 2)
+            {
+                float d = SegDistSquared(px, sg[k], sg[k + 1]);
+                if (d < bd) { bd = d; best = b; }
+            }
+        }
+        bones.Add(best); bones.Add(best); bones.Add(best);
+        weights.Add(1f); weights.Add(0f); weights.Add(0f);
+    }
+
+    // 部品 g の骨だけから重みの大きい3本を選んで足す。部品の骨に重みがなければ false
+    private bool PickTop3(float[] w, int g, List<int> bones, List<float> weights)
+    {
+        int nb = _bones.Count;
+        float total = 0f;
+        for (int b = 0; b < nb; b++) { if (GroupOf(b) != g) w[b] = -1f; else total += w[b]; }
+        if (total <= 0f) return false;
+        int start = bones.Count;
+        float sum = 0f;
+        for (int k = 0; k < 3; k++)
+        {
+            int best = -1; float bv = 0f;
+            for (int b = 0; b < nb; b++) if (w[b] > bv) { bv = w[b]; best = b; }
+            if (best < 0) { bones.Add(bones[start]); weights.Add(0f); continue; }
+            bones.Add(best); weights.Add(bv); sum += bv; w[best] = -1f;
+        }
+        for (int k = 0; k < 3; k++) weights[start + k] = weights[start + k] / sum;
+        return true;
+    }
+
     private void Weights(Vector2 px, float scale, float[] w, int[] bi, float[] bw, int v)
     {
         int nb = _bones.Count;
@@ -295,6 +547,7 @@ public partial class RigSkin : MonoBehaviour
             for (int s = 0; s + 1 < sg.Count; s += 2) d = Mathf.Min(d, SegDistSquared(px, sg[s], sg[s + 1]));
             float d2 = Mathf.Max(d, 9f) / (scale * scale);
             w[b] = sg.Count == 0 ? 0f : 1f / (d2 * d2 * d2);   // 6乗: 骨の近くはほぼその骨だけに付く
+            if (_bones[b].Gate != 0) w[b] *= GateWeight(_bones[b], px);
         }
         for (int k = 0; k < 3; k++)
         {
@@ -321,7 +574,7 @@ public partial class RigSkin : MonoBehaviour
         MeshData data;
         if (!MeshCache.TryGetValue(key, out data))
         {
-            data = BuildMeshData(spr);
+            data = _rig.APose ? BuildPartsMeshData(spr) : BuildMeshData(spr);
             MeshCache.Add(key, data);
         }
         Remember(MeshCache, MeshUse, key, MaxMeshCache);
@@ -340,12 +593,15 @@ public partial class RigSkin : MonoBehaviour
         Pose();
         _mesh.vertices = _verts;
         _mesh.uv = data.UV;
+        if (data.UV2 != null) _mesh.uv2 = data.UV2;
         _mesh.SetTriangles(_allTris, 0);
         _mesh.RecalculateBounds();
         gameObject.AddComponent<MeshFilter>().sharedMesh = _mesh;
         _renderer = gameObject.AddComponent<MeshRenderer>();
-        _material = new Material(Shader.Find("Sprites/Default"));
+        var partsShader = data.Labels != null ? Shader.Find("Gunya/RigParts") : null;
+        _material = new Material(partsShader != null ? partsShader : Shader.Find("Sprites/Default"));
         _material.mainTexture = spr.texture;
+        if (partsShader != null) _material.SetTexture("_LabelTex", data.Labels);
         _renderer.sharedMaterial = _material;
         _renderer.sortingOrder = _p.Order;
         _renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -461,7 +717,7 @@ public partial class RigSkin : MonoBehaviour
         for (int b = 0; b < _bones.Count; b++)
         {
             var bo = _bones[b];
-            float a = bo.Tr != null ? Mathf.DeltaAngle(bo.Rest, AngOf(bo.Tr)) : 0f;
+            float a = (bo.Tr != null ? Mathf.DeltaAngle(bo.Rest, AngOf(bo.Tr)) : 0f) + bo.Offset;
             if (bo.IsBat)
             {
                 float pa = _bones[bo.Parent].Ang;
@@ -564,6 +820,45 @@ public partial class RigSkin : MonoBehaviour
         System.Array.Clear(_viewCameras, 0, _viewCameras.Length);
     }
 
+    // ---- グローブ(Aポーズの体のみ。捕る側=後ろの腕の手に付ける) ----
+    private SpriteRenderer _glove;
+    private float _gloveSize;
+
+    public bool AttachGlove(Sprite s)
+    {
+        if (s == null || _farmB < 0 || !UsesBodyArt) return false;
+        if (_glove == null)
+        {
+            var go = new GameObject("Glove");
+            go.transform.SetParent(transform, false);
+            go.layer = gameObject.layer;
+            _glove = go.AddComponent<SpriteRenderer>();
+            _glove.sortingOrder = _p.Order + 1;
+        }
+        _glove.sprite = s;
+        // 手のひら大(身長のおよそ 1/6)
+        _gloveSize = TargetHeight * _rig.Scale * 0.17f;
+        Vector2 b = s.bounds.size;
+        float k = _gloveSize / Mathf.Max(0.01f, Mathf.Max(b.x, b.y));
+        _glove.transform.localScale = new Vector3(k * (_m < 0f ? -1f : 1f), k, 1f);
+        PlaceGlove();
+        return true;
+    }
+
+    private void PlaceGlove()
+    {
+        if (_glove == null || _farmB < 0) return;
+        Vector2 elbow = _bones[_farmB].Cur;
+        Vector2 wrist = Apply(_farmB, _wristB);
+        Vector2 dir = wrist - elbow;
+        if (dir.sqrMagnitude < 1e-8f) dir = Vector2.down;
+        dir.Normalize();
+        Vector2 pos = wrist + dir * (_gloveSize * 0.28f);
+        _glove.transform.localPosition = new Vector3(pos.x, pos.y, -0.01f);
+        // 手を入れる口(画像の下)が手首側、指先(画像の上)が腕の先の向き
+        _glove.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f);
+    }
+
     private void OnDestroy()
     {
         if (_mesh != null) Destroy(_mesh);
@@ -579,6 +874,7 @@ public partial class RigSkin : MonoBehaviour
         FaceState(Time.timeScale > 0f ? Time.deltaTime : Mathf.Min(Time.unscaledDeltaTime, 0.05f));   // 一時停止中も表情は動かす
         Pose();
         AttachBat();
+        PlaceGlove();
         _mesh.vertices = _verts;
         UpdateSeams();
         FaceDraw();

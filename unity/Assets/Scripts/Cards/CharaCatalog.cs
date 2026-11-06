@@ -188,13 +188,21 @@ public static class CharaCatalog
     public static Sprite Head(string id) { return Load(Heads, "Head", id); }
     public static Sprite Full(string id) { return Load(Fulls, "Full", id); }
 
+    // 試合で動かす用: Aポーズの立ち絵(Body) / 持ち物(Bat。握る側が左) / グローブ(Glove)。Tools/chara-rig/prep_body.py で作る
+    private static readonly Dictionary<string, Sprite> Bodies = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<string, Sprite> Bats = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<string, Sprite> Gloves = new Dictionary<string, Sprite>();
+    public static Sprite Body(string id) { return Load(Bodies, "Body", id); }
+    public static Sprite BatArt(string id) { return Load(Bats, "Bat", id); }
+    public static Sprite GloveArt(string id) { return Load(Gloves, "Glove", id); }
+
     // ---- 画像のメモリ管理 ----
     // 読んだ画像は最後に使った時刻を覚えておく。種類ごとの上限を超えたら、画面で使われていない古いものから
     // 手放し(辞書から外す)、Resources.UnloadUnusedAssets でどこからも参照されていない画像だけをメモリから消す。
     // 使用中(表示中の UI・スプライト・選手の体)の画像は消さない。必要になればまた読み込む。
     private static readonly Dictionary<string, Sprite> Fulls = new Dictionary<string, Sprite>();
     private static readonly Dictionary<string, float> LastUse = new Dictionary<string, float>();
-    public static int MaxThumbs = 40, MaxCuts = 32, MaxHeads = 32, MaxFulls = 4;   // Cut・Head は両チームの打順(18人)が収まる数
+    public static int MaxThumbs = 40, MaxCuts = 32, MaxHeads = 32, MaxFulls = 4, MaxBodies = 24, MaxProps = 24;   // Cut・Head は両チームの打順(18人)が収まる数
     public static int Loads { get; private set; }
     public static int Released { get; private set; }
 
@@ -210,11 +218,15 @@ public static class CharaCatalog
         return s;
     }
 
-    public static int Cached { get { return Thumbs.Count + Cuts.Count + Heads.Count + Fulls.Count; } }
+    public static int Cached { get { return Thumbs.Count + Cuts.Count + Heads.Count + Fulls.Count + Bodies.Count + Bats.Count + Gloves.Count; } }
 
     public static bool OverBudget
     {
-        get { return Thumbs.Count > MaxThumbs || Cuts.Count > MaxCuts || Heads.Count > MaxHeads || Fulls.Count > MaxFulls; }
+        get
+        {
+            return Thumbs.Count > MaxThumbs || Cuts.Count > MaxCuts || Heads.Count > MaxHeads || Fulls.Count > MaxFulls
+                || Bodies.Count > MaxBodies || Bats.Count > MaxProps || Gloves.Count > MaxProps;
+        }
     }
 
     // 上限を超えた分を手放す。unload=true なら参照の切れた画像をメモリから消す(画面の切り替え時など)。
@@ -228,6 +240,9 @@ public static class CharaCatalog
             n += TrimKind(Cuts, "Cut", MaxCuts, used);
             n += TrimKind(Heads, "Head", MaxHeads, used);
             n += TrimKind(Fulls, "Full", MaxFulls, used);
+            n += TrimKind(Bodies, "Body", MaxBodies, used);
+            n += TrimKind(Bats, "Bat", MaxProps, used);
+            n += TrimKind(Gloves, "Glove", MaxProps, used);
             Released += n;
         }
         if (unload && n > 0) Resources.UnloadUnusedAssets();

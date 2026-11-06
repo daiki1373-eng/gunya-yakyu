@@ -89,9 +89,40 @@ public class RagdollPlayer : MonoBehaviour
         if (UseRigSkin && !string.IsNullOrEmpty(stats.CharaId))
         {
             player.Skin = RigSkin.TryAttach(player, stats.CharaId);
-            if (player.Skin != null) player.HideBodyArt(!player.Skin.HasPaintedBat);
+            if (player.Skin != null)
+            {
+                player.HideBodyArt(!player.Skin.HasPaintedBat);
+                // Aポーズの体: 打者はキャラのバット(持ち物)の絵、投手はキャラのグローブの絵を持たせる
+                if (player.Skin.UsesBodyArt)
+                {
+                    if (player.Bat != null)
+                    {
+                        // 2本目の持ち物(<id>_2。双子の金バットなど)があれば、打席ごとにどちらかを持つ
+                        var second = CharaCatalog.BatArt(stats.CharaId + "_2");
+                        player.ApplyBatArt(second != null && Random.value < 0.5f ? second : CharaCatalog.BatArt(stats.CharaId));
+                    }
+                    else player.Skin.AttachGlove(CharaCatalog.GloveArt(stats.CharaId));
+                }
+            }
         }
         return player;
+    }
+
+    // バットの見た目をキャラの持ち物の絵にする(絵は握る側が左。標準のバット=横512px)。
+    // 当たり判定・振り方は変えず、見た目の長さだけ絵に合わせる(大根は少し短く、巨大バットは長く)。
+    public void ApplyBatArt(Sprite art)
+    {
+        if (art == null || Bat == null) return;
+        var bsr = Bat.GetComponentInChildren<SpriteRenderer>();
+        if (bsr == null) return;
+        bsr.sprite = art;
+        bsr.color = Color.white;
+        float len = 0.94f * Mathf.Clamp(art.rect.width / 512f, 0.35f, 1.3f);
+        float k = len / Mathf.Max(0.01f, art.bounds.size.x);
+        var t = bsr.transform;
+        t.localRotation = Quaternion.Euler(0f, 0f, 90f);   // 絵の右(先端)を上へ
+        t.localScale = new Vector3(k, k, 1f);
+        t.localPosition = new Vector3(0f, -0.47f + len * 0.5f, t.localPosition.z);   // 握る端を手の位置にそろえる
     }
 
     // レイヤー行列を書き換えず、自分の体と他の選手の体だけ衝突を無効にする。
