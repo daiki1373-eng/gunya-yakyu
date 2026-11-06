@@ -3,6 +3,9 @@
 #   Full : 横648に縮小(縦は比のまま)
 # 使い方: python cards.py <chara フォルダ> <Assets/Resources/Chara>
 import sys, os
+
+# 一覧用の切り出し位置(上からの割合)をキャラごとに変える。絵の主役が下に寄っているもの
+THUMB_Y = {'penguin': 1.0}
 from PIL import Image
 
 def main():
@@ -20,7 +23,7 @@ def main():
             im.resize((648, round(H * 648 / W)), Image.LANCZOS).save(fu, optimize=True)
         if not os.path.exists(th):
             ch = min(H, round(W * 1.5)); cw = round(ch / 1.5)
-            ox = (W - cw) // 2; oy = round((H - ch) * 0.35)
+            ox = (W - cw) // 2; oy = round((H - ch) * THUMB_Y.get(cid, 0.35))
             im.crop((ox, oy, ox + cw, oy + ch)).resize((240, 360), Image.LANCZOS).save(th, optimize=True)
         n += 1
     print('made', n)

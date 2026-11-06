@@ -9,7 +9,16 @@ FIX = {
     'pole': ('mask', None),
     'zombie': ('mask', None),
     'rock': ('rect', (0.10, 0.50, 0.90, 0.90)),
+    # isnet が背景の光・爆発まで拾った絵(2026-11-07 新規51体)
+    'scarecrow': ('rect', (0.16, 0.20, 0.95, 0.97)),
+    'robovac': ('rect', (0.05, 0.28, 0.95, 0.90)),
+    'tengu': ('rect', (0.05, 0.05, 0.95, 0.97)),
+    'yeti': ('rect', (0.05, 0.08, 0.95, 0.92)),
+    'announcer': ('rect', (0.05, 0.10, 0.97, 0.93)),
+    'daibutsu': ('rect', (0.05, 0.10, 0.95, 0.90)),
 }
+import sys
+ONLY = sys.argv[1:] or None   # 一部だけやり直すときは引数に id を並べる
 src = os.path.expanduser('~/mnt/gunya-yakyu/chara')
 out = os.path.expanduser('~/cut')
 sess = ort.InferenceSession(os.path.expanduser('~/models/isnet-anime.onnx'), providers=['CPUExecutionProvider'])
@@ -21,6 +30,7 @@ def isnet(im):
     return (m - m.min()) / (m.max() - m.min() + 1e-6)
 
 for cid, (mode, rect) in FIX.items():
+    if ONLY and cid not in ONLY: continue
     f = next(p for p in os.listdir(src) if os.path.splitext(p)[0] == cid and os.path.isfile(os.path.join(src, p)))
     im = Image.open(os.path.join(src, f)).convert('RGB'); W, H = im.size
     s = 0.25; w, h = int(W * s), int(H * s)
@@ -35,7 +45,8 @@ for cid, (mode, rect) in FIX.items():
         x0, y0, x1, y1 = int(rect[0] * w), int(rect[1] * h), int(rect[2] * w), int(rect[3] * h)
         gm[:] = cv2.GC_BGD
         gm[y0:y1, x0:x1] = cv2.GC_PR_FGD
-        gm[ms > 0.5] = cv2.GC_FGD          # isnet が拾った小物(帽子)は残す
+        if cid == 'rock': gm[ms > 0.5] = cv2.GC_FGD          # isnet が拾った小物(帽子)は残す
+        else: gm[(ms > 0.85) & (gm == cv2.GC_PR_FGD)] = cv2.GC_FGD
     cv2.grabCut(small, gm, None, bgm, fgm, 8, cv2.GC_INIT_WITH_MASK)
     a = ((gm == 1) | (gm == 3)).astype(np.uint8)
     # 一番大きなかたまり + その 3% 以上のかたまりだけ残す
