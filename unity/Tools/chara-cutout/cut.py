@@ -9,6 +9,7 @@ so=ort.SessionOptions(); so.intra_op_num_threads=4
 sess=ort.InferenceSession(os.path.expanduser('~/models/isnet-anime.onnx'), so, providers=['CPUExecutionProvider'])
 n=0
 for f in sorted(os.listdir(src)):
+    if not f.lower().endswith(('.png','.webp','.jpg','.jpeg')) or not os.path.isfile(os.path.join(src,f)): continue   # rig-src などは対象外
     cid=os.path.splitext(f)[0]
     if os.path.exists(os.path.join(out,cid+'.png')): continue
     if time.time()-t0>30: break

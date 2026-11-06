@@ -62,7 +62,7 @@ public class CharaImportSettings : AssetPostprocessor
             ti.alphaIsTransparency = true;
             ti.mipmapEnabled = true;
             ti.maxTextureSize = cut ? 1024 : 256;
-            ti.npotScale = TextureImporterNPOTScale.ToNearest;   // 2の累乗にして圧縮を効かせる(端末のメモリ節約)
+            // 512・256 の正方形で書き出しているので、2の累乗への拡大は不要(スプライトでは設定できない)
             var st = new TextureImporterSettings();
             ti.ReadTextureSettings(st);
             st.spriteAlignment = cut ? (int)SpriteAlignment.BottomCenter : (int)SpriteAlignment.Center;
