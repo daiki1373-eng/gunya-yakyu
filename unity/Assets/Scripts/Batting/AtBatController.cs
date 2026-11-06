@@ -152,6 +152,27 @@ public partial class AtBatController : MonoBehaviour
         _batterIndex = -1;
         _oppIndex = -1;
         _teamsFor = -1;   // 投手を作り直す
+        if (isActiveAndEnabled) StartCoroutine(PrewarmSkins());
+    }
+
+    // 両チームの選手の体(元絵の網目と重み)を、1フレームに1人ずつ前もって作っておく。
+    // 初めて打席に立つ瞬間のひっかかり(重み計算 20〜140ms)を、試合開始の演出中に済ませる。
+    private System.Collections.IEnumerator PrewarmSkins()
+    {
+        var seen = new System.Collections.Generic.HashSet<string>();
+        var teams = new[] { _userTeam, _oppTeam };
+        foreach (var team in teams)
+        {
+            if (team == null) continue;
+            foreach (var d in team.Lineup)
+            {
+                if (d == null || !seen.Add(d.Id) || !RigSkin.CanRig(d.Id)) continue;
+                yield return null;
+                var p = RagdollPlayer.Create(null, "Prewarm", new Vector2(900f, -50f), 1f, CharaRoster.Stats(d),
+                    Color.white, Color.white, true);
+                Destroy(p.gameObject);
+            }
+        }
     }
 
     private void ApplyTeams()
