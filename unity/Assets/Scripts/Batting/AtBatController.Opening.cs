@@ -35,6 +35,7 @@ public partial class AtBatController
             if (!_introSkip) yield return StartCoroutine(IntroWait(0.22f));   // 帯がはけてから PLAY BALL
         }
         _ui.ShowResult("PLAY BALL");
+        _stage.Stadium.ShowVision("playball", 3.5f);
         if (!_introSkip) { _stage.Stadium.LaunchFireworks(4); GameAudio.Play(Sfx.HitPerfect, 0.7f, 0.9f); }
         yield return StartCoroutine(IntroWait(IntroEnabled ? 1.1f : 0.35f));
         _ui.HideVersus(true);

@@ -435,8 +435,97 @@ public class StadiumBuilder : MonoBehaviour
         _lampB = Lamps("B", c + new Vector3(5f, 3.6f, -0.1f), 3, new Color(0.2f, 1f, 0.35f));
         _lampS = Lamps("S", c + new Vector3(5f, 0.6f, -0.1f), 2, new Color(1f, 0.85f, 0.15f));
         _lampO = Lamps("O", c + new Vector3(5f, -2.4f, -0.1f), 2, new Color(1f, 0.2f, 0.15f));
+        BuildVision(c);
         // 掲示板の光のにじみ
         Quad("BoardGlow", StadiumArt.Glow, new Color(0.6f, 0.7f, 1f, 0.12f), OBoard - 1, c + Vector3.forward * 0.5f, Vector3.zero, new Vector2(70f, 40f));
+    }
+
+    // ---- 大型ビジョン(掲示板の画面) ----
+    // 常時: 画面の真ん中(題字の帯と下の得点の帯の間)にロゴの絵。得点・回・BSO は下の帯に小さく。
+    // 試合開始・ホームランの瞬間だけ、画面全体に専用の絵を出す(ShowVision)。
+    private SpriteRenderer _visionEvent, _visionEventBack;
+    private float _visionUntil, _visionT0;
+    private Vector3 _visionEventScale;
+    private static Sprite LoadVision(string n) { return Resources.Load<Sprite>("Presentation/" + n); }
+
+    private void BuildVision(Vector3 c)
+    {
+        var logo = LoadVision("vision_logo");
+        if (logo == null) return;
+        Quad("VisionLogo", logo, Color.white, OBoard + 2, c + new Vector3(0f, 0.25f, -0.03f), Vector3.zero, new Vector2(39f, 11.1f));
+        // 下の得点の帯
+        Quad("BoardBand", SpriteFactory.White, new Color(0.02f, 0.03f, 0.06f, 0.92f), OBoard + 2, c + new Vector3(0f, -7.4f, -0.06f), Vector3.zero, new Vector2(39f, 4.2f));
+        SetLocal(_boardScore, c + new Vector3(-12.5f, -7.4f, -0.1f), 0.75f);
+        SetLocal(_boardCount, c + new Vector3(-3.2f, -7.4f, -0.1f), 0.85f);
+        if (_boardBatter != null) _boardBatter.gameObject.SetActive(false);   // 打者名は画面の札に出ている
+        SetLocal(_boardSpeed, c + new Vector3(14.5f, 7.6f, -0.1f), 0.7f);
+        PlaceLamps(_lampB, "B", c + new Vector3(2.2f, -7.4f, -0.1f));
+        PlaceLamps(_lampS, "S", c + new Vector3(8.9f, -7.4f, -0.1f));
+        PlaceLamps(_lampO, "O", c + new Vector3(14.0f, -7.4f, -0.1f));
+        var title = _root.Find("BoardTitle");
+        if (title != null) title.localPosition = c + new Vector3(-6f, 7.6f, -0.1f);
+        // 出来事の絵(画面全体。絵の縦横比のまま収め、余白は暗くする)
+        _visionEventBack = Quad("VisionEventBack", SpriteFactory.White, new Color(0.01f, 0.01f, 0.03f, 1f), OBoardText + 1, c + new Vector3(0f, 0f, -0.15f), Vector3.zero, new Vector2(39f, 19f));
+        _visionEvent = Quad("VisionEvent", logo, Color.white, OBoardText + 2, c + new Vector3(0f, 0f, -0.2f), Vector3.zero, new Vector2(39f, 19f));
+        _visionEventBack.gameObject.SetActive(false);
+        _visionEvent.gameObject.SetActive(false);
+    }
+
+    private static void SetLocal(TextMesh t, Vector3 pos, float scale)
+    {
+        if (t == null) return;
+        t.transform.localPosition = pos;
+        t.transform.localScale *= scale;
+    }
+
+    private void PlaceLamps(SpriteRenderer[] arr, string label, Vector3 pos)
+    {
+        if (arr == null) return;
+        var lab = _root.Find("Lamp" + label);
+        if (lab != null) { lab.localPosition = pos; lab.localScale *= 0.7f; }
+        for (int i = 0; i < arr.Length; i++)
+        {
+            arr[i].transform.localPosition = pos + new Vector3(1.6f + i * 1.55f, 0f, 0f);
+            arr[i].transform.localScale *= 0.62f;
+        }
+    }
+
+    // kind: "playball" / "homerun"
+    public void ShowVision(string kind, float seconds)
+    {
+        if (_visionEvent == null) return;
+        var sp = LoadVision("vision_" + kind);
+        if (sp == null) return;
+        _visionEvent.sprite = sp;
+        Vector2 bs = sp.bounds.size;
+        float k = Mathf.Min(39f / bs.x, 19f / bs.y);
+        _visionEventScale = new Vector3(bs.x * k / bs.x, bs.y * k / bs.y, 1f) * 1f;
+        _visionEventScale = new Vector3(k, k, 1f);
+        _visionEvent.transform.localScale = _visionEventScale;
+        _visionEvent.gameObject.SetActive(true);
+        _visionEventBack.gameObject.SetActive(true);
+        _visionT0 = Time.unscaledTime;
+        _visionUntil = Time.unscaledTime + seconds;
+    }
+
+    public void HideVision() { _visionUntil = 0f; TickVision(); }
+
+    private void TickVision()
+    {
+        if (_visionEvent == null || !_visionEvent.gameObject.activeSelf) return;
+        float t = Time.unscaledTime;
+        if (t >= _visionUntil)
+        {
+            _visionEvent.gameObject.SetActive(false);
+            _visionEventBack.gameObject.SetActive(false);
+            return;
+        }
+        // 出た瞬間に少し大きく出て落ち着き、その後はゆっくり明滅
+        float u = Mathf.Clamp01((t - _visionT0) / 0.35f);
+        float pop = 1f + (1f - u) * (1f - u) * 0.12f;
+        _visionEvent.transform.localScale = _visionEventScale * pop;
+        float glow = 0.88f + 0.12f * Mathf.Sin((t - _visionT0) * 6f);
+        _visionEvent.color = new Color(glow, glow, glow, 1f);
     }
 
     private SpriteRenderer[] Lamps(string label, Vector3 pos, int n, Color on)
@@ -619,6 +708,7 @@ public class StadiumBuilder : MonoBehaviour
     {
         GameAudio.TickAmbience(Time.unscaledDeltaTime);
         TickFireworks(Time.deltaTime);
+        TickVision();
         float t = Time.time;
         bool cheering = t < _cheerUntil;
         float amp = cheering ? _cheerAmp * Mathf.Clamp01((_cheerUntil - t) / 1.2f) : 0f;

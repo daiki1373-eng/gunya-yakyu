@@ -54,6 +54,15 @@ public partial class AppShell
     private IEnumerator PullRoutineFixed(List<PullResult> results)
     {
         _busy = true;
+        // ダイヤルをぐるっと回して、マシンを揺らしてから演出へ
+        if (_gachaDial != null && _gacha.gameObject.activeSelf)
+        {
+            _dialSpin = 1400f;
+            GameAudio.Play(Sfx.Whoosh, 0.6f, 0.7f);
+            float t = 0f;
+            while (t < 0.55f && !_tapped) { t += Time.unscaledDeltaTime; yield return null; }
+            _tapped = false;
+        }
         BgmPlayer.Jingle("bgm-gacha-pull", 3.5f);
         _skipAll = false;
         ClearChildren(_show);

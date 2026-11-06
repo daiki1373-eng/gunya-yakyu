@@ -11,6 +11,22 @@ public class CharaImportSettings : AssetPostprocessor
     private void OnPreprocessTexture()
     {
         string p = assetPath.Replace('\\', '/');
+        // 演出素材(タイトル背景・大型ビジョン・ガチャマシン・アイコン)
+        if (p.Contains("/Resources/Presentation/"))
+        {
+            var pi = (TextureImporter)assetImporter;
+            pi.textureType = TextureImporterType.Sprite;
+            pi.spriteImportMode = SpriteImportMode.Single;
+            pi.alphaIsTransparency = true;
+            pi.mipmapEnabled = p.Contains("/vision_");      // 球場の中で遠くに映るものだけミップマップ
+            pi.npotScale = TextureImporterNPOTScale.None;
+            pi.textureCompression = TextureImporterCompression.Compressed;
+            pi.crunchedCompression = true;
+            pi.compressionQuality = 70;
+            pi.maxTextureSize = 2048;
+            pi.spritePixelsPerUnit = 100f;
+            return;
+        }
         if (!p.Contains("/Resources/Chara/")) return;
         var ti = (TextureImporter)assetImporter;
         // Aポーズの体の部品の塗り分け(BodyLabel)。値をそのまま読むので、圧縮・ミップマップ・補間なし、CPUから読める

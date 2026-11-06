@@ -282,7 +282,11 @@ public partial class AtBatController
             label += "  " + Mathf.RoundToInt(play.Distance) + "m";
         _ui.ShowResult(label);
         // 曲: 自軍の本塁打 / 自軍投手が痛打された / 自軍のファインプレー
-        if (play.Kind == PlayKind.HomeRun) Music(_gs.UserBatting ? "bgm-homerun" : "bgm-pitcher-hit", 10f);
+        if (play.Kind == PlayKind.HomeRun)
+        {
+            Music(_gs.UserBatting ? "bgm-homerun" : "bgm-pitcher-hit", 10f);
+            _stage.Stadium.ShowVision("homerun", 5f);
+        }
         else if (!_gs.UserBatting && play.IsHit && play.Quirk == QuirkKind.None
                  && (_outcome.Rank == HitRank.Perfect || play.Bases >= 2)) Music("bgm-pitcher-hit", 7f);
         else if (!_gs.UserBatting && play.IsOut && play.Quirk == QuirkKind.None
