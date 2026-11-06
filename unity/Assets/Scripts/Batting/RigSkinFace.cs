@@ -109,6 +109,7 @@ public partial class RigSkin
                 }
             FaceCache.Add(key, data);
         }
+        Remember(FaceCache, FaceUse, key, MaxFaceCache);
         _fPx = data.Pixels; _fBi = data.Bones; _fBw = data.Weights;
         _fV = new Vector3[n];
         var go = new GameObject("Face");

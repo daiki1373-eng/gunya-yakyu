@@ -249,6 +249,24 @@ public partial class RigSkin : MonoBehaviour
         public override int GetHashCode() { unchecked { return (Id.GetHashCode() * 397 ^ Cell) * 397 ^ Topology; } }
     }
     private static readonly Dictionary<MeshKey, MeshData> MeshCache = new Dictionary<MeshKey, MeshData>();
+    // 網目の重みは使い回すが、上限を超えたら一番長く使っていないものから捨てる(使用中の選手は自分の配列を持っているので安全)
+    public static int MaxMeshCache = 40, MaxFaceCache = 24;
+    private static readonly Dictionary<MeshKey, float> MeshUse = new Dictionary<MeshKey, float>();
+    private static readonly Dictionary<MeshKey, float> FaceUse = new Dictionary<MeshKey, float>();
+    public static int CachedMeshes { get { return MeshCache.Count + FaceCache.Count; } }
+
+    private static void Remember(Dictionary<MeshKey, MeshData> cache, Dictionary<MeshKey, float> use, MeshKey key, int max)
+    {
+        use[key] = Time.realtimeSinceStartup;
+        while (cache.Count > max)
+        {
+            MeshKey oldest = default(MeshKey); float t = float.MaxValue; bool found = false;
+            foreach (var kv in use)
+                if (kv.Value < t && !kv.Key.Equals(key) && cache.ContainsKey(kv.Key)) { t = kv.Value; oldest = kv.Key; found = true; }
+            if (!found) break;
+            cache.Remove(oldest); use.Remove(oldest);
+        }
+    }
 
     private MeshKey CacheKey(int cell)
     {
@@ -306,6 +324,7 @@ public partial class RigSkin : MonoBehaviour
             data = BuildMeshData(spr);
             MeshCache.Add(key, data);
         }
+        Remember(MeshCache, MeshUse, key, MaxMeshCache);
         int n = data.Pixels.Length;
         _rest = new Vector2[n];
         _verts = new Vector3[n];
@@ -465,19 +484,37 @@ public partial class RigSkin : MonoBehaviour
             bo.AxisX = new Vector2(cos, sin) * (bo.Scale * bo.Sq.x);
             bo.AxisY = new Vector2(-sin, cos) * (bo.Scale * bo.Sq.y);
         }
-        const float z = 0f;
-        for (int v = 0; v < _rest.Length; v++)
+        // 各骨の変換を 2x2 行列 + 平行移動の数値にしておき、頂点ごとの計算は float だけで行う
+        // (Vector2 の演算子呼び出しを避けると、エディタ・スマホとも数倍速い)
+        int nb = _bones.Count;
+        if (_m00 == null || _m00.Length != nb)
         {
-            Vector2 acc = Vector2.zero;
+            _m00 = new float[nb]; _m01 = new float[nb]; _m10 = new float[nb]; _m11 = new float[nb]; _t0 = new float[nb]; _t1 = new float[nb];
+        }
+        for (int b = 0; b < nb; b++)
+        {
+            var bo = _bones[b];
+            _m00[b] = bo.AxisX.x; _m01[b] = bo.AxisY.x; _m10[b] = bo.AxisX.y; _m11[b] = bo.AxisY.y;
+            _t0[b] = bo.Cur.x - (bo.AxisX.x * bo.Pivot.x + bo.AxisY.x * bo.Pivot.y);
+            _t1[b] = bo.Cur.y - (bo.AxisX.y * bo.Pivot.x + bo.AxisY.y * bo.Pivot.y);
+        }
+        var rest = _rest; var bi = _bi; var bw = _bw; var verts = _verts;
+        var m00 = _m00; var m01 = _m01; var m10 = _m10; var m11 = _m11; var t0 = _t0; var t1 = _t1;
+        for (int v = 0, i = 0; v < rest.Length; v++, i += 3)
+        {
+            float rx = rest[v].x, ry = rest[v].y, x = 0f, y = 0f;
             for (int k = 0; k < 3; k++)
             {
-                float wt = _bw[v * 3 + k];
+                float wt = bw[i + k];
                 if (wt <= 0f) continue;
-                acc += Apply(_bi[v * 3 + k], _rest[v]) * wt;
+                int b = bi[i + k];
+                x += wt * (m00[b] * rx + m01[b] * ry + t0[b]);
+                y += wt * (m10[b] * rx + m11[b] * ry + t1[b]);
             }
-            _verts[v] = new Vector3(acc.x, acc.y, z);
+            verts[v].x = x; verts[v].y = y; verts[v].z = 0f;
         }
     }
+    private float[] _m00, _m01, _m10, _m11, _t0, _t1;
 
     private static Camera[] _viewCameras = new Camera[8];
     private static Plane[][] _viewPlanes = new Plane[8][];
@@ -522,7 +559,7 @@ public partial class RigSkin : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetCaches()
     {
-        MeshCache.Clear(); FaceCache.Clear();
+        MeshCache.Clear(); FaceCache.Clear(); MeshUse.Clear(); FaceUse.Clear();
         _viewFrame = -1; _viewCount = 0;
         System.Array.Clear(_viewCameras, 0, _viewCameras.Length);
     }
