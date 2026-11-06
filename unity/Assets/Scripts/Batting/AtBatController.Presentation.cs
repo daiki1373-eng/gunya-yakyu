@@ -132,6 +132,7 @@ public partial class AtBatController
         if (prev <= 0f) yield break;
         Time.timeScale = 0f;
         yield return new WaitForSecondsRealtime(realSeconds);
+        while (AppShell.MenuOpen) yield return null;
         if (Time.timeScale == 0f) Time.timeScale = prev;
     }
 
@@ -139,6 +140,7 @@ public partial class AtBatController
     private IEnumerator SlowMo(float scale, float realSeconds)
     {
         yield return new WaitForSecondsRealtime(0.09f);
+        while (AppShell.MenuOpen) yield return null;
         float baseScale = Time.timeScale;
         if (baseScale <= 0f) yield break;
         Time.timeScale = baseScale * scale;
@@ -146,6 +148,7 @@ public partial class AtBatController
         float t = 0f;
         while (t < 0.25f)
         {
+            while (AppShell.MenuOpen) yield return null;
             t += Time.unscaledDeltaTime;
             if (Time.timeScale <= 0f) yield break;
             Time.timeScale = Mathf.Lerp(baseScale * scale, baseScale, Mathf.Clamp01(t / 0.25f));
