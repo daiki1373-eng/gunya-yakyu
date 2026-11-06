@@ -107,7 +107,8 @@ public partial class AtBatController
         else
         {
             // 引き分け専用素材は追加せず、自作の短い締めジングル。
-            GameAudio.PlayJingle(new[] { 60, 64, 67, 72 }, 0.14f);
+            // PlayJingle はMIDI番号ではなくC5からの半音差を受け取る。
+            GameAudio.PlayJingle(new[] { 0, 4, 7, 0 }, 0.14f);
             GameAudio.Play(Sfx.Cheer, 0.45f);
         }
         if (won) { _stage.Stadium.LaunchFireworks(6); GameAudio.Play(Sfx.BigCheer, 0.8f); }
