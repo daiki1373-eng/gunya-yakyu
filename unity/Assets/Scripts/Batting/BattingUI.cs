@@ -11,6 +11,7 @@ public class BattingUI
     private Image[] _bases = new Image[4];
     private Text _swingLabel, _comm, _replayTag;
     private float _commStart = -99f;
+    private TelopFx _commFx;
     private const float CommDur = 1.9f;
     // 投球UI
     private Image[] _pitchBtn = new Image[5];
@@ -127,25 +128,31 @@ public class BattingUI
         _batter = NewText(plate.transform, "Batter", new Vector2(1f, 1f), new Vector2(-12f, -2f),
             new Vector2(360f, 30f), 18, TextAnchor.MiddleRight, Color.white);
 
-        _speed = NewText(canvasGo.transform, "Speed", new Vector2(0.5f, 1f), new Vector2(0f, -56f),
-            new Vector2(300f, 34f), 24, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.95f));
-        _rank = NewText(canvasGo.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0f, 150f),
-            new Vector2(700f, 70f), 52, TextAnchor.MiddleCenter, Color.white);
-        _rank.fontStyle = FontStyle.Bold;
-        _result = NewText(canvasGo.transform, "Result", new Vector2(0.5f, 0.5f), new Vector2(0f, 96f),
-            new Vector2(800f, 50f), 34, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.6f));
-        _result.fontStyle = FontStyle.Bold;
-        // 結果の文字はグラデーション + 弾んで出る
-        _rank.gameObject.AddComponent<UiFxText>();
-        _result.gameObject.AddComponent<UiFxText>().PopScale = 1.3f;
+        // ---- テロップ ----
+        // 文字の重なりを避けるため、縦の置き場所を決めておく(基準 960x540 の中央からの高さ)
+        //   判定 +150 / 珍プレー +55 / 得点・コイン -20 / 実況 -92 / 結果の札 -168 / 球速は左下の札
+        TelopFx fx;
+        var navy = new Color(0.03f, 0.05f, 0.13f, 0.90f);
+        var speedPlate = NewPlate(canvasGo.transform, "SpeedPlate", new Vector2(0f, 0f), new Vector2(0f, 0.5f),
+            new Vector2(0f, 44f), 42f, navy, UiKit.Gold);
+        _speed = NewTelop(canvasGo.transform, "Speed", new Vector2(0f, 0f), new Vector2(0f, 0.5f), new Vector2(30f, 44f),
+            20, TextAnchor.MiddleLeft, Color.white, TelopFx.Kind.Plain, out fx);
+        fx.Mode = TelopFx.Anim.Slide; fx.SlideFrom = -40f; fx.PopTime = 0.2f;
+        fx.SetPlate(speedPlate); fx.PlatePad = 90f; fx.PlateMinW = 160f;
 
-        _quirk = NewText(canvasGo.transform, "Quirk", new Vector2(0.5f, 0.5f), new Vector2(0f, 40f),
-            new Vector2(800f, 70f), 46, TextAnchor.MiddleCenter, new Color(1f, 0.55f, 0.15f));
-        _quirk.fontStyle = FontStyle.Bold;
-        _quirk.gameObject.AddComponent<UiFxText>().PopScale = 1.7f;
-        _banner = NewText(canvasGo.transform, "Banner", new Vector2(0.5f, 0.5f), new Vector2(0f, -60f),
-            new Vector2(800f, 60f), 38, TextAnchor.MiddleCenter, Color.white);
-        _banner.fontStyle = FontStyle.Bold;
+        _rank = NewTelop(canvasGo.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 150f),
+            56, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Rank, out fx);
+
+        var resultPlate = NewPlate(canvasGo.transform, "ResultPlate", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -168f), 54f, navy, UiKit.Gold);
+        _result = NewTelop(canvasGo.transform, "Result", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -168f),
+            30, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Plain, out fx);
+        fx.SetPlate(resultPlate);
+
+        _quirk = NewTelop(canvasGo.transform, "Quirk", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 55f),
+            62, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Stamp, out fx);
+        _banner = NewTelop(canvasGo.transform, "Banner", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -20f),
+            46, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Gold, out fx);
 
         // 塁ランプ(ひし形)
         Vector2[] bp = { Vector2.zero, new Vector2(22f, 0f), new Vector2(0f, 22f), new Vector2(-22f, 0f) };
@@ -191,15 +198,15 @@ public class BattingUI
         _stealLabel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
         ShowSteal(false, false);
 
-        // 実況字幕(大きく弾むように出す)
-        _comm = NewText(canvasGo.transform, "Commentary", new Vector2(0.5f, 0.5f), new Vector2(0f, 210f),
-            new Vector2(900f, 90f), 60, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.35f));
-        _comm.fontStyle = FontStyle.Bold;
-        _comm.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        // 実況字幕(バラエティ番組のような太い縁で、横から滑り込む)
+        _comm = NewTelop(canvasGo.transform, "Commentary", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -92f),
+            48, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.35f), TelopFx.Kind.Comment, out _commFx);
         _comm.text = "";
-        _replayTag = NewText(canvasGo.transform, "ReplayTag", new Vector2(1f, 1f), new Vector2(-16f, -52f),
-            new Vector2(300f, 34f), 24, TextAnchor.MiddleRight, new Color(1f, 0.4f, 0.35f));
-        _replayTag.fontStyle = FontStyle.Bold;
+        var replayPlate = NewPlate(canvasGo.transform, "ReplayPlate", new Vector2(1f, 1f), new Vector2(1f, 0.5f),
+            new Vector2(0f, -66f), 36f, new Color(0.72f, 0.05f, 0.08f, 0.95f), UiKit.GoldLight);
+        _replayTag = NewTelop(canvasGo.transform, "ReplayTag", new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(-34f, -66f),
+            19, TextAnchor.MiddleRight, Color.white, TelopFx.Kind.Plain, out fx);
+        fx.SetPlate(replayPlate); fx.PlatePad = 70f; fx.PlateMinW = 150f;
         _replayTag.text = "";
 
         BuildIntroCard(canvasGo.transform);
@@ -379,6 +386,7 @@ public class BattingUI
         _comm.text = text ?? "";
         _comm.color = c;
         _commStart = Time.unscaledTime;
+        if (_commFx != null) _commFx.Restart();
     }
 
     public void SetReplay(bool on, string label = "● REPLAY")
@@ -391,7 +399,7 @@ public class BattingUI
 
     public void ShowPitch(string name, float kmh)
     {
-        _speed.text = name + "  " + Mathf.RoundToInt(kmh) + " km/h";
+        _speed.text = name + "  " + SpeedNum(kmh);
     }
 
     public void SetBatter(PlayerStats p)
@@ -406,18 +414,28 @@ public class BattingUI
 
     public void ShowSpeed(float kmh)
     {
-        _speed.text = Mathf.RoundToInt(kmh) + " km/h";
+        _speed.text = SpeedNum(kmh);
     }
 
     public void ShowRank(HitRank r, string suffix)
     {
-        _rank.text = RankText(r) + (string.IsNullOrEmpty(suffix) ? "" : "  " + suffix);
+        _rank.text = RankText(r) + (string.IsNullOrEmpty(suffix) ? "" : "  <size=28>" + suffix + "</size>");
         _rank.color = RankColor(r);
     }
 
     public void ShowResult(string text)
     {
-        _result.text = text ?? "";
+        text = text ?? "";
+        // 珍プレーのはんこと同じ言葉なら、札は出さない(同じ文字が2つ並ばないように)
+        if (text.Length > 0 && _quirk != null && _quirk.text.Length > 0 && _quirk.text.TrimEnd('！', '!') == text.TrimEnd('！', '!'))
+            text = "";
+        // 飛距離(58m など)は金色で目立たせる
+        _result.text = System.Text.RegularExpressions.Regex.Replace(text, @"(\d+m)", "<color=#FFD54A>$1</color>");
+    }
+
+    private static string SpeedNum(float kmh)
+    {
+        return "<color=#FFD54A><size=27>" + Mathf.RoundToInt(kmh) + "</size></color> km/h";
     }
 
     public void ClearCenter()
@@ -537,11 +555,6 @@ public class BattingUI
             if (u >= 1f) _comm.text = "";
             else
             {
-                float pop = Mathf.Clamp01(u / 0.14f);
-                float sc = Mathf.Lerp(2.0f, 1f, 1f - (1f - pop) * (1f - pop));
-                float wob = Mathf.Sin(u * 30f) * (1f - u) * 2.5f;
-                _comm.rectTransform.localScale = Vector3.one * sc;
-                _comm.rectTransform.localRotation = Quaternion.Euler(0f, 0f, wob);
                 var c = _comm.color; c.a = Mathf.Clamp01((1f - u) / 0.25f); _comm.color = c;
             }
         }
@@ -583,6 +596,46 @@ public class BattingUI
         ol.effectColor = new Color(0f, 0f, 0f, 0.85f);
         ol.effectDistance = new Vector2(1.5f, -1.5f);
         return text;
+    }
+
+    private Text NewTelop(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 pos,
+        int fontSize, TextAnchor align, Color color, TelopFx.Kind kind, out TelopFx fx)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = anchor;
+        rt.pivot = pivot;
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(900f, fontSize * 1.5f);
+        var text = go.AddComponent<Text>();
+        text.font = _font;
+        text.fontSize = fontSize;
+        text.fontStyle = FontStyle.Bold;
+        text.alignment = align;
+        text.color = color;
+        text.supportRichText = true;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
+        fx = go.AddComponent<TelopFx>();
+        fx.Preset(kind);
+        return text;
+    }
+
+    private RectTransform NewPlate(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 pos,
+        float height, Color body, Color line)
+    {
+        var img = NewImage(parent, name, Color.white);
+        img.sprite = TelopFx.PlateSprite(body, line);
+        img.raycastTarget = false;
+        var r = img.rectTransform;
+        r.anchorMin = r.anchorMax = anchor;
+        r.pivot = pivot;
+        r.anchoredPosition = pos;
+        r.sizeDelta = new Vector2(300f, height);
+        img.gameObject.SetActive(false);
+        return r;
     }
 
     public static Font GetFont()
