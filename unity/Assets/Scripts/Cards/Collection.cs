@@ -29,6 +29,7 @@ public static class Collection
     {
         if (amount <= 0 || Coins < amount) return false;
         Coins -= amount;
+        Save();   // 消費はすぐ保存(アプリを落としても戻らない)
         return true;
     }
 

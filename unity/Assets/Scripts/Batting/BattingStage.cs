@@ -126,6 +126,14 @@ public class BattingStage : MonoBehaviour
     // カメラと注視点は球場内のままなので、屋根の裏や暗い球場外へ入らない。
     public static void FollowFraming(Vector3 ball, float distance, out Vector3 position, out Vector3 lookAt)
     {
+        // ファウルの打球は、内野スタンド(ファウルラインから約13m)の手前8mまでしか追わない。
+        // 追いすぎるとカメラがスタンドの裏側に入り、画面の大半が暗い構造物になる。
+        float foul = (Mathf.Abs(ball.x) - ball.z) * 0.7071f;
+        if (foul > 8f)
+        {
+            Vector3 outward = new Vector3(Mathf.Sign(ball.x) * 0.7071f, 0f, -0.7071f);
+            ball -= outward * (foul - 8f);
+        }
         Vector3 flat = new Vector3(ball.x, 0f, ball.z);
         Vector3 direction = flat.sqrMagnitude > 4f ? flat.normalized : Vector3.forward;
         float angle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
