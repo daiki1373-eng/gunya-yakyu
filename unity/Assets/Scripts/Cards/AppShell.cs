@@ -404,8 +404,16 @@ public partial class AppShell : MonoBehaviour
     // ------------------------------------------------------------
     // 画面切り替え
     // ------------------------------------------------------------
+    private System.Collections.IEnumerator TrimSoon()
+    {
+        yield return null;
+        CharaCatalog.TrimArt(true);
+    }
+
     private void Only(RectTransform r)
     {
+        // 画面を切り替えたら(隠した画面の画像を手放した次のフレームで)、上限を超えた画像をメモリから消す
+        if (isActiveAndEnabled) StartCoroutine(TrimSoon());
         if (_title != null) _title.gameObject.SetActive(r == _title);
         _home.gameObject.SetActive(r == _home);
         _cards.gameObject.SetActive(r == _cards);

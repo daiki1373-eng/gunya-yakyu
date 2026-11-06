@@ -31,6 +31,8 @@ public partial class AtBatController
 
     private void SetupBatter()
     {
+        // 打席ごとに画像キャッシュの上限を確認(超えていなければ何もしない)
+        if (CharaCatalog.OverBudget) CharaCatalog.TrimArt(false);
         Color uniform, accent;
         if (_userTeam == null) BuildTeams();
         if (_gs.UserBatting)

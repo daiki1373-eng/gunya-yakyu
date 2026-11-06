@@ -11,6 +11,7 @@ public sealed class CardArtLoader : MonoBehaviour
     private Vector2 _inner;
     private RectTransform _viewport;
     private int _readyFrame;
+    private bool _lazy, _loaded;
     private static int _loadFrame = -1, _loadsThisFrame;
     private const int LoadsPerFrame = 4;
     private readonly Vector3[] _corners = new Vector3[4];
@@ -22,6 +23,7 @@ public sealed class CardArtLoader : MonoBehaviour
         loader._id = id;
         loader._kind = kind;
         loader._inner = inner;
+        loader._lazy = lazy;
         image.enabled = false;
         if (!lazy) loader.Load();
         else
@@ -31,11 +33,26 @@ public sealed class CardArtLoader : MonoBehaviour
         }
     }
 
-    private void OnEnable() { _readyFrame = Time.frameCount + 1; }
+    private void OnEnable()
+    {
+        _readyFrame = Time.frameCount + 1;
+        // 隠したときに手放した画像を、また表示されたら読み直す
+        if (!_loaded && !_lazy && _image != null) Load();
+    }
+
+    // 画面から外れたら(一覧を閉じた・別の画面へ)画像を手放す。画像キャッシュの上限管理で消せるようにする
+    private void OnDisable()
+    {
+        if (_image == null || !_loaded) return;
+        _image.sprite = null;
+        _image.enabled = false;
+        _loaded = false;
+    }
 
     private void LateUpdate()
     {
         if (_image == null) { enabled = false; return; }
+        if (_loaded) return;
         // 表示直後は GridLayoutGroup が配置する前なので1フレーム待つ。
         if (Time.frameCount < _readyFrame) return;
         if (_viewport != null)
@@ -74,6 +91,6 @@ public sealed class CardArtLoader : MonoBehaviour
             _image.rectTransform.anchoredPosition = new Vector2(0f,
                 aspect > innerAspect ? 0f : -(size.y - _inner.y) * 0.15f);
         }
-        enabled = false;
+        _loaded = true;
     }
 }
