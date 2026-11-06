@@ -99,11 +99,12 @@ public static class CardWidget
         p.NameText = UiKit.Txt(bottom.transform, "Name", d.Name, Mathf.RoundToInt(12 * fs), Color.white, TextAnchor.MiddleLeft);
         UiKit.Fill(p.NameText.rectTransform);
         p.NameText.rectTransform.offsetMin = new Vector2(4f * fs, 0f);
-        p.NameText.horizontalOverflow = HorizontalWrapMode.Wrap;
-        p.NameText.resizeTextForBestFit = true;
-        p.NameText.resizeTextMinSize = Mathf.RoundToInt(9 * fs);
-        p.NameText.resizeTextMaxSize = Mathf.RoundToInt(12 * fs);
         p.NameText.rectTransform.offsetMax = new Vector2(-24f * fs, 0f);
+        // 名前は言葉の切れ目で2行にする(文字の途中で折り返さない)
+        UiKit.FitName(p.NameText, d.Name, inner.x - 28f * fs, 31f * fs, Mathf.RoundToInt(12 * fs), Mathf.Max(8, Mathf.RoundToInt(9 * fs)));
+        // 2行になった名前は札を少し高くして、小さくなりすぎないようにする
+        if (p.NameText.text.IndexOf('\n') >= 0)
+            bottom.rectTransform.sizeDelta = new Vector2(inner.x, 33f * fs);
         p.CountText = UiKit.Txt(bottom.transform, "Count", "", Mathf.RoundToInt(12 * fs), UiKit.GoldLight, TextAnchor.MiddleRight);
         UiKit.Fill(p.CountText.rectTransform);
         p.CountText.rectTransform.offsetMax = new Vector2(-4f * fs, 0f);

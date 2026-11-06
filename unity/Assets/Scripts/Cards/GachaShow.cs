@@ -173,9 +173,7 @@ public partial class AppShell
             var stamp = UiKit.Txt(stage, "Stamp", secret ? "SECRET" : "★5", secret ? 110 : 130,
                 secret ? new Color(1f, 0.75f, 1f) : UiKit.GoldLight, TextAnchor.MiddleCenter);
             UiKit.Place(stamp.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 160f));
-            var ssh = stamp.gameObject.AddComponent<Shadow>();
-            ssh.effectColor = new Color(0.5f, 0f, 0f, 1f);
-            ssh.effectDistance = new Vector2(5f, -6f);
+            UiKit.Style(stamp, TelopFx.Kind.Big);
             GameAudio.Play(Sfx.HitPerfect, 1f, 0.8f);
             BgmPlayer.Jingle(secret ? "bgm-rarity-secret" : "bgm-rarity-5");
             GameAudio.Play(Sfx.BigCheer, 0.9f);
@@ -213,8 +211,9 @@ public partial class AppShell
         card.Root.anchoredPosition = new Vector2(0f, 20f);
         card.Frame.raycastTarget = false;
         flash.transform.SetAsLastSibling();
-        var name = UiKit.Txt(stage, "Name", d.Name, 32, Color.white, TextAnchor.MiddleCenter);
+        var name = UiKit.Style(UiKit.Txt(stage, "Name", d.Name, 32, Color.white, TextAnchor.MiddleCenter), TelopFx.Kind.Heading);
         UiKit.Place(name.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -222f), new Vector2(700f, 44f));
+        UiKit.FitName(name, d.Name, 680f, 0f, 32, 24);
         string sub = r.Add.Capped ? "MAX" : (r.Add.IsNew ? "" : "重ね " + r.Add.After + " / " + CharaCatalog.StackMax(d));
         var subT = UiKit.Txt(stage, "Sub", sub, 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
         UiKit.Place(subT.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -252f), new Vector2(500f, 28f));

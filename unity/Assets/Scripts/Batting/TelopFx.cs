@@ -14,7 +14,7 @@ using UnityEngine.UI;
 public class TelopFx : BaseMeshEffect
 {
     public enum Anim { None, Pop, Stamp, Slide }
-    public enum Kind { Plain, Rank, Comment, Stamp, Gold }
+    public enum Kind { Plain, Rank, Comment, Stamp, Gold, Label, Heading, Logo, Big }
 
     public Anim Mode = Anim.Pop;
     public bool UseTextColor = true;        // true: Text の色(リッチテキストの色も)から塗りを作る
@@ -28,6 +28,7 @@ public class TelopFx : BaseMeshEffect
     public Color Outer = Color.white;
     public Color Shadow = new Color(0f, 0f, 0f, 0.45f);
     public Vector2 ShadowOffset = new Vector2(3f, -4f);
+    public float ShadowSpread = -1f;        // 影の広がり(負なら縁の太さと同じ)
     public float Skew = 0.15f;              // 斜体の傾き(高さ1あたりの横ずれ)
     public float Rotation;                  // 止まったときの傾き(度)
     public float PopScale = 1.5f, PopTime = 0.3f;
@@ -53,6 +54,7 @@ public class TelopFx : BaseMeshEffect
 
     public void Preset(Kind k)
     {
+        ShadowSpread = -1f; Rotation = 0f; InnerFromText = false;
         switch (k)
         {
             case Kind.Plain:      // 札の上に乗る文字(結果・球速・リプレイ)
@@ -89,8 +91,41 @@ public class TelopFx : BaseMeshEffect
                 OuterWidth = 1.5f; Outer = new Color(1f, 0.95f, 0.8f, 1f); Skew = 0.12f;
                 Shadow = new Color(0f, 0f, 0f, 0.45f); ShadowOffset = new Vector2(3f, -4f);
                 break;
+            case Kind.Label:      // 画面の普通の文字(ボタン・数値・名前)。動かさない
+                Mode = Anim.None; UseTextColor = true; TopWhite = 0.25f; BottomDark = 0.9f;
+                InnerWidth = 0f; OuterWidth = 1.8f; Outer = new Color(0.12f, 0.02f, 0.03f, 0.95f); Skew = 0f;
+                Shadow = new Color(0f, 0f, 0f, 0.45f); ShadowOffset = new Vector2(1.5f, -2.2f); ShadowSpread = 0f;
+                break;
+            case Kind.Heading:    // 見出し・キャラ名(金のグラデーション + 濃い赤の縁)
+                Mode = Anim.None; UseTextColor = true; TopWhite = 0.55f; BottomDark = 0.82f;
+                InnerWidth = 2.6f; InnerFromText = false; Inner = new Color(0.30f, 0.02f, 0.04f, 1f);
+                OuterWidth = 0f; Skew = 0.08f;
+                Shadow = new Color(0f, 0f, 0f, 0.5f); ShadowOffset = new Vector2(2f, -3f); ShadowSpread = 1.5f;
+                break;
+            case Kind.Logo:       // タイトルロゴ
+                Mode = Anim.None; UseTextColor = true; TopWhite = 0.7f; BottomDark = 0.85f;
+                InnerWidth = 6f; InnerFromText = false; Inner = new Color(0.75f, 0.05f, 0.07f, 1f);
+                OuterWidth = 3f; Outer = new Color(0.22f, 0.01f, 0.02f, 1f); Skew = 0.14f;
+                Shadow = new Color(0.12f, 0f, 0f, 0.6f); ShadowOffset = new Vector2(4f, -6f);
+                break;
+            case Kind.Big:        // ガチャの確定文字(動きは呼び出し側)
+                Mode = Anim.None; UseTextColor = true; TopWhite = 0.75f; BottomDark = 0.8f;
+                InnerWidth = 7f; InnerFromText = false; Inner = new Color(0.78f, 0.05f, 0.08f, 1f);
+                OuterWidth = 4f; Outer = new Color(0.2f, 0f, 0.02f, 1f); Skew = 0.12f;
+                Shadow = new Color(0f, 0f, 0f, 0.55f); ShadowOffset = new Vector2(6f, -8f);
+                break;
         }
         if (graphic != null) graphic.SetVerticesDirty();
+    }
+
+    // Text に仕上げを付ける(付いていれば種類だけ変える)
+    public static TelopFx Apply(Text t, Kind k)
+    {
+        if (t == null) return null;
+        var fx = t.GetComponent<TelopFx>();
+        if (fx == null) fx = t.gameObject.AddComponent<TelopFx>();
+        fx.Preset(k);
+        return fx;
     }
 
     public void SetPlate(RectTransform plate)
@@ -175,9 +210,9 @@ public class TelopFx : BaseMeshEffect
 
         _dst.Clear();
         float outerR = InnerWidth + OuterWidth;
-        if (Shadow.a > 0.001f) Ring(ShadowOffset, outerR, _dir8, Shadow, false);
-        if (OuterWidth > 0.01f) Ring(Vector2.zero, outerR, _dir12, Outer, false);
-        if (InnerWidth > 0.01f) Ring(Vector2.zero, InnerWidth, _dir12, Inner, InnerFromText);
+        if (Shadow.a > 0.001f) Ring(ShadowOffset, ShadowSpread >= 0f ? ShadowSpread : outerR, _dir8, Shadow, false);
+        if (OuterWidth > 0.01f) Ring(Vector2.zero, outerR, outerR <= 2.5f ? _dir8 : _dir12, Outer, false);
+        if (InnerWidth > 0.01f) Ring(Vector2.zero, InnerWidth, InnerWidth <= 2.5f ? _dir8 : _dir12, Inner, InnerFromText);
         _dst.AddRange(_fill);
         vh.Clear();
         vh.AddUIVertexTriangleStream(_dst);
@@ -207,6 +242,7 @@ public class TelopFx : BaseMeshEffect
     private void LateUpdate()
     {
         if (_text == null) return;
+        if (Mode == Anim.None && Plate == null) return;   // 普通の文字は位置も大きさも触らない
         if (!_baseSet) { _base = _rt.anchoredPosition; _baseSet = true; }
         string s = _text.text;
         if (s != _last)

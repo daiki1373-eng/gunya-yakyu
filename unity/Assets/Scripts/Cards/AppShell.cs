@@ -105,7 +105,7 @@ public partial class AppShell : MonoBehaviour
         UiKit.Place(line.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(2000f, 3f));
         var back = UiKit.Btn(screen, "Back", "←", new Vector2(64f, 44f), false, ShowHome, 26);
         UiKit.Place(back.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(12f, -8f), new Vector2(64f, 44f));
-        titleText = UiKit.Txt(screen, "Title", title, 30, UiKit.GoldLight, TextAnchor.MiddleLeft);
+        titleText = UiKit.Style(UiKit.Txt(screen, "Title", title, 30, UiKit.GoldLight, TextAnchor.MiddleLeft), TelopFx.Kind.Heading);
         UiKit.Place(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(92f, -8f), new Vector2(600f, 44f));
     }
 
@@ -128,12 +128,9 @@ public partial class AppShell : MonoBehaviour
         UiKit.Place(t1.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, 178f), new Vector2(520f, 70f));
         var t2 = UiKit.Txt(_home, "Logo2", "ベースボール", 62, Color.white, TextAnchor.MiddleCenter);
         UiKit.Place(t2.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, 112f), new Vector2(560f, 80f));
-        foreach (var t in new[] { t1, t2 })
-        {
-            var sh = t.gameObject.AddComponent<Shadow>();
-            sh.effectColor = new Color(0.45f, 0f, 0f, 0.9f);
-            sh.effectDistance = new Vector2(3f, -4f);
-        }
+        t2.color = new Color(1f, 0.95f, 0.78f);
+        UiKit.Style(t1, TelopFx.Kind.Logo);
+        UiKit.Style(t2, TelopFx.Kind.Logo);
 
         var play = UiKit.Btn(_home, "Play", "試合", new Vector2(300f, 70f), true, StartGame, 32);
         UiKit.Place(play.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(190f, 10f), new Vector2(300f, 70f));
@@ -178,12 +175,9 @@ public partial class AppShell : MonoBehaviour
         UiKit.Place(logo1.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -22f), new Vector2(800f, 80f));
         var logo2 = UiKit.Txt(_title, "Logo2", "ベースボール", 74, Color.white, TextAnchor.MiddleCenter);
         UiKit.Place(logo2.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(860f, 92f));
-        foreach (var t in new[] { logo1, logo2 })
-        {
-            var sh = t.gameObject.AddComponent<Shadow>();
-            sh.effectColor = new Color(0.45f, 0f, 0f, 0.95f);
-            sh.effectDistance = new Vector2(4f, -5f);
-        }
+        logo2.color = new Color(1f, 0.95f, 0.78f);
+        UiKit.Style(logo1, TelopFx.Kind.Logo);
+        UiKit.Style(logo2, TelopFx.Kind.Logo);
         var cont = UiKit.Btn(_title, "Continue", "つづきから", new Vector2(320f, 74f), true, OnContinue, 34);
         UiKit.Place(cont.GetComponent<RectTransform>(), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 28f), new Vector2(320f, 74f));
 
@@ -315,11 +309,12 @@ public partial class AppShell : MonoBehaviour
         p.Frame.raycastTarget = false;
         StartCoroutine(PopIn(p.Root, 0.25f));
 
-        var r = UiKit.Txt(_detail, "Rarity", CharaCatalog.Label(d.Rarity) + "   " + d.Code, 30, d.Rarity == Rarity.Secret ? new Color(1f, 0.6f, 0.95f) : UiKit.GoldLight, TextAnchor.MiddleLeft);
+        var r = UiKit.Txt(_detail, "Rarity", CharaCatalog.Label(d.Rarity) + "   " + CodeLabel(d.Code), 30, d.Rarity == Rarity.Secret ? new Color(1f, 0.6f, 0.95f) : UiKit.GoldLight, TextAnchor.MiddleLeft);
         UiKit.Place(r.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, 178f), new Vector2(440f, 40f));
-        var n = UiKit.Txt(_detail, "Name", d.Name, 34, Color.white, TextAnchor.MiddleLeft);
+        var n = UiKit.Style(UiKit.Txt(_detail, "Name", d.Name, 34, Color.white, TextAnchor.MiddleLeft), TelopFx.Kind.Heading);
         UiKit.Place(n.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, 134f), new Vector2(460f, 48f));
-        var pos = UiKit.Txt(_detail, "Pos", d.Position + "   " + string.Join(" / ", d.Tags), 18, new Color(1f, 0.85f, 0.6f), TextAnchor.MiddleLeft, false);
+        UiKit.FitName(n, d.Name, 450f, 52f, 34, 21);
+        var pos = UiKit.Txt(_detail, "Pos", d.Position + "   " + string.Join(" / ", d.Tags), 18, new Color(1f, 0.85f, 0.6f), TextAnchor.MiddleLeft);
         UiKit.Place(pos.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(22f, 98f), new Vector2(460f, 28f));
         // 紹介文(roster-101.csv の intro)
         var intro = UiKit.Txt(_detail, "Intro", d.Intro, 17, Color.white, TextAnchor.UpperLeft, false);
@@ -348,6 +343,15 @@ public partial class AppShell : MonoBehaviour
         }
         var have = UiKit.Txt(_detail, "Points", Collection.Points.ToString("N0") + " pt", 20, Color.white, TextAnchor.MiddleLeft);
         UiKit.Place(have.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, -146f), new Vector2(240f, 32f));
+    }
+
+    // カード番号の表示("ch006" → "No.006")
+    private static string CodeLabel(string code)
+    {
+        if (string.IsNullOrEmpty(code)) return "";
+        string digits = "";
+        foreach (char ch in code) if (char.IsDigit(ch)) digits += ch;
+        return digits.Length > 0 ? "No." + digits : code;
     }
 
     // ---- ガチャ画面 ----

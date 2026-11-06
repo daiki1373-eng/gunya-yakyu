@@ -67,13 +67,95 @@ public static class UiKit
         t.horizontalOverflow = HorizontalWrapMode.Overflow;
         t.verticalOverflow = VerticalWrapMode.Overflow;
         t.raycastTarget = false;
-        if (outline)
-        {
-            var o = r.gameObject.AddComponent<Outline>();
-            o.effectColor = new Color(0.15f, 0f, 0f, 0.9f);
-            o.effectDistance = new Vector2(1.6f, -1.6f);
-        }
+        if (outline) TelopFx.Apply(t, TelopFx.Kind.Label);   // 縁取り + 影(全画面で同じ仕上げ)
         return t;
+    }
+
+    // 文字の仕上げを変える(見出し・ロゴなど)
+    public static Text Style(Text t, TelopFx.Kind k)
+    {
+        TelopFx.Apply(t, k);
+        return t;
+    }
+
+    // キャラ名などを枠に収める。1行で入れば少しだけ縮め、入らなければ言葉の切れ目で2行にする。
+    // (日本語は文字の途中で折り返されるので、自動の折り返しは使わない)
+    public static void FitName(Text t, string name, float maxW, float maxH, int maxSize, int minSize)
+    {
+        if (t == null) return;
+        name = name ?? "";
+        t.horizontalOverflow = HorizontalWrapMode.Overflow;
+        t.verticalOverflow = VerticalWrapMode.Overflow;
+        t.resizeTextForBestFit = false;
+        t.text = name;
+        int oneLineMin = Mathf.Max(minSize, Mathf.RoundToInt(maxSize * 0.8f));
+        for (int sz = maxSize; sz >= oneLineMin; sz--)
+        {
+            t.fontSize = sz;
+            if (t.preferredWidth <= maxW) return;
+        }
+        int cut = BreakAt(name);
+        if (cut > 0)
+        {
+            t.text = name.Substring(0, cut) + "\n" + name.Substring(cut);
+            t.lineSpacing = 0.9f;
+            for (int sz = maxSize; sz >= minSize; sz--)
+            {
+                t.fontSize = sz;
+                if (t.preferredWidth <= maxW && (maxH <= 0f || t.preferredHeight <= maxH)) return;
+            }
+            return;
+        }
+        // 切れ目がない短い名前は、1行のまま最小の大きさにする
+        for (int sz = oneLineMin; sz >= minSize; sz--)
+        {
+            t.fontSize = sz;
+            if (t.preferredWidth <= maxW) return;
+        }
+    }
+
+    // 2行に分けるならどこか。かっこの前・中黒の後・文字の種類(漢字/ひらがな/カタカナ/英数)が変わる所のうち、真ん中に近い所。
+    public static int BreakAt(string s)
+    {
+        if (string.IsNullOrEmpty(s) || s.Length < 4) return -1;
+        int best = -1;
+        float bestScore = float.MaxValue;
+        float mid = s.Length * 0.5f;
+        for (int i = 2; i <= s.Length - 2; i++)
+        {
+            char a = s[i - 1], b = s[i];
+            bool ok = b == '（' || b == '(' || b == '「' || a == '・' || a == '）' || a == ')' || a == '　' || a == ' ' || a == 'の'
+                      || (Script(a) != Script(b) && Script(a) != 0 && Script(b) != 0 && !(a == 'ー' || b == 'ー'));
+            if ("のとなにがをはでもやっゃゅょー）)」、。".IndexOf(b) >= 0) ok = false;   // 助詞や小さい字の前では切らない
+            if (Script(a) == 3 && Script(b) == 1) ok = false;   // 送りがな(早食|い)は切らない
+            bool tail = i == s.Length - 2 && s.EndsWith("選手") && i >= 3;
+            if (tail) ok = true;
+            if (!ok) continue;
+            float score = Mathf.Abs(i - mid);
+            if (b == '（' || b == '(') score -= 1.5f;   // かっこは切れ目として優先
+            if (a == 'の') score -= 1.5f;
+            if (tail) score -= 2f;                       // 「〜選手」は語尾で切る
+            if (score < bestScore) { bestScore = score; best = i; }
+        }
+        if (best < 0)
+        {
+            // カタカナだけの名前は、よくある語尾の前で切る(なければ切らない)
+            string[] tails = { "エース", "ヒッター", "キャプテン", "マスコット", "ピッチャー", "キャッチャー", "バッター", "スラッガー", "ボーイ", "ガール", "マン" };
+            foreach (var tail in tails)
+            {
+                if (s.Length > tail.Length + 1 && s.EndsWith(tail)) return s.Length - tail.Length;
+            }
+        }
+        return best;
+    }
+
+    private static int Script(char c)
+    {
+        if (c >= '\u3040' && c <= '\u309F') return 1;   // ひらがな
+        if ((c >= '\u30A0' && c <= '\u30FF') || c == 'ー') return 2;   // カタカナ
+        if (c >= '\u4E00' && c <= '\u9FFF') return 3;   // 漢字
+        if (char.IsLetterOrDigit(c)) return 4;
+        return 0;
     }
 
     public static Button Btn(Transform parent, string name, string label, Vector2 size, bool primary, Action onClick,

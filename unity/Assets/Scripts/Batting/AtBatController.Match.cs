@@ -26,6 +26,7 @@ public partial class AtBatController
         _stage.ShowRunnersOnBases(_gs.Base);
         _ui.SetSwingLabel(_gs.UserBatting ? "SWING" : "投げる");
         _ui.ShowPitchPanel(false, _avail, _selKind);
+        _ui.ShowMeter(false);   // 前の打席の投球メーターを残さない
         _reticleOn = false;
         RefreshHud();
         _ui.ShowResult("");
