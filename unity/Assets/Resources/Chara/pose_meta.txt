@@ -91,7 +91,7 @@ dog_swing_finish 705 630
 dog_run_side 461 410
 dog_run_side_2 461 410
 dogu_swing_ready 705 630
-dogu_swing_finish 705 622
+dogu_swing_finish 705 630
 dogu_run_side 461 410
 dogu_run_side_2 461 410
 dragon_swing_ready 705 630
@@ -309,7 +309,7 @@ slacker_run_side_2 461 410
 sleepyhead_pitch_release 705 630
 sleepyhead_run_side 461 410
 sleepyhead_run_side_2 461 410
-snowman_pitch_release 705 609
+snowman_pitch_release 705 630
 snowman_run_side 461 410
 snowman_run_side_2 461 410
 soccer_swing_ready 705 630
@@ -360,7 +360,7 @@ umpire_swing_ready 705 630
 umpire_swing_finish 705 630
 umpire_run_side 461 410
 umpire_run_side_2 461 410
-vampire_pitch_release 705 630
+vampire_pitch_release 705 622
 vampire_run_side 461 410
 vampire_run_side_2 461 410
 weathercaster_swing_ready 705 630
