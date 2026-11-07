@@ -1,23 +1,21 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 // ============================================================
 // AppShell.Opening.cs
 // 起動時のタイトル演出(約3秒、タップで最後の形へ飛ばす)
-//   暗闇に光が差す → 「ぐにゃぐにゃ」が落ちてきてつぶれる → 「ベースボール」が叩きつけられる(閃光・揺れ・花火・曲)
-//   → カードが下から1枚ずつ飛び出してくるりと返る → 「つづきから」が弾んで出る
-// 演出の後も、ロゴはぐにゃぐにゃ揺れ、カードはゆっくり浮き沈みし、ボタンは軽く脈打つ。
+//   暗闇の球場に照明が3段階で点く(カメラは低い位置から夜空へ持ち上がる)
+//   → 左から打者、右から投手が滑り込む → ロゴが叩きつけられてぐにゃっとつぶれる(花火・曲)
+//   → 「つづきから」が弾んで出る
+// 演出の後は、ロゴがゆっくり弾み、キャラが呼吸し、ボタンが軽く脈打つ。絵は互いに重ねない。
 // ============================================================
 public partial class AppShell
 {
-    private readonly List<RectTransform> _titleCards = new List<RectTransform>();
-    private Vector2[] _titleCardHome;
-    private JellyText _logo1, _logo2;
-    private RectTransform _titleCont, _titleEmblem;
+    private RectTransform _titleCont;
     private bool _titleIntroDone, _titleIntroRunning, _titleSkip;
+    private float _titleSlideL, _titleSlideR, _logoSquash = 0f, _logoIn = 1f;
 
     private IEnumerator TitleStep(float dur, Action<float> f)
     {
@@ -49,148 +47,119 @@ public partial class AppShell
         _titleIntroDone = true;
         _titleIntroRunning = true;
         _titleSkip = false;
-        var logo1 = (RectTransform)_logo1.transform;
-        var logo2 = (RectTransform)_logo2.transform;
-        Vector2 l1 = logo1.anchoredPosition, l2 = logo2.anchoredPosition;
-        int n = _titleCards.Count;
-        _titleCardHome = new Vector2[n];
-        var cardRot = new Quaternion[n];
-        for (int i = 0; i < n; i++)
-        {
-            _titleCardHome[i] = _titleCards[i].anchoredPosition;
-            cardRot[i] = _titleCards[i].localRotation;
-            _titleCards[i].localScale = Vector3.zero;
-        }
-        var raysImg = _titleRays.GetComponent<Image>();
-        Color raysC = raysImg.color;
 
         // 幕(黒)。ここをタップすると最後の形へ飛ばす
         var curtain = UiKit.Img(_title, "Curtain", SpriteFactory.White, Color.black, true);
         UiKit.Fill(curtain.rectTransform);
+        curtain.transform.SetSiblingIndex(1);   // 背景の幕のすぐ上(キャラ・ロゴ・ボタンより奥)
         var tap = curtain.gameObject.AddComponent<Button>();
         tap.transition = Selectable.Transition.None;
         tap.onClick.AddListener(() => _titleSkip = true);
-        var flash = UiKit.Img(_title, "Flash", SpriteFactory.White, new Color(1f, 1f, 1f, 0f));
-        UiKit.Fill(flash.rectTransform);
-        logo1.localScale = Vector3.zero; logo2.localScale = Vector3.zero; _titleCont.localScale = Vector3.zero;
-        if (_titleEmblem != null) _titleEmblem.localScale = Vector3.zero;
-        raysImg.color = new Color(raysC.r, raysC.g, raysC.b, 0f);
-        // ロゴとボタンは幕より手前(幕は背景・カードだけを暗くする)
-        curtain.transform.SetSiblingIndex(_titleRays.GetSiblingIndex() + 1);
-        if (_titleEmblem != null) _titleEmblem.SetAsLastSibling();
-        logo1.SetAsLastSibling(); logo2.SetAsLastSibling(); _titleCont.SetAsLastSibling();
-        flash.transform.SetAsLastSibling();
-        _namePanel.SetAsLastSibling();   // 名前入力はいつも一番手前
+        _namePanel.SetAsLastSibling();
 
-        // 1) 暗闇に光が差す
-        GameAudio.Play(Sfx.Whoosh, 0.5f, 0.6f);
-        yield return TitleStep(0.55f, u =>
+        _titleSlideL = _titleSlideR = 1f;
+        _logoIn = 0f; _logoSquash = 0f;
+        _titleCont.localScale = Vector3.zero;
+
+        // 1) 照明が3段階で点く
+        yield return TitleWait(0.35f);
+        float[] lv = { 0.72f, 0.45f, 0.22f };
+        for (int i = 0; i < lv.Length && !_titleSkip; i++)
         {
-            raysImg.color = new Color(raysC.r, raysC.g, raysC.b, raysC.a * u);
-            _titleRays.localScale = Vector3.one * Mathf.Lerp(0.25f, 1f, EaseOut(u));
-            curtain.color = new Color(0f, 0f, 0f, Mathf.Lerp(1f, 0.55f, u));
-        });
+            GameAudio.Play(Sfx.Thud, 0.8f, 0.7f + i * 0.08f);
+            float from = curtain.color.a, to = lv[i];
+            yield return TitleStep(0.08f, u => curtain.color = new Color(0f, 0f, 0f, Mathf.Lerp(from, to, u)));
+            yield return TitleWait(0.2f);
+        }
 
-        // 2) 「ぐにゃぐにゃ」が上から落ちてきて、着地でぐにゃっとつぶれる
+        // 2) 打者が左から、投手が右から滑り込む
+        GameAudio.Play(Sfx.Whoosh, 0.7f, 1.0f);
+        StartCoroutine(TitleStep(0.42f, u => _titleSlideL = 1f - BackOut(u)));
+        yield return TitleWait(0.12f);
         GameAudio.Play(Sfx.Whoosh, 0.7f, 1.15f);
-        yield return TitleStep(0.32f, u =>
-        {
-            logo1.localScale = Vector3.one;
-            logo1.anchoredPosition = l1 + new Vector2(0f, (1f - u * u) * 420f);
-        });
-        if (!_titleSkip) { GameAudio.Play(Sfx.Boing, 0.9f, 0.8f); _logo1.Boost = 1f; }
-        yield return TitleStep(0.3f, u =>
-        {
-            float sq = Mathf.Sin(u * Mathf.PI) * (1f - u) * 0.6f;
-            logo1.localScale = new Vector3(1f + sq, 1f - sq * 0.8f, 1f);
-        });
+        yield return TitleStep(0.42f, u => _titleSlideR = 1f - BackOut(u));
 
-        // 3) 「ベースボール」が叩きつけられる: 閃光・画面の揺れ・花火・曲の始まり
-        yield return TitleStep(0.2f, u => { logo2.localScale = Vector3.one * Mathf.Lerp(3f, 1f, u * u); });
+        // 3) ロゴが叩きつけられ、着地でぐにゃっとつぶれる。花火と曲
+        GameAudio.Play(Sfx.Whoosh, 0.6f, 1.3f);
+        yield return TitleStep(0.18f, u => { _logoIn = u; });
         if (!_titleSkip)
         {
             GameAudio.Play(Sfx.HitPerfect, 1f, 0.75f);
             GameAudio.Play(Sfx.BigCheer, 0.6f);
             BgmPlayer.PlayBase(BgmPlayer.Home);
             BgmPlayer.Jingle("bgm-title");
-            _logo2.Boost = 0.8f;
-            for (int k = 0; k < 4; k++)
-                _fx.Firework(new Vector2(UnityEngine.Random.Range(-420f, 420f), -300f), UnityEngine.Random.Range(330f, 470f),
-                    k % 2 == 0 ? UiKit.Gold : new Color(1f, 0.3f, 0.2f));
+            if (_stageRef != null) _stageRef.Stadium.LaunchFireworks(6);
         }
         Vector2 home = _title.anchoredPosition;
-        yield return TitleStep(0.3f, u =>
+        yield return TitleStep(0.45f, u =>
         {
-            if (_titleEmblem != null) _titleEmblem.localScale = Vector3.one * BackOut(u);
-            flash.color = new Color(1f, 1f, 1f, 0.75f * (1f - u));
-            curtain.color = new Color(0f, 0f, 0f, Mathf.Lerp(0.55f, 0f, u));
-            float amp = (1f - u) * 14f;
+            _logoSquash = Mathf.Sin(u * Mathf.PI * 2.2f) * (1f - u);
+            curtain.color = new Color(0f, 0f, 0f, Mathf.Lerp(0.22f, 0f, u));
+            float amp = (1f - u) * 10f;
             _title.anchoredPosition = home + new Vector2(Mathf.Sin(u * 70f) * amp, Mathf.Cos(u * 53f) * amp);
         });
         _title.anchoredPosition = home;
 
-        // 4) カードが外側から順に下から飛び出し、くるりと返って扇に収まる
-        int[] order = { 0, 4, 1, 3, 2 };
-        foreach (int i in order)
-        {
-            if (i >= n) continue;
-            StartCoroutine(TitleCardIn(_titleCards[i], _titleCardHome[i], cardRot[i]));
-            if (!_titleSkip) GameAudio.Play(Sfx.Whoosh, 0.35f, 1.3f + i * 0.05f);
-            yield return TitleWait(0.11f);
-        }
-        yield return TitleWait(0.35f);
-
-        // 5) ボタンが弾んで出る
+        // 4) ボタンが弾んで出る
         if (!_titleSkip) GameAudio.Play(Sfx.Click, 0.6f, 1.4f);
         yield return TitleStep(0.3f, u => { _titleCont.localScale = Vector3.one * BackOut(u); });
 
         // 仕上げ(飛ばしたときもここで最後の形にそろえる)
         if (_titleSkip) BgmPlayer.PlayBase(BgmPlayer.Home);
-        logo1.anchoredPosition = l1; logo2.anchoredPosition = l2;
-        logo1.localScale = logo2.localScale = Vector3.one;
-        if (_titleEmblem != null) _titleEmblem.localScale = Vector3.one;
+        _titleSlideL = _titleSlideR = 0f;
+        _logoIn = 1f; _logoSquash = 0f;
         _titleCont.localScale = Vector3.one;
-        raysImg.color = raysC;
-        _titleRays.localScale = Vector3.one;
         _title.anchoredPosition = home;
-        for (int i = 0; i < n; i++)
-        {
-            _titleCards[i].anchoredPosition = _titleCardHome[i];
-            _titleCards[i].localRotation = cardRot[i];
-            _titleCards[i].localScale = Vector3.one;
-        }
         Destroy(curtain.gameObject);
-        Destroy(flash.gameObject);
         _titleIntroRunning = false;
     }
 
-    private IEnumerator TitleCardIn(RectTransform card, Vector2 to, Quaternion rot)
-    {
-        Vector2 from = to + new Vector2(0f, -520f);
-        float t = 0f, dur = 0.42f;
-        while (t < dur && !_titleSkip)
-        {
-            t += Mathf.Min(Time.unscaledDeltaTime, 0.05f);
-            float u = Mathf.Clamp01(t / dur);
-            float e = BackOut(u);
-            card.anchoredPosition = Vector2.LerpUnclamped(from, to, e);
-            // 横に裏返った状態から開く
-            float flip = Mathf.Clamp01(u * 1.6f);
-            card.localScale = new Vector3(Mathf.Abs(Mathf.Cos((1f - flip) * Mathf.PI * 0.5f)), 1f, 1f);
-            card.localRotation = rot * Quaternion.Euler(0f, 0f, (1f - e) * 25f);
-            yield return null;
-        }
-        card.anchoredPosition = to;
-        card.localScale = Vector3.one;
-        card.localRotation = rot;
-    }
-
-    // 演出の後: カードがゆっくり浮き沈みし、ボタンが軽く脈打つ
+    // 毎フレームの配置: 左右のキャラの体の幅から、真ん中の列(ロゴ)の幅を決める
     private void TitleIdle(float t)
     {
-        if (_title == null || !_title.gameObject.activeSelf || _titleIntroRunning || _titleCardHome == null) return;
-        for (int i = 0; i < _titleCards.Count && i < _titleCardHome.Length; i++)
-            _titleCards[i].anchoredPosition = _titleCardHome[i] + new Vector2(0f, Mathf.Sin(t * 1.4f + i * 1.3f) * 5f);
-        if (_titleCont != null) _titleCont.localScale = Vector3.one * (1f + 0.035f * Mathf.Sin(t * 3.2f));
+        if (_title == null || !_title.gameObject.activeSelf) return;
+        var size = _root.rect.size;
+        const float margin = 24f, gap = 28f, feet = 12f;
+        float bodyFrac = 0.82f;
+        float wl = LayoutChara(_titleL, size.y, bodyFrac, margin, feet);
+        float wr = LayoutChara(_titleR, size.y, bodyFrac, margin, feet);
+        float side = Mathf.Max(wl, wr);
+        // 真ん中の列は最低 400 を確保する(狭い画面ではキャラを小さくする)
+        float mid = size.x - 2f * (margin + side + gap);
+        if (mid < 400f && side > 0f)
+        {
+            bodyFrac *= Mathf.Max(0.4f, (size.x - 400f - 2f * (margin + gap)) / (2f * side));
+            wl = LayoutChara(_titleL, size.y, bodyFrac, margin, feet);
+            wr = LayoutChara(_titleR, size.y, bodyFrac, margin, feet);
+            side = Mathf.Max(wl, wr);
+            mid = size.x - 2f * (margin + side + gap);
+        }
+        // 滑り込み(画面の外から)と呼吸
+        if (_titleL != null)
+        {
+            _titleL.Rt.anchoredPosition += new Vector2(-_titleSlideL * (side + margin + 40f), 0f);
+            _titleL.Rt.localScale = new Vector3(1f, 1f + 0.01f * Mathf.Sin(t * 2.0f), 1f);
+        }
+        if (_titleR != null)
+        {
+            _titleR.Rt.anchoredPosition += new Vector2(_titleSlideR * (side + margin + 40f), 0f);
+            _titleR.Rt.localScale = new Vector3(1f, 1f + 0.01f * Mathf.Sin(t * 2.0f + 1.7f), 1f);
+        }
+        // ロゴ: 真ん中の列の幅いっぱい(最大 560)。上から落ちてきて、つぶれて戻る。演出の後はゆっくり弾む
+        if (_titleLogo != null)
+        {
+            var sp = _titleLogo.GetComponent<Image>().sprite;
+            float lw = Mathf.Min(560f, mid);
+            float lh = sp != null ? lw * sp.rect.height / sp.rect.width : lw * 0.38f;
+            _titleLogo.sizeDelta = new Vector2(lw, lh);
+            float y = -size.y * 0.08f - lh / 2f;
+            float drop = (1f - _logoIn) * (size.y * 0.6f);
+            float bob = _titleIntroRunning ? 0f : Mathf.Sin(t * 1.6f) * 4f;
+            _titleLogo.anchoredPosition = new Vector2(0f, y + drop + bob);
+            float sq = _logoSquash * 0.22f + (_titleIntroRunning ? 0f : Mathf.Sin(t * 3.2f) * 0.012f);
+            _titleLogo.localScale = new Vector3(1f + sq, 1f - sq, 1f);
+            _titleLogo.gameObject.SetActive(_logoIn > 0f);
+        }
+        if (_titleCont != null && !_titleIntroRunning) _titleCont.localScale = Vector3.one * (1f + 0.035f * Mathf.Sin(t * 3.2f));
     }
 }

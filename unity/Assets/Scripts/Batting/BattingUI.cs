@@ -62,12 +62,22 @@ public class BattingUI
         }
     }
 
+    // 試合開始の演出の間は、操作ボタンを隠す(絵と重ねない)
+    public void SetControlsVisible(bool on)
+    {
+        if (_swingRect != null) _swingRect.gameObject.SetActive(on);
+    }
+
+    // 試合のUIの画面(タイトル・ホームの間は AppShell が隠す)
+    public static Canvas RootCanvas { get; private set; }
+
     private void BuildInternal(Transform parent)
     {
         var canvasGo = new GameObject("BattingUI");
         canvasGo.transform.SetParent(parent, false);
         var canvas = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        RootCanvas = canvas;
         var scaler = canvasGo.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(960f, 540f);
