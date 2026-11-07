@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "build-webgl",
+    "ignore": ["firebase.json", "**/.*"],
+    "headers": [
+      { "source": "Build/**", "headers": [ { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" } ] },
+      { "source": "**/*.@(html|webmanifest)", "headers": [ { "key": "Cache-Control", "value": "no-cache" } ] }
+    ]
+  }
+}

@@ -8,6 +8,18 @@ using UnityEngine;
 // ============================================================
 public class CharaImportSettings : AssetPostprocessor
 {
+    // ブラウザ版(WebGL、主に iPhone の Safari)は ASTC で圧縮して容量とメモリを抑える。
+    // 寸法を変えると試合用の絵(体・決めポーズ・切り抜き)の画素座標がずれるので、縮めるのはカード絵(Full)と一覧(Thumb)だけ。
+    private static void WebGL(TextureImporter ti, int maxSize, TextureImporterFormat fmt)
+    {
+        var s = ti.GetPlatformTextureSettings("WebGL");
+        s.overridden = true;
+        s.maxTextureSize = maxSize;
+        s.format = fmt;
+        s.compressionQuality = 50;
+        ti.SetPlatformTextureSettings(s);
+    }
+
     private void OnPreprocessTexture()
     {
         string p = assetPath.Replace('\\', '/');
@@ -25,6 +37,7 @@ public class CharaImportSettings : AssetPostprocessor
             pi.compressionQuality = 70;
             pi.maxTextureSize = 2048;
             pi.spritePixelsPerUnit = 100f;
+            WebGL(pi, 2048, TextureImporterFormat.ASTC_6x6);
             return;
         }
         if (!p.Contains("/Resources/Chara/")) return;
@@ -57,6 +70,10 @@ public class CharaImportSettings : AssetPostprocessor
         ti.compressionQuality = 60;
         ti.maxTextureSize = p.Contains("/Thumb/") ? 512 : 2048;
         ti.spritePixelsPerUnit = 100f;
+        if (p.Contains("/Full/")) WebGL(ti, 1024, TextureImporterFormat.ASTC_6x6);
+        else if (p.Contains("/Thumb/")) WebGL(ti, 512, TextureImporterFormat.ASTC_6x6);
+        else if (p.Contains("/Pose/")) WebGL(ti, 1024, TextureImporterFormat.ASTC_8x8);
+        else WebGL(ti, 2048, TextureImporterFormat.ASTC_6x6);   // 体・持ち物・切り抜き・頭(寸法はそのまま)
         // 試合で動かす用(Body=Aポーズの立ち絵 / Bat=持ち物 / Glove)。寸法は4の倍数で作ってあるのでそのまま圧縮する
         bool body = p.Contains("/Body/"), prop = p.Contains("/Bat/") || p.Contains("/Glove/");
         if (body || prop)

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ぐにゃ野球">
+<meta name="theme-color" content="#05081a">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>ぐにゃ野球</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #05081a;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  #unity-canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; background: #05081a; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 18px; }
+  #loading img { width: 120px; height: 120px; border-radius: 26px; }
+  #bar { width: 220px; height: 8px; border-radius: 4px; background: #1c2350; overflow: hidden; }
+  #fill { width: 0%; height: 100%; background: linear-gradient(90deg, #ffcf3a, #ff7a00); }
+  /* 縦向きのときは、横にしてほしいことを絵で示す */
+  #rotate { display: none; position: fixed; inset: 0; background: #05081a; align-items: center; justify-content: center; z-index: 10; }
+  #rotate svg { width: 120px; height: 120px; animation: tilt 1.6s ease-in-out infinite; }
+  @keyframes tilt { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+  @media (orientation: portrait) { #rotate { display: flex; } }
+</style>
+</head>
+<body>
+<canvas id="unity-canvas" tabindex="-1"></canvas>
+<div id="loading"><img src="icon-180.png" alt=""><div id="bar"><div id="fill"></div></div></div>
+<div id="rotate"><svg viewBox="0 0 100 100" fill="none" stroke="#ffcf3a" stroke-width="6" stroke-linecap="round">
+  <rect x="30" y="12" width="40" height="76" rx="8"/><line x1="44" y1="78" x2="56" y2="78"/></svg></div>
+<script>
+  var canvas = document.querySelector("#unity-canvas");
+  var config = {
+    dataUrl: "Build/{{{ DATA_FILENAME }}}",
+    frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_WASM
+    codeUrl: "Build/{{{ CODE_FILENAME }}}",
+#endif
+#if MEMORY_FILENAME
+    memoryUrl: "Build/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+    symbolsUrl: "Build/{{{ SYMBOLS_FILENAME }}}",
+#endif
+    streamingAssetsUrl: "StreamingAssets",
+    companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+    productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+    productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+    devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+    matchWebGLToCanvasSize: true,
+  };
+  var script = document.createElement("script");
+  script.src = "Build/{{{ LOADER_FILENAME }}}";
+  script.onload = function () {
+    createUnityInstance(canvas, config, function (p) {
+      document.querySelector("#fill").style.width = (100 * p) + "%";
+    }).then(function () {
+      document.querySelector("#loading").style.display = "none";
+    }).catch(function (m) { alert(m); });
+  };
+  document.body.appendChild(script);
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+</script>
+</body>
+</html>
