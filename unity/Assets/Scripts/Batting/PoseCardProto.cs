@@ -2,14 +2,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // ============================================================
-// PoseCardProto.cs(試作・フェーズE)
-// 決めポーズの絵(構え・スイング途中・投げ終わり)と横向きの走り絵を、その瞬間だけ体の代わりに出して比べるための仕組み。
-// 絵は Resources/Presentation/proto_<id>_<pose>.png(Tools/presentation/prep.py が Aポーズと同じ台紙・縮尺で作る)。
-// Enabled=false(既定)なら何もしない。全キャラへ広げるかは田端の判断待ち。
+// PoseCardProto.cs
+// 決めポーズの絵(構え・振り切り・投げ終わり)と横向きの走り絵(2コマ)を、その瞬間だけ体の代わりに出す。
+// 絵は Resources/Chara/Pose/<id>_<pose>.png と pose_meta.txt(Tools/chara-rig/prep_poses.py が Aポーズと同じ縮尺で作る)。
+// Enabled=false で全員を体(物理)だけに戻せる。
 // ============================================================
 public class PoseCardProto : MonoBehaviour
 {
-    public static bool Enabled = false;
+    public static bool Enabled = true;
 
     private static Dictionary<string, Vector2Int> _meta;   // 絵の名前 → (足の下端の画素, 体の高さの画素)
 
@@ -24,7 +24,7 @@ public class PoseCardProto : MonoBehaviour
     {
         if (_meta != null) return;
         _meta = new Dictionary<string, Vector2Int>();
-        var ta = Resources.Load<TextAsset>("Presentation/proto_meta");
+        var ta = Resources.Load<TextAsset>("Chara/pose_meta");
         if (ta == null) return;
         foreach (var line in ta.text.Split('\n'))
         {
@@ -37,7 +37,7 @@ public class PoseCardProto : MonoBehaviour
     public static Sprite Make(string name, RigSkin skin, float standPx = 0f)
     {
         LoadMeta();
-        var src = Resources.Load<Sprite>("Presentation/" + name);
+        var src = Resources.Load<Sprite>("Chara/Pose/" + name);
         Vector2Int m;
         if (src == null || skin == null || !_meta.TryGetValue(name, out m)) return null;
         Rect r = src.rect;
@@ -53,9 +53,10 @@ public class PoseCardProto : MonoBehaviour
         if (!Enabled || p == null || p.Skin == null || !p.Skin.UsesBodyArt) return null;
         var c = p.gameObject.AddComponent<PoseCardProto>();
         c._p = p; c._skin = p.Skin;
-        c._ready = Make("proto_" + id + "_swing_ready", p.Skin);
-        c._follow = Make("proto_" + id + "_swing_follow", p.Skin);
-        c._release = Make("proto_" + id + "_pitch_release", p.Skin);
+        bool batter = p.Bat != null;
+        c._ready = batter ? Make(id + "_swing_ready", p.Skin) : null;
+        c._follow = batter ? Make(id + "_swing_finish", p.Skin) : null;
+        c._release = batter ? null : Make(id + "_pitch_release", p.Skin);
         if (c._ready == null && c._release == null) { Destroy(c); return null; }
         var go = new GameObject("PoseCard");
         go.transform.SetParent(p.Skin.transform.parent, false);
@@ -85,7 +86,7 @@ public class PoseCardProto : MonoBehaviour
             float ts = now - _swingT;
             // 倒れていなければ(構えでかがんでいても)構えの絵。転倒・のけぞりの間は体(物理)のまま
             bool standing = Mathf.Abs(Mathf.DeltaAngle(_p.Chest.rotation, 0f)) < 55f && _p.Pelvis.position.y > _p.transform.position.y + 0.45f;
-            if (ts >= 0f && ts < 0.10f) show = _follow;                 // 振り出しの一瞬
+            if (ts >= 0.06f && ts < 0.42f) show = _follow;              // 振り抜いた直後(振り出しの一瞬は物理の体で回す)
             else if (_waiting && !_p.BatThrown) show = _ready;               // 投球を待つ間は構え(物理のかがんだ構えの代わり)
             else if (ts > 1.2f && standing && !_p.BatThrown) show = _ready;  // 打席に入るまでなど
         }

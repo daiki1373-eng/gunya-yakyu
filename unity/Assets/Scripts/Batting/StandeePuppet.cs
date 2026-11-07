@@ -198,6 +198,7 @@ public class StandeePuppet : MonoBehaviour
 
     // ---- 試作(フェーズE): 横向きの走り絵。走っている間だけ体の代わりに出す(PoseCardProto.Enabled のときだけ) ----
     private SpriteRenderer _runCard;
+    private readonly Sprite[] _runFrames = new Sprite[2];
     private bool _runShown;
 
     private void SetupRunCard(string id)
@@ -207,8 +208,10 @@ public class StandeePuppet : MonoBehaviour
         if (!PoseCardProto.Enabled || _skin == null || !_skin.UsesBodyArt) return;
         var rig = CharaRig.GetBody(id);
         float stand = rig != null ? (rig.Box.w - rig.Box.y) * 0.92f : 0f;
-        var sp = PoseCardProto.Make("proto_" + id + "_run_side", _skin, stand);
+        var sp = PoseCardProto.Make(id + "_run_side", _skin, stand);
         if (sp == null) return;
+        _runFrames[0] = sp;
+        _runFrames[1] = PoseCardProto.Make(id + "_run_side_2", _skin, stand) ?? sp;
         var go = new GameObject("RunCard");
         go.transform.SetParent(_skin.transform.parent, false);
         go.transform.localPosition = new Vector3(_skin.FootLocal.x, _skin.FootLocal.y, -0.02f);
@@ -226,10 +229,11 @@ public class StandeePuppet : MonoBehaviour
         if (on)
         {
             _runCard.flipX = _dirX < 0f;         // 絵は右向き
+            _runCard.sprite = _runFrames[(Mathf.Sin(_phase) >= 0f) ? 0 : 1];   // 脚の振りに合わせて2コマを交互に
             // 体(_body)は横向きのとき細く縮めているので、走り絵はその分を戻す
             float turn = Mathf.Abs(_dirX);
             _runCard.transform.localScale = new Vector3(1f / Mathf.Max(0.5f, 1f - 0.16f * turn), 1f, 1f);
-            float bob = Mathf.Abs(Mathf.Sin(_phase)) * 0.12f;
+            float bob = Mathf.Abs(Mathf.Sin(_phase)) * 0.06f;
             _runCard.transform.localPosition = new Vector3(_skin.FootLocal.x, _skin.FootLocal.y + bob, -0.02f);
         }
         if (on == _runShown) return;
