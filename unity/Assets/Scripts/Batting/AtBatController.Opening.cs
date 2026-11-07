@@ -19,7 +19,7 @@ public partial class AtBatController
     {
         _introSkip = false; _skipQueued = false;
         _ui.SetControlsVisible(false);
-        _ui.SetTeamMarks(Mark("team_me"), Mark(RivalMarks[RivalIndex]));
+        _ui.SetTeamMarks(Mark("team_me"), Mark(RivalMark));
         BgmPlayer.Jingle("bgm-playball", 7f);
         // 夜空(タイトルの続き)から、選手の並んだグラウンドへカメラを下ろす
         _stage.SetShot(new Vector3(0f, 2f, -9f), new Vector3(0f, 78f, 130f), 0.3f, true);
@@ -54,8 +54,8 @@ public partial class AtBatController
     {
         string me = AppShell.PlayerName;
         string mine = string.IsNullOrEmpty(me) ? "じぶんのチーム" : me + "のチーム";
-        string rival = RivalNames[RivalIndex];
-        _ui.ShowVersus(mine, Heads(_userTeam), rival, Heads(_oppTeam), _gs.UserBatsFirst, Mark("team_me"), Mark(RivalMarks[RivalIndex]));
+        string rival = RivalName;
+        _ui.ShowVersus(mine, Heads(_userTeam), rival, Heads(_oppTeam), _gs.UserBatsFirst, Mark("team_me"), Mark(RivalMark));
     }
 
     // 投手 + 打順の上から3人の顔

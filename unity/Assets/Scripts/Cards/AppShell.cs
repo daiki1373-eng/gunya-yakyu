@@ -74,6 +74,9 @@ public partial class AppShell : MonoBehaviour
         BuildCards();
         BuildTitle();
         BuildGacha();
+        BuildLineup();
+        BuildOnline();
+        OnlineService.Create(gameObject);
         _detail = UiKit.Fill(UiKit.Rect(_root, "Detail"));
         _show = UiKit.Fill(UiKit.Rect(_root, "GachaShow"));
         _fx = UiFx.Create(_root);
@@ -158,18 +161,22 @@ public partial class AppShell : MonoBehaviour
         {
             var lg = UiKit.Img(_homeCol, "Logo", logoSp, Color.white);
             lg.preserveAspect = true; lg.raycastTarget = false;
-            UiKit.Place(lg.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(370f, 150f));
+            UiKit.Place(lg.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(340f, 130f));
             _homeLogo = lg.rectTransform;
         }
-        var play = UiKit.Btn(_homeCol, "Play", "試合", new Vector2(300f, 70f), true, StartGame, 32);
-        UiKit.Place(play.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 14f), new Vector2(300f, 70f));
-        _playLabel = play.GetComponentInChildren<Text>();
-        var gacha = UiKit.Btn(_homeCol, "Gacha", "ガチャ", new Vector2(300f, 62f), true, ShowGacha, 28);
-        UiKit.Place(gacha.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -68f), new Vector2(300f, 62f));
-        var cards = UiKit.Btn(_homeCol, "Cards", "カード", new Vector2(300f, 62f), false, ShowCards, 28);
-        UiKit.Place(cards.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -142f), new Vector2(300f, 62f));
+        // ボタン(上から 試合・オンライン対戦・編成・ガチャ・カード)
+        string[] labels = { "試合", "オンライン対戦", "編成", "ガチャ", "カード" };
+        System.Action[] acts = { StartGame, ShowOnline, ShowLineup, ShowGacha, ShowCards };
+        for (int i = 0; i < labels.Length; i++)
+        {
+            bool primary = i < 2;
+            float h = i == 0 ? 62f : 54f;
+            var b = UiKit.Btn(_homeCol, "Btn" + i, labels[i], new Vector2(300f, h), primary, acts[i], i == 0 ? 30 : 25);
+            UiKit.Place(b.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 60f - i * 62f - (i > 0 ? 4f : 0f)), new Vector2(300f, h));
+            if (i == 0) _playLabel = b.GetComponentInChildren<Text>();
+        }
         _homeOwned = UiKit.Txt(_homeCol, "Owned", "", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
-        UiKit.Place(_homeOwned.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -194f), new Vector2(300f, 30f));
+        UiKit.Place(_homeOwned.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -226f), new Vector2(300f, 30f));
         _homeCoins = UiKit.Txt(_home, "Coins", "", 20, UiKit.GoldLight, TextAnchor.UpperRight);
         UiKit.Place(_homeCoins.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-20f, -16f), new Vector2(250f, 30f));
         _homeCoinIcon = Icon(_home, "icon_coin", new Vector2(1f, 1f), new Vector2(-200f, -31f), 34f);
@@ -488,6 +495,8 @@ public partial class AppShell : MonoBehaviour
         _home.gameObject.SetActive(r == _home);
         _cards.gameObject.SetActive(r == _cards);
         _gacha.gameObject.SetActive(r == _gacha);
+        if (_lineup != null) _lineup.gameObject.SetActive(r == _lineup);
+        if (_onlineScr != null) _onlineScr.gameObject.SetActive(r == _onlineScr);
         _detail.gameObject.SetActive(false);
         _show.gameObject.SetActive(false);
         _fx.Clear();

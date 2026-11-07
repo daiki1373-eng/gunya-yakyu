@@ -77,6 +77,7 @@ public partial class AtBatController : MonoBehaviour
     // ------------------------------------------------------------
     private void Awake()
     {
+        Current = this;
         // 物理(Physics2D)用の地面。上面が y=0。
         var ground = new GameObject("PhysicsGround");
         ground.transform.SetParent(transform, false);
@@ -148,7 +149,7 @@ public partial class AtBatController : MonoBehaviour
     private void BuildTeams()
     {
         _userTeam = CharaRoster.UserTeam();
-        _oppTeam = CharaRoster.OpponentTeam(_userTeam, Random.Range(0, 100000));
+        if (!TakeOnlineOpponent()) _oppTeam = CharaRoster.OpponentTeam(_userTeam, Random.Range(0, 100000));
         _batterIndex = -1;
         _oppIndex = -1;
         _teamsFor = -1;   // 投手を作り直す
