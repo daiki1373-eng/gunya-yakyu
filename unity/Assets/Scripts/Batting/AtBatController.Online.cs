@@ -39,9 +39,19 @@ public partial class AtBatController
     {
         StopAllCoroutines();
         Time.timeScale = 1f;
+        _ui.SetControlsVisible(false);
+        _teamsFor = -1;
         _ui.HideVersus(true);
         _ui.ShowResult("");
         _ui.ShowBanner("");
+        _ui.ClearCenter();   // 前の試合の判定(GOOD など)を残さない
+        _ui.ClearSpeed();
+        _ui.ShowQuirk("");
+        _ui.ShowCommentary("", Color.white);
+        _ui.SetReplay(false);
+        _ui.HideIntroCard();
+        _ui.SetBatterLabel("");
+        if (_batter != null) _batter.gameObject.SetActive(false);   // 前の試合の打者は、次の打席で作り直すまで隠す
         _ui.ShowPitchPanel(false, _avail, _selKind);
         _ui.ShowMeter(false);
         _stage.Stadium.HideVision();

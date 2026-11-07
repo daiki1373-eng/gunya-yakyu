@@ -19,10 +19,11 @@ public partial class AtBatController
     {
         _introSkip = false; _skipQueued = false;
         _ui.SetControlsVisible(false);
+        ApplyTeams();   // 全景に映る守備の選手を、先にこの試合のチームの姿にしておく
         _ui.SetTeamMarks(Mark("team_me"), Mark(RivalMark));
         BgmPlayer.Jingle("bgm-playball", 7f);
         // 夜空(タイトルの続き)から、選手の並んだグラウンドへカメラを下ろす
-        _stage.SetShot(new Vector3(0f, 2f, -9f), new Vector3(0f, 78f, 130f), 0.3f, true);
+        _stage.SetShot(new Vector3(0f, 2f, -9f), new Vector3(0f, 86f, 130f), 0.3f, true);
         _stage.SetShot(new Vector3(0f, 15f, -27f), new Vector3(0f, 0f, 38f), 1.4f, false);
         _stage.Stadium.LaunchFireworks(first ? 8 : 4);
         GameAudio.Play(Sfx.Cheer, 0.7f);

@@ -202,6 +202,7 @@ public partial class AtBatController : MonoBehaviour
     private IEnumerator Start()
     {
         yield return null;
+        _ui.SetControlsVisible(false);   // 開幕の演出が終わるまで操作ボタンは出さない
         while (HoldStart) yield return null;
         BuildTeams();   // 所持カードは試合開始時点のもので組む
         _gameStartT = Time.unscaledTime;

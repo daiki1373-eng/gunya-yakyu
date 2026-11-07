@@ -65,7 +65,8 @@ public partial class AppShell
         _vsButton.interactable = true;
         // 開くたびに、今の編成を自分の番号に保存する
         _onlineStatus.text = "通信中…";
-        StartCoroutine(svc.Publish(CharaRoster.UserTeam(), PlayerName,
+        string nm = string.IsNullOrEmpty(PlayerName) ? "ななし" : PlayerName;
+        StartCoroutine(svc.Publish(CharaRoster.UserTeam(), nm,
             code => { _myCode.text = code; if (!_onlineBusy) _onlineStatus.text = ""; },
             err => { if (!_onlineBusy) _onlineStatus.text = err; }));
     }
@@ -89,6 +90,7 @@ public partial class AppShell
             int mark; int.TryParse(code, out mark);
             AtBatController.OnlineOppMark = mark;
             bool restart = _gameStarted;
+            if (restart) CoverFade();
             StartGame();
             if (restart && AtBatController.Current != null) AtBatController.Current.RestartMatch();
         }, err => { _onlineBusy = false; _onlineStatus.text = err; }));

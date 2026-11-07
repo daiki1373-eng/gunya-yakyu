@@ -102,7 +102,7 @@ public partial class AppShell
             // 起動直後は低い位置から夜空へ持ち上がる(クレーン)
             float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - _kvT0) / 2.6f));
             pos = new Vector3(Mathf.Sin(a) * 6f, Mathf.Lerp(1.0f, 2.0f, k), Mathf.Lerp(-3f, -9f, k));
-            look = new Vector3(Mathf.Sin(a + 0.6f) * 18f, Mathf.Lerp(14f, 78f, k), 130f);   // 夜空と照明塔(電光掲示板は画面の外)
+            look = new Vector3(Mathf.Sin(a + 0.6f) * 18f, Mathf.Lerp(14f, 86f, k), 130f);   // 夜空と照明塔(電光掲示板は画面の外)
         }
         else
         {
@@ -125,5 +125,28 @@ public partial class AppShell
         if (_stageRef == null) _stageRef = FindObjectOfType<BattingStage>();
         if (_stageRef != null && !_gameStarted)
             _stageRef.SetShot(new Vector3(0f, 1.0f, -3f), new Vector3(0f, 14f, 130f), 0.9f, true);
+    }
+
+    // 画面全体を黒で覆い、少し待ってから明ける(試合の始まり用)
+    private void CoverFade()
+    {
+        var cover = UiKit.Img(_root, "Cover", SpriteFactory.White, Color.black, true);
+        UiKit.Fill(cover.rectTransform);
+        cover.transform.SetAsLastSibling();
+        StartCoroutine(CoverRoutine(cover));
+    }
+
+    private System.Collections.IEnumerator CoverRoutine(Image cover)
+    {
+        float t = 0f;
+        while (t < 0.3f) { t += Time.unscaledDeltaTime; yield return null; }
+        t = 0f;
+        while (t < 0.45f)
+        {
+            t += Time.unscaledDeltaTime;
+            cover.color = new Color(0f, 0f, 0f, 1f - Mathf.Clamp01(t / 0.45f));
+            yield return null;
+        }
+        Destroy(cover.gameObject);
     }
 }

@@ -520,6 +520,7 @@ public partial class AppShell : MonoBehaviour
 
     public void StartGame()
     {
+        if (!_gameStarted) CoverFade();   // 初めて試合へ入るときは暗転でつなぐ(前の画面の残りを見せない)
         BgmPlayer.PlayBase(BgmPlayer.Match);
         Only(null);
         MenuOpen = false;
