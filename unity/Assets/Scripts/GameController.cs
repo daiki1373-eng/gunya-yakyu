@@ -67,9 +67,7 @@ public class GameController : MonoBehaviour
     {
         SetupCamera();
         // ラグドール同士(同一レイヤー)は衝突させない。地面とは衝突する。
-        Physics2D.IgnoreLayerCollision(RagdollPlayer.RagdollLayer, RagdollPlayer.RagdollLayer, true);
-        // ボール(レイヤー9)は判定を確率モデルで行うため、ラグドールとは衝突させない。
-        Physics2D.IgnoreLayerCollision(9, RagdollPlayer.RagdollLayer, true);
+        // 体同士とボールの衝突は生成後にColliderの組ごとに設定する。
 
         BackgroundBuilder.Build(transform);
 
@@ -137,6 +135,7 @@ public class GameController : MonoBehaviour
         _batter = RagdollPlayer.Create(transform, "Batter",
             new Vector2(BackgroundBuilder.BatterX, BackgroundBuilder.GroundTopY), -1f,
             _batterStats, uniform, accent, true);
+        if (_ball != null) _batter.IgnoreCollisionWith(_ball.GetComponent<Collider2D>());
 
         ResetBall();
         _pitcher.ResetPose();
@@ -164,6 +163,7 @@ public class GameController : MonoBehaviour
         _ballRb = _ball.AddComponent<Rigidbody2D>();
         _ballRb.bodyType = RigidbodyType2D.Kinematic;
         _ballRb.gravityScale = 0f;
+        if (_pitcher != null) _pitcher.IgnoreCollisionWith(col);
         ResetBall();
     }
 

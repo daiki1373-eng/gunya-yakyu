@@ -11,6 +11,54 @@ public static class Collection
     private const string Prefix = "gunya.card.";
     private const string PityKey = "gunya.gacha.pity4";
     private const string PullsKey = "gunya.gacha.pulls";
+    private const string CoinsKey = "gunya.coins";
+
+    // 仮のゲーム内通貨。初期配布は新規保存データだけに適用する。
+    public const int StartingCoins = 1000;
+    public const int PullCoinCost = 100;
+    public const int ExchangeCoinCost = 300;
+    public const int ExchangeCoinPoints = 15;
+
+    public static int Coins
+    {
+        get { return Mathf.Max(0, PlayerPrefs.GetInt(CoinsKey, StartingCoins)); }
+        set { PlayerPrefs.SetInt(CoinsKey, Mathf.Max(0, value)); }
+    }
+
+    public static bool TrySpendCoins(int amount)
+    {
+        if (amount <= 0 || Coins < amount) return false;
+        Coins -= amount;
+        Save();   // 消費はすぐ保存(アプリを落としても戻らない)
+        return true;
+    }
+
+    public static bool ExchangeCoins()
+    {
+        if (Points > int.MaxValue - ExchangeCoinPoints || !TrySpendCoins(ExchangeCoinCost)) return false;
+        Points += ExchangeCoinPoints;
+        Save();
+        return true;
+    }
+
+    // 勝敗と内容による仮置き報酬。長い試合で際限なく増えないよう各加点を制限する。
+    public static int CalculateMatchReward(int runs, int opponentRuns, int hits, int steals)
+    {
+        int result = runs > opponentRuns ? 120 : runs == opponentRuns ? 60 : 0;
+        return 60 + result + Mathf.Clamp(runs, 0, 10) * 10
+            + Mathf.Clamp(hits, 0, 20) * 3 + Mathf.Clamp(steals, 0, 6) * 10;
+    }
+
+    public static int AwardMatch(GameState state)
+    {
+        if (state == null || !state.GameOver || state.RewardClaimed) return 0;
+        int reward = CalculateMatchReward(state.Runs, state.OppRuns, state.UserHits, state.UserSteals);
+        int awarded = Mathf.Min(reward, int.MaxValue - Coins);
+        Coins += awarded;
+        state.RewardClaimed = true;
+        Save();
+        return awarded;
+    }
 
     public static int Count(string id) { return PlayerPrefs.GetInt(Prefix + id, 0); }
     public static bool Owned(string id) { return Count(id) > 0; }
@@ -76,6 +124,7 @@ public static class Collection
         PlayerPrefs.DeleteKey(PityKey);
         PlayerPrefs.DeleteKey(PullsKey);
         PlayerPrefs.DeleteKey(PointsKey);
+        PlayerPrefs.DeleteKey(CoinsKey);
         PlayerPrefs.Save();
     }
 }

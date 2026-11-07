@@ -144,16 +144,21 @@ public static class CharaRoster
         if (t.Pitcher == null) t.Pitcher = CharaCatalog.Get("sleepyhead");
         // 打者: 所持(レア度順)→ 足りなければおまかせ(★3〜★1の野手から)
         foreach (var d in owned) if (Role(d) != CharaRole.Pitcher && Fields(d) && t.Lineup.Count < 9) t.Lineup.Add(d);
-        string[] fallback = { "rookie", "ceo", "carpenter", "umpire", "teacher", "bigeater", "chef", "student", "suntan", "cat", "farmer", "guard" };
-        foreach (var id in fallback)
+        foreach (var id in FreeAgents)
         {
             if (t.Lineup.Count >= 9) break;
             var d = CharaCatalog.Get(id);
             if (!t.Lineup.Contains(d)) t.Lineup.Add(d);
         }
         Order(t.Lineup);
+        // 編成で決めた打順があれば、それを使う
+        var saved = TeamSetup.SavedLineup();
+        if (saved != null) { t.Lineup.Clear(); t.Lineup.AddRange(saved); }
         return t;
     }
+
+    // 所持カードが足りないときに打線を埋める選手(編成でも選べる)
+    public static readonly string[] FreeAgents = { "rookie", "ceo", "carpenter", "umpire", "teacher", "bigeater", "chef", "student", "suntan", "cat", "farmer", "guard" };
 
     public static Team OpponentTeam(Team user, int seed)
     {

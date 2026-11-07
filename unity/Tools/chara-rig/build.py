@@ -1,5 +1,7 @@
 # pose_raw.json(自動推定) + rig_manual.txt(手直し) → Assets/Resources/Chara/rig.txt
-# 使い方: python build.py <pose_raw.json> <rig_manual.txt> <出力rig.txt>
+# 使い方: python build.py <pose_raw.json> <rig_manual.txt> <出力rig.txt> [--apose]
+# --apose: Aポーズの立ち絵(Body)用。全員に flag apose を付ける(試合ではラグドールの向きそのままに腕脚を向ける)
+# rig_manual.txt に `id flag skip` と書いたキャラは出力しない
 import sys, json, os
 sys.path.insert(0, os.path.dirname(__file__))
 from rigio import load_rig, save_rig
@@ -67,7 +69,7 @@ def main():
         if rig[cid].get('noface'):
             for nm in ('eyeL', 'eyeR', 'mouth', 'browL', 'browR'):
                 rig[cid]['j'].pop(nm, None); rig[cid]['j'].pop(nm + 'Sz', None)
-        if not rig[cid]['j']: del rig[cid]
+        if rig[cid].get('skip') or not rig[cid]['j']: del rig[cid]
         else:
             # 前に出す腕(打者=バットを振る腕/投手=投げる腕)。バットを握る側、なければ手が高い側
             jj = rig[cid]['j']
@@ -80,6 +82,8 @@ def main():
                 else:
                     fr = 'L' if 'wristL' in jj else 'R'
                 rig[cid]['front' + fr] = True
+    if '--apose' in sys.argv:
+        for v in rig.values(): v['apose'] = True
     hdr = '# 自動生成(Tools/chara-rig/build.py)。手で直すときは rig_manual.txt を編集して再生成する\n'
     save_rig(sys.argv[3], {k: {kk: vv for kk, vv in v.items() if kk != 'manual'} for k, v in rig.items()}, hdr)
     print('rigged', len(rig), 'auto-failed(needs manual):', [b for b in bad if b not in manual])

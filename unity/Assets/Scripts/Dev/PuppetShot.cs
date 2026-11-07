@@ -25,6 +25,7 @@ public class PuppetShot : MonoBehaviour
             var root = new GameObject("PuppetRoot_" + id).transform;
             root.position = new Vector3(600f, 0f, 0f);
             var p = StandeePuppet.Create(root, root, 4);
+            p.WithGlove = true;
             p.SetSprite(cut, 3.3f);
             var sheet = new Texture2D(S * N, S, TextureFormat.RGB24, false);
             // 0:待つ 1-3:走る 4-5:捕る 6-7:投げる

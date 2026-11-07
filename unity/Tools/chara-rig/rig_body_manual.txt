@@ -1,0 +1,94 @@
+# Aポーズの立ち絵(Resources/Chara/Body)の関節の手直し。書式は rig_manual.txt と同じ。
+# 双子は2人並んだ絵。prep_body.py が左の1人だけを切り出している
+# 脚がはっきりない絵は、下半身を胴と一緒に動かす(左右に割れないように)
+snowman flag nolegs
+deliveryrobot flag nolegs
+jizo flag nolegs
+daibutsu flag nolegs
+# 新規51体: 骨格推定が効かない絵は手で書く(2026-11-07)
+# フクロウ: 翼を腕として扱う
+owl flag replace
+owl head 256 120
+owl neck 256 270
+owl chest 256 350
+owl pelvis 256 560
+owl shoulderL 165 275
+owl elbowL 135 420
+owl wristL 130 560
+owl shoulderR 345 275
+owl elbowR 375 420
+owl wristR 380 560
+owl hipL 215 560
+owl kneeL 210 620
+owl ankleL 205 680
+owl hipR 295 560
+owl kneeR 295 620
+owl ankleR 300 680
+owl eyeL 213 185
+owl eyeLSz 40 20
+owl eyeR 300 185
+owl eyeRSz 40 20
+owl mouth 256 225
+owl mouthSz 18 10
+hamster flag replace
+hamster head 256 180
+hamster neck 256 350
+hamster chest 256 430
+hamster pelvis 256 570
+hamster shoulderL 115 420
+hamster elbowL 85 445
+hamster wristL 65 460
+hamster shoulderR 400 420
+hamster elbowR 425 445
+hamster wristR 445 460
+hamster hipL 210 590
+hamster kneeL 180 640
+hamster ankleL 150 685
+hamster hipR 300 590
+hamster kneeR 330 640
+hamster ankleR 355 685
+hamster eyeL 200 205
+hamster eyeLSz 30 26
+hamster eyeR 323 205
+hamster eyeRSz 30 26
+hamster mouth 261 290
+hamster mouthSz 40 12
+# 手足のない物は体ごと揺れる(腕・脚の骨なし)
+robovac flag replace
+robovac flag nolegs
+robovac head 256 250
+robovac neck 256 330
+robovac chest 256 450
+robovac pelvis 256 600
+pole flag replace
+pole flag nolegs
+pole head 256 120
+pole neck 256 250
+pole chest 256 400
+pole pelvis 256 600
+extinguisher flag replace
+extinguisher flag nolegs
+extinguisher head 256 170
+extinguisher neck 256 300
+extinguisher chest 256 420
+extinguisher pelvis 256 600
+extinguisher eyeL 230 280
+extinguisher eyeLSz 22 10
+extinguisher eyeR 285 280
+extinguisher eyeRSz 22 10
+mochi flag replace
+mochi flag nolegs
+mochi head 256 300
+mochi neck 256 400
+mochi chest 256 480
+mochi pelvis 256 620
+rock flag replace
+rock flag nolegs
+rock head 256 300
+rock neck 256 400
+rock chest 256 480
+rock pelvis 256 620
+# 丸い・平たい体(手足のない物)は、人と同じ背丈にすると打席で画面をふさぐので小さくする
+rock scale 0.55
+mochi scale 0.55
+robovac scale 0.5

@@ -1,6 +1,8 @@
 import os, time, sys
 import numpy as np, cv2
 import onnxruntime as ort
+import sys as _s; _s.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from srcpick import pick_sources
 from PIL import Image
 src=os.path.expanduser('~/mnt/gunya-yakyu/chara')
 out=os.path.expanduser('~/cut')
@@ -8,8 +10,7 @@ t0=time.time()
 so=ort.SessionOptions(); so.intra_op_num_threads=4
 sess=ort.InferenceSession(os.path.expanduser('~/models/isnet-anime.onnx'), so, providers=['CPUExecutionProvider'])
 n=0
-for f in sorted(os.listdir(src)):
-    cid=os.path.splitext(f)[0]
+for cid, f in sorted(pick_sources(src).items()):   # 作り直し版(_v2)があればそちらを採用
     if os.path.exists(os.path.join(out,cid+'.png')): continue
     if time.time()-t0>30: break
     im=Image.open(os.path.join(src,f)).convert('RGB')

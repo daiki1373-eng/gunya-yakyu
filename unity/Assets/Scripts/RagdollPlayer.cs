@@ -8,8 +8,8 @@ using UnityEngine;
 //
 // 設計メモ:
 // - 関節の可動域はわざと大げさに広く取り、「関節が異常に曲がる」土台にする。
-// - 全パーツを同一レイヤー(8)に置き、Bootstrap側で同レイヤー同士の衝突を
-//   無効化する(自分の体同士で絡まないように)。地面(レイヤー0)とは衝突する。
+// - 全パーツを同一レイヤー(8)に置く。生成時にColliderの組ごとに衝突を
+//   無効化する(自分の体同士で絡まないように)。地面とは衝突する。
 // - 立ち続けるために、胸・頭・腰へ「起き上がりトルク」を掛ける簡易バランス
 //   制御と、腰をホームポジションへ戻す弱いバネを入れている。
 //   スイング/投球/転倒の演出中は _poseHoldTimer / _flopTimer で制御を緩める。
@@ -63,8 +63,14 @@ public class RagdollPlayer : MonoBehaviour
 
     private readonly List<PartState> _initialPose = new List<PartState>();
     private readonly List<Rigidbody2D> _allParts = new List<Rigidbody2D>();
+    private readonly List<Collider2D> _colliders = new List<Collider2D>();
+    private struct JointState { public HingeJoint2D Joint; public float Min, Max; }
+    private readonly List<JointState> _joints = new List<JointState>();
+    private static readonly List<RagdollPlayer> ActivePlayers = new List<RagdollPlayer>();
+    private float _stackSpin = 1f;
     private Vector2 _pelvisHome, _pelvisHomeInit;
     private float _poseHoldTimer;
+    private PoseCardProto _poseCard;
     private float _flopTimer;
 
     // ------------------------------------------------------------
@@ -79,13 +85,95 @@ public class RagdollPlayer : MonoBehaviour
         var player = go.AddComponent<RagdollPlayer>();
         if (stats.HasLook) { uniform = stats.LookJersey; accent = stats.LookTrim; pinstripe = stats.LookStripe; }
         player.Build(rootPos, facing, stats, uniform, accent, isBatter);
+        player.IgnoreBodyCollisions();
         if (pinstripe) player.AddPinstripes();
         if (UseRigSkin && !string.IsNullOrEmpty(stats.CharaId))
         {
             player.Skin = RigSkin.TryAttach(player, stats.CharaId);
-            if (player.Skin != null) player.HideBodyArt(!player.Skin.HasPaintedBat);
+            if (player.Skin != null)
+            {
+                player.HideBodyArt(!player.Skin.HasPaintedBat);
+                // Aポーズの体: 打者はキャラのバット(持ち物)の絵、投手はキャラのグローブの絵を持たせる
+                if (player.Skin.UsesBodyArt)
+                {
+                    if (player.Bat != null)
+                    {
+                        // 2本目の持ち物(<id>_2。双子の金バットなど)があれば、打席ごとにどちらかを持つ
+                        var second = CharaCatalog.BatArt(stats.CharaId + "_2");
+                        player.ApplyBatArt(second != null && Random.value < 0.5f ? second : CharaCatalog.BatArt(stats.CharaId));
+                    }
+                    else player.Skin.AttachGlove(CharaCatalog.GloveArt(stats.CharaId));
+                    player._poseCard = PoseCardProto.TryAttach(player, stats.CharaId);
+                }
+            }
         }
         return player;
+    }
+
+    // バットの見た目をキャラの持ち物の絵にする(絵は握る側が左。標準のバット=横512px)。
+    // 当たり判定・振り方は変えず、見た目の長さだけ絵に合わせる(大根は少し短く、巨大バットは長く)。
+    public void ApplyBatArt(Sprite art)
+    {
+        if (art == null || Bat == null) return;
+        var bsr = Bat.GetComponentInChildren<SpriteRenderer>();
+        if (bsr == null) return;
+        bsr.sprite = art;
+        bsr.color = Color.white;
+        float len = 0.94f * Mathf.Clamp(art.rect.width / 512f, 0.35f, 1.3f);
+        float k = len / Mathf.Max(0.01f, art.bounds.size.x);
+        var t = bsr.transform;
+        t.localRotation = Quaternion.Euler(0f, 0f, 90f);   // 絵の右(先端)を上へ
+        t.localScale = new Vector3(k, k, 1f);
+        t.localPosition = new Vector3(0f, -0.47f + len * 0.5f, t.localPosition.z);   // 握る端を手の位置にそろえる
+    }
+
+    // レイヤー行列を書き換えず、自分の体と他の選手の体だけ衝突を無効にする。
+    // 再有効化時にUnityがIgnoreCollisionの状態を失う場合にも設定し直す。
+    private void OnEnable()
+    {
+        if (!ActivePlayers.Contains(this)) ActivePlayers.Add(this);
+        IgnoreBodyCollisions();
+    }
+
+    private void OnDisable() { ActivePlayers.Remove(this); }
+
+    private void IgnoreBodyCollisions()
+    {
+        for (int i = 0; i < _colliders.Count; i++)
+        {
+            for (int j = 0; j < i; j++) Physics2D.IgnoreCollision(_colliders[i], _colliders[j], true);
+            for (int p = 0; p < ActivePlayers.Count; p++)
+            {
+                var other = ActivePlayers[p];
+                if (other == null || other == this) continue;
+                other.IgnoreCollisionWith(_colliders[i]);
+            }
+        }
+    }
+
+    public void IgnoreCollisionWith(Collider2D other)
+    {
+        if (other == null) return;
+        for (int i = 0; i < _colliders.Count; i++)
+            if (_colliders[i] != null) Physics2D.IgnoreCollision(_colliders[i], other, true);
+    }
+
+    // 重ねは見た目だけに反映。判定に使うStatsには一切書き込まない。
+    // 1枚で従来どおり、上限で関節の両端+25度・スイング角速度1.2倍。
+    public void SetStackCount(int ownedCopies, int stackLimit)
+    {
+        float progress = stackLimit <= 1 ? 0f : Mathf.Clamp01((ownedCopies - 1f) / (stackLimit - 1f));
+        _stackSpin = Mathf.Lerp(1f, 1.2f, progress);
+        float extra = 25f * progress;
+        for (int i = 0; i < _joints.Count; i++)
+        {
+            JointState state = _joints[i];
+            if (state.Joint == null) continue;
+            var limits = state.Joint.limits;
+            limits.min = Mathf.Max(-180f, state.Min - extra);
+            limits.max = Mathf.Min(180f, state.Max + extra);
+            state.Joint.limits = limits;
+        }
     }
 
     private void Build(Vector2 rootPos, float facing, PlayerStats stats, Color uniform, Color accent, bool isBatter)
@@ -207,17 +295,19 @@ public class RagdollPlayer : MonoBehaviour
         {
             var c = go.AddComponent<CircleCollider2D>();
             c.radius = size.x * 0.5f;
+            _colliders.Add(c);
         }
         else
         {
             var b = go.AddComponent<BoxCollider2D>();
             b.size = size;
+            _colliders.Add(b);
         }
         _allParts.Add(rb);
         return rb;
     }
 
-    private static HingeJoint2D Connect(Rigidbody2D child, Rigidbody2D parentBody,
+    private HingeJoint2D Connect(Rigidbody2D child, Rigidbody2D parentBody,
         Vector2 anchorOnChild, Vector2 anchorOnParent, float minAngle, float maxAngle)
     {
         var joint = child.gameObject.AddComponent<HingeJoint2D>();
@@ -231,6 +321,7 @@ public class RagdollPlayer : MonoBehaviour
         limits.min = minAngle;
         limits.max = maxAngle;
         joint.limits = limits;
+        _joints.Add(new JointState { Joint = joint, Min = minAngle, Max = maxAngle });
         return joint;
     }
 
@@ -449,6 +540,7 @@ public class RagdollPlayer : MonoBehaviour
     // ------------------------------------------------------------
     public void ResetPose()
     {
+        if (_poseCard != null) _poseCard.OnReset();
         _poseHoldTimer = 0f;
         _flopTimer = 0f;
         _exprTimer = 0f;
@@ -513,6 +605,7 @@ public class RagdollPlayer : MonoBehaviour
     // ------------------------------------------------------------
     public void DoPitchMotion()
     {
+        if (_poseCard != null) _poseCard.OnPitch();
         _poseHoldTimer = 0.35f;
         SetExpression(Expr.Focus, 0.7f);
         float f = Facing;
@@ -525,11 +618,12 @@ public class RagdollPlayer : MonoBehaviour
 
     public void DoSwing()
     {
+        if (_poseCard != null) _poseCard.OnSwing();
         _poseHoldTimer = 0.30f;
         if (_expr == Expr.Normal) SetExpression(Expr.Focus, 0.5f);
         float f = Facing;
         // バットは上向きに立っているので前へ倒れる向き、腕は下向きなので逆符号。
-        float g = 0.6f + 0.4f * BattingConfig.GunyaLevel;
+        float g = (0.6f + 0.4f * BattingConfig.GunyaLevel) * _stackSpin;
         if (Bat != null) Bat.angularVelocity = -1500f * f * g;
         if (ArmFrontFore != null) ArmFrontFore.angularVelocity = 1100f * f * g;
         if (ArmFrontUpper != null) ArmFrontUpper.angularVelocity = 700f * f * g;

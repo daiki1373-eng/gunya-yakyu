@@ -154,7 +154,7 @@ public static class BattingSim
                 if (!gs.UserBatting) { gs.Outs = 3; gs.EndInningIfNeeded(); continue; }   // 守りは飛ばす
                 halfInn++;
                 runsBefore = gs.Runs;
-                while (gs.Outs < 3)
+                while (gs.Outs < 3 && !gs.GameOver)
                 {
                     var b = CharaRoster.Stats(user.Lineup[bi % user.Lineup.Count]); bi++;
                     int batSide = b.BatsRight ? -1 : 1;
@@ -289,7 +289,7 @@ public static class BattingSim
         {
             gs.Outs = 0; gs.ClearBases();
             int runsBefore = gs.OppRuns;
-            while (gs.Outs < 3)
+            while (gs.Outs < 3 && !gs.GameOver)
             {
                 var b = opp[bi % 3]; bi++;
                 int batSide = b.BatsRight ? -1 : 1;

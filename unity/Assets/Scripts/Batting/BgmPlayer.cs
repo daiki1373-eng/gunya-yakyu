@@ -25,7 +25,7 @@ public static class BgmPlayer
         { "bgm-doubleplay", 54 }, { "bgm-error", 54 }, { "bgm-fineplay", 54 }, { "bgm-pitcher-hit", 52 },
         { "bgm-playball", 50 }, { "bgm-steal-ok", 48 }, { "bgm-steal-out", 48 }, { "bgm-bases-loaded", 46 },
         { "bgm-chance", 42 }, { "bgm-pinch", 42 }, { "bgm-strikeout", 36 }, { "bgm-gacha-suspense", 30 },
-        { "bgm-rarity-low", 26 }, { "bgm-gacha-pull", 20 },
+        { "bgm-rarity-low", 26 }, { "bgm-gacha-pull", 20 }, { "bgm-title", 60 }, { "bgm-versus", 45 },
     };
 
     public static readonly List<string> Log = new List<string>();   // 検証用: 鳴らしたジングルの記録

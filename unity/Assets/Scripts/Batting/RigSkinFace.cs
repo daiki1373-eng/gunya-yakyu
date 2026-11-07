@@ -16,6 +16,7 @@ public partial class RigSkin
     private float _io;                 // 目と目の間(画素)。顔の大きさの基準
     private float _side = 1f;          // 記号を出す側(画像の右=+1)
 
+    private static readonly Dictionary<MeshKey, MeshData> FaceCache = new Dictionary<MeshKey, MeshData>();
     private Mesh _fMesh;
     private MeshRenderer _fMr;
     private Vector2[] _fPx;
@@ -80,28 +81,37 @@ public partial class RigSkin
         int nx = (x1 - x0) / FCell + 1, ny = (y1 - y0) / FCell + 1;
         if (nx < 3 || ny < 3) { _warpable = false; return; }
         int n = nx * ny;
-        _fPx = new Vector2[n]; _fV = new Vector3[n]; _fBi = new int[n * 3]; _fBw = new float[n * 3];
-        var uv = new Vector2[n];
-        var tex = spr.texture; Rect tr = spr.textureRect;
-        var w = new float[_bones.Count];
-        for (int j = 0; j < ny; j++)
-            for (int i = 0; i < nx; i++)
-            {
-                int v = j * nx + i;
-                var px = new Vector2(x0 + i * FCell, y0 + j * FCell);
-                _fPx[v] = px;
-                uv[v] = new Vector2((tr.x + px.x / _rig.Size.x * tr.width) / tex.width,
-                                    (tr.y + (1f - px.y / _rig.Size.y) * tr.height) / tex.height);
-                Weights(px, _wScale, w, _fBi, _fBw, v);
-            }
-        var tris = new int[(nx - 1) * (ny - 1) * 6];
-        int t = 0;
-        for (int j = 0; j + 1 < ny; j++)
-            for (int i = 0; i + 1 < nx; i++)
-            {
-                int a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
-                tris[t++] = a; tris[t++] = c; tris[t++] = b; tris[t++] = b; tris[t++] = c; tris[t++] = d;
-            }
+        var key = CacheKey(FCell);
+        MeshData data;
+        if (!FaceCache.TryGetValue(key, out data))
+        {
+            data = new MeshData { Pixels = new Vector2[n], UV = new Vector2[n], Bones = new int[n * 3], Weights = new float[n * 3] };
+            var tex = spr.texture; Rect tr = spr.textureRect;
+            var w = new float[_bones.Count];
+            for (int j = 0; j < ny; j++)
+                for (int i = 0; i < nx; i++)
+                {
+                    int v = j * nx + i;
+                    var px = new Vector2(x0 + i * FCell, y0 + j * FCell);
+                    data.Pixels[v] = px;
+                    data.UV[v] = new Vector2((tr.x + px.x / _rig.Size.x * tr.width) / tex.width,
+                                        (tr.y + (1f - px.y / _rig.Size.y) * tr.height) / tex.height);
+                    Weights(px, _wScale, w, data.Bones, data.Weights, v);
+                }
+            data.Triangles = new int[(nx - 1) * (ny - 1) * 6];
+            int t = 0;
+            for (int j = 0; j + 1 < ny; j++)
+                for (int i = 0; i + 1 < nx; i++)
+                {
+                    int a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+                    data.Triangles[t++] = a; data.Triangles[t++] = c; data.Triangles[t++] = b;
+                    data.Triangles[t++] = b; data.Triangles[t++] = c; data.Triangles[t++] = d;
+                }
+            FaceCache.Add(key, data);
+        }
+        Remember(FaceCache, FaceUse, key, MaxFaceCache);
+        _fPx = data.Pixels; _fBi = data.Bones; _fBw = data.Weights;
+        _fV = new Vector3[n];
         var go = new GameObject("Face");
         go.transform.SetParent(transform, false);
         go.layer = gameObject.layer;
@@ -109,7 +119,7 @@ public partial class RigSkin
         _fMesh.MarkDynamic();
         _fCol = new Color[n];
         for (int i = 0; i < n; i++) _fCol[i] = Color.white;
-        _fMesh.vertices = _fV; _fMesh.uv = uv; _fMesh.triangles = tris; _fMesh.colors = _fCol;
+        _fMesh.vertices = _fV; _fMesh.uv = data.UV; _fMesh.triangles = data.Triangles; _fMesh.colors = _fCol;
         go.AddComponent<MeshFilter>().sharedMesh = _fMesh;
         _fMr = go.AddComponent<MeshRenderer>();
         _fMr.sharedMaterial = GetComponent<MeshRenderer>().sharedMaterial;
