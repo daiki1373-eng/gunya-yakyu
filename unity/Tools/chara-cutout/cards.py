@@ -7,15 +7,15 @@ import sys, os
 # 一覧用の切り出し位置(上からの割合)をキャラごとに変える。絵の主役が下に寄っているもの
 THUMB_Y = {'penguin': 1.0}
 from PIL import Image
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from srcpick import pick_sources
 
 def main():
     src, dst = sys.argv[1], sys.argv[2]
     for k in ('Thumb', 'Full'): os.makedirs(os.path.join(dst, k), exist_ok=True)
     n = 0
-    for f in sorted(os.listdir(src)):
+    for cid, f in sorted(pick_sources(src).items()):   # 作り直し版(_v2)があればそちらを採用
         p = os.path.join(src, f)
-        if not os.path.isfile(p) or not f.lower().endswith(('.png', '.webp', '.jpg', '.jpeg')): continue
-        cid = os.path.splitext(f)[0]
         th, fu = os.path.join(dst, 'Thumb', cid + '.png'), os.path.join(dst, 'Full', cid + '.png')
         if os.path.exists(th) and os.path.exists(fu): continue
         im = Image.open(p).convert('RGB'); W, H = im.size
