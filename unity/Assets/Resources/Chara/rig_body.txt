@@ -1650,6 +1650,7 @@ miko browRSz 18 3
 mochi size 512 768
 mochi box 6 164 505 704
 mochi flag nolegs
+mochi scale 0.55
 mochi flag frontR
 mochi flag apose
 mochi head 256 300
@@ -2044,6 +2045,7 @@ robot-gold ankleR 183 651
 robovac size 512 768
 robovac box 6 187 505 704
 robovac flag nolegs
+robovac scale 0.50
 robovac flag frontR
 robovac flag apose
 robovac head 256 250
@@ -2053,6 +2055,7 @@ robovac pelvis 256 600
 rock size 512 768
 rock box 6 179 504 704
 rock flag nolegs
+rock scale 0.55
 rock flag frontR
 rock flag apose
 rock head 256 300

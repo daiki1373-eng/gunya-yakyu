@@ -88,3 +88,7 @@ rock head 256 300
 rock neck 256 400
 rock chest 256 480
 rock pelvis 256 620
+# 丸い・平たい体(手足のない物)は、人と同じ背丈にすると打席で画面をふさぐので小さくする
+rock scale 0.55
+mochi scale 0.55
+robovac scale 0.5

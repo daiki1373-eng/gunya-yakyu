@@ -20,6 +20,8 @@ public partial class AtBatController
         _introSkip = false; _skipQueued = false;
         _ui.SetControlsVisible(false);
         ApplyTeams();   // 全景に映る守備の選手を、先にこの試合のチームの姿にしておく
+        _stage.SetZoneVisible(false);   // ストライクゾーンと狙いの円は打席が始まってから出す
+        _cursor.SetVisible(false);
         _ui.SetTeamMarks(Mark("team_me"), Mark(RivalMark));
         BgmPlayer.Jingle("bgm-playball", 7f);
         // 夜空(タイトルの続き)から、選手の並んだグラウンドへカメラを下ろす
@@ -48,6 +50,7 @@ public partial class AtBatController
         _ui.HideVersus(true);
         _ui.ShowResult("");
         _ui.SetControlsVisible(true);
+        _stage.SetZoneVisible(true);
         _stage.SetCameraMode(CamMode.Catcher);
     }
 
