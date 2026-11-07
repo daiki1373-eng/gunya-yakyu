@@ -1,0 +1,4 @@
+proto_ojisan_swing_ready 725 665
+proto_ojisan_swing_follow 725 641
+proto_ojisan_pitch_release 725 665
+proto_ojisan_run_side 710 710

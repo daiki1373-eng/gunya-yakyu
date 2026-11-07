@@ -70,6 +70,7 @@ public class RagdollPlayer : MonoBehaviour
     private float _stackSpin = 1f;
     private Vector2 _pelvisHome, _pelvisHomeInit;
     private float _poseHoldTimer;
+    private PoseCardProto _poseCard;
     private float _flopTimer;
 
     // ------------------------------------------------------------
@@ -102,6 +103,7 @@ public class RagdollPlayer : MonoBehaviour
                         player.ApplyBatArt(second != null && Random.value < 0.5f ? second : CharaCatalog.BatArt(stats.CharaId));
                     }
                     else player.Skin.AttachGlove(CharaCatalog.GloveArt(stats.CharaId));
+                    player._poseCard = PoseCardProto.TryAttach(player, stats.CharaId);
                 }
             }
         }
@@ -538,6 +540,7 @@ public class RagdollPlayer : MonoBehaviour
     // ------------------------------------------------------------
     public void ResetPose()
     {
+        if (_poseCard != null) _poseCard.OnReset();
         _poseHoldTimer = 0f;
         _flopTimer = 0f;
         _exprTimer = 0f;
@@ -602,6 +605,7 @@ public class RagdollPlayer : MonoBehaviour
     // ------------------------------------------------------------
     public void DoPitchMotion()
     {
+        if (_poseCard != null) _poseCard.OnPitch();
         _poseHoldTimer = 0.35f;
         SetExpression(Expr.Focus, 0.7f);
         float f = Facing;
@@ -614,6 +618,7 @@ public class RagdollPlayer : MonoBehaviour
 
     public void DoSwing()
     {
+        if (_poseCard != null) _poseCard.OnSwing();
         _poseHoldTimer = 0.30f;
         if (_expr == Expr.Normal) SetExpression(Expr.Focus, 0.5f);
         float f = Facing;

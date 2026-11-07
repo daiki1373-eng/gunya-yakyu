@@ -100,6 +100,10 @@ public partial class RigSkin : MonoBehaviour
     // 腕と脚が胴から離れて描かれているので、大きく振っても絵が伸びにくい。false で全員を元絵の体に戻す。
     public static bool UseBodyArt = true;
     public bool UsesBodyArt { get; private set; }
+    // 試作(決めポーズの絵の差し替え)用: 元絵1画素の大きさ・足元の位置(Space の中)・Aポーズの絵の足の下端(画素)
+    public float PixelWorld { get { return _k; } }
+    public Vector2 FootLocal { get { return new Vector2(_rootX, _groundY); } }
+    public float FootPixel { get { return _footY; } }
 
     private static bool BodyOk(string charaId)
     {

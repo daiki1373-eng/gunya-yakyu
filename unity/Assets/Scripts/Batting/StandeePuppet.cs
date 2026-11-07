@@ -115,6 +115,7 @@ public class StandeePuppet : MonoBehaviour
             if (_skin != null)
             {
                 if (WithGlove) _skin.AttachGlove(CharaCatalog.GloveArt(id));
+                SetupRunCard(id);
                 return;
             }
         }
@@ -194,6 +195,48 @@ public class StandeePuppet : MonoBehaviour
     }
 
     private static void Rot(Transform t, float deg) { t.localRotation = Quaternion.Euler(0f, 0f, deg); }
+
+    // ---- 試作(フェーズE): 横向きの走り絵。走っている間だけ体の代わりに出す(PoseCardProto.Enabled のときだけ) ----
+    private SpriteRenderer _runCard;
+    private bool _runShown;
+
+    private void SetupRunCard(string id)
+    {
+        if (_runCard != null) { Destroy(_runCard.gameObject); _runCard = null; }
+        _runShown = false;
+        if (!PoseCardProto.Enabled || _skin == null || !_skin.UsesBodyArt) return;
+        var rig = CharaRig.GetBody(id);
+        float stand = rig != null ? (rig.Box.w - rig.Box.y) * 0.92f : 0f;
+        var sp = PoseCardProto.Make("proto_" + id + "_run_side", _skin, stand);
+        if (sp == null) return;
+        var go = new GameObject("RunCard");
+        go.transform.SetParent(_skin.transform.parent, false);
+        go.transform.localPosition = new Vector3(_skin.FootLocal.x, _skin.FootLocal.y, -0.02f);
+        go.layer = _skin.gameObject.layer;
+        _runCard = go.AddComponent<SpriteRenderer>();
+        _runCard.sprite = sp;
+        _runCard.sortingOrder = _order + 1;
+        _runCard.enabled = false;
+    }
+
+    private void TickRunCard(float t)
+    {
+        if (_runCard == null) return;
+        bool on = _run > 0.45f && Mathf.Abs(_dirX) > 0.25f;
+        if (on)
+        {
+            _runCard.flipX = _dirX < 0f;         // 絵は右向き
+            // 体(_body)は横向きのとき細く縮めているので、走り絵はその分を戻す
+            float turn = Mathf.Abs(_dirX);
+            _runCard.transform.localScale = new Vector3(1f / Mathf.Max(0.5f, 1f - 0.16f * turn), 1f, 1f);
+            float bob = Mathf.Abs(Mathf.Sin(_phase)) * 0.12f;
+            _runCard.transform.localPosition = new Vector3(_skin.FootLocal.x, _skin.FootLocal.y + bob, -0.02f);
+        }
+        if (on == _runShown) return;
+        _runShown = on;
+        _runCard.enabled = on;
+        _skin.transform.localScale = on ? Vector3.zero : Vector3.one;
+    }
     private float _headPop = 1f;
     public bool WithGlove;        // 守備の選手はグローブの絵を付ける(走者は付けない)
     private float _dirX;          // -1=画面の左へ / +1=右へ走っている
@@ -235,7 +278,12 @@ public class StandeePuppet : MonoBehaviour
         float bob = Mathf.Abs(Mathf.Sin(_phase)) * (_legs ? 0.10f : 0.22f) * _run;
         float lean = -7f * _run;
         float sway = Mathf.Sin(t * 1.9f) * 1.6f * (1f - _run);
-        if (_skin != null) { PoseBones(dt, g, t, legA, Mathf.Abs(Mathf.Sin(_phase)) * 0.10f * _run, lean, sway); return; }
+        if (_skin != null)
+        {
+            PoseBones(dt, g, t, legA, Mathf.Abs(Mathf.Sin(_phase)) * 0.10f * _run, lean, sway);
+            TickRunCard(t);
+            return;
+        }
         float breathe = 1f + 0.014f * Mathf.Sin(t * 2.6f) * (1f - _run);
         float upRot = lean + sway, sx = 1f, sy = breathe, spread = 0f;
 
