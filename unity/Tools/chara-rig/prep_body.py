@@ -12,6 +12,8 @@ from PIL import Image
 
 STD_BAT = 1500.0   # 依頼書の標準バットの長さ(画素)
 HALF_LEFT = {'twins'}   # 2人並んだ絵
+# グローブの絵があっても手に付けないキャラ(magical はカード絵で腰の装備として描かれている。Muse の注記どおり、手に着けるもののみ対象)
+SKIP_GLOVE = {'magical'}
 
 def pick(folder, cid, kind):
     best, bv = None, -1
@@ -89,7 +91,7 @@ def main():
             im = im.resize((max(8, round(im.width * k)), max(8, round(im.height * k))), Image.LANCZOS)
             mul4(bleed(im)).save(os.path.join(dst, 'Bat', cid + '_2.png'), optimize=True)
             done['Bat'].append(cid + '_2')
-        p = pick(folder, cid, 'glove')
+        p = pick(folder, cid, 'glove') if cid not in SKIP_GLOVE else None
         if p:
             im = trim(Image.open(p).convert('RGBA'), 6)
             im.thumbnail((256, 256), Image.LANCZOS)

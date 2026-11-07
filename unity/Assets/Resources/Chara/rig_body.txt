@@ -319,6 +319,36 @@ cat elbowR 180 412
 cat wristR 134 478
 cat kneeR 216 557
 cat ankleR 204 653
+ceo size 512 768
+ceo box 98 75 413 704
+ceo flag frontR
+ceo flag apose
+ceo neck 260 222
+ceo pelvis 250 425
+ceo chest 257 293
+ceo head 246 78
+ceo shoulderL 345 221
+ceo hipL 300 427
+ceo elbowL 381 316
+ceo wristL 370 428
+ceo kneeL 316 537
+ceo ankleL 329 645
+ceo shoulderR 176 223
+ceo hipR 199 423
+ceo elbowR 139 313
+ceo wristR 122 418
+ceo kneeR 202 537
+ceo ankleR 204 637
+ceo eyeL 236 130
+ceo eyeLSz 14 4
+ceo eyeR 270 129
+ceo eyeRSz 14 4
+ceo mouth 254 161
+ceo mouthSz 39 11
+ceo browL 234 122
+ceo browLSz 20 4
+ceo browR 272 120
+ceo browRSz 24 4
 cheerleader size 512 768
 cheerleader box 147 75 364 704
 cheerleader flag frontL
@@ -1176,6 +1206,36 @@ hamster eyeR 323 205
 hamster eyeRSz 30 26
 hamster mouth 261 290
 hamster mouthSz 40 12
+helper size 512 768
+helper box 97 75 413 704
+helper flag frontR
+helper flag apose
+helper neck 256 223
+helper pelvis 248 415
+helper chest 253 290
+helper head 251 91
+helper shoulderL 336 222
+helper hipL 300 415
+helper elbowL 382 311
+helper wristL 386 415
+helper kneeL 323 537
+helper ankleL 334 637
+helper shoulderR 176 225
+helper hipR 197 415
+helper elbowR 134 312
+helper wristR 118 413
+helper kneeR 184 534
+helper ankleR 188 639
+helper eyeL 236 139
+helper eyeLSz 15 6
+helper eyeR 271 138
+helper eyeRSz 15 5
+helper mouth 254 169
+helper mouthSz 32 6
+helper browL 234 128
+helper browLSz 22 5
+helper browR 273 127
+helper browRSz 22 4
 heroine size 512 768
 heroine box 114 75 397 704
 heroine flag frontR
@@ -1236,6 +1296,36 @@ housewife browL 238 132
 housewife browLSz 18 3
 housewife browR 272 131
 housewife browRSz 18 3
+idol size 512 768
+idol box 115 75 396 704
+idol flag frontR
+idol flag apose
+idol neck 256 227
+idol pelvis 252 381
+idol chest 255 281
+idol head 257 118
+idol shoulderL 303 228
+idol hipL 289 381
+idol elbowL 332 297
+idol wristL 376 385
+idol kneeL 284 509
+idol ankleL 286 637
+idol shoulderR 209 226
+idol hipR 216 381
+idol elbowR 181 296
+idol wristR 135 384
+idol kneeR 226 511
+idol ankleR 227 638
+idol eyeL 241 154
+idol eyeLSz 13 6
+idol eyeR 272 154
+idol eyeRSz 14 6
+idol mouth 257 181
+idol mouthSz 22 6
+idol browL 238 145
+idol browLSz 18 3
+idol browR 274 144
+idol browRSz 20 3
 interpreter size 512 768
 interpreter box 151 75 359 704
 interpreter flag frontR
@@ -1377,6 +1467,36 @@ legend-grandpa browL 230 143
 legend-grandpa browLSz 31 7
 legend-grandpa browR 282 141
 legend-grandpa browRSz 31 5
+magical size 512 768
+magical box 116 75 395 704
+magical flag frontL
+magical flag apose
+magical neck 257 257
+magical pelvis 254 404
+magical chest 256 308
+magical head 258 144
+magical shoulderL 304 260
+magical hipL 290 402
+magical elbowL 329 319
+magical wristL 373 391
+magical kneeL 288 518
+magical ankleL 302 639
+magical shoulderR 210 254
+magical hipR 219 406
+magical elbowR 188 316
+magical wristR 138 392
+magical kneeR 224 520
+magical ankleR 216 639
+magical eyeL 242 182
+magical eyeLSz 13 3
+magical eyeR 272 183
+magical eyeRSz 12 4
+magical mouth 258 209
+magical mouthSz 18 9
+magical browL 240 175
+magical browLSz 20 3
+magical browR 273 174
+magical browRSz 18 3
 magician size 512 768
 magician box 103 75 407 704
 magician flag frontR
@@ -2480,6 +2600,36 @@ twins browL 236 127
 twins browLSz 15 3
 twins browR 265 124
 twins browRSz 18 3
+umpire size 512 768
+umpire box 123 75 388 704
+umpire flag frontR
+umpire flag apose
+umpire neck 257 237
+umpire pelvis 256 396
+umpire chest 257 293
+umpire head 256 110
+umpire shoulderL 316 237
+umpire hipL 295 396
+umpire elbowL 346 319
+umpire wristL 370 410
+umpire kneeL 323 528
+umpire ankleL 347 653
+umpire shoulderR 198 237
+umpire hipR 216 397
+umpire elbowR 166 317
+umpire wristR 142 409
+umpire kneeR 188 530
+umpire ankleR 168 652
+umpire eyeL 241 155
+umpire eyeLSz 13 5
+umpire eyeR 272 154
+umpire eyeRSz 13 4
+umpire mouth 256 183
+umpire mouthSz 22 6
+umpire browL 239 147
+umpire browLSz 20 3
+umpire browR 273 146
+umpire browRSz 18 3
 vampire size 512 768
 vampire box 97 74 413 704
 vampire flag frontR
