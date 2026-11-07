@@ -11,10 +11,14 @@ public partial class AtBatController
 {
     // 相手チームの名前(球場の看板の会社のチーム。仮置き)
     private static readonly string[] RivalNames = { "こんにゃく電鉄", "ぐにゃぐにゃ保険", "ふにゃ食品", "ぐにゃっとカメラ", "ぐにゃ乳業", "ぐにゃ銀行" };
+    private static readonly string[] RivalMarks = { "team_konnyaku", "team_hoken", "team_funya", "team_camera", "team_milk", "team_bank" };
+    private static Sprite Mark(string n) { return Resources.Load<Sprite>("Presentation/" + n); }
+    private int RivalIndex { get { return Mathf.Abs(_gs.GameNo - 1) % RivalNames.Length; } }
 
     private IEnumerator Opening(bool first)
     {
         _introSkip = false; _skipQueued = false;
+        _ui.SetTeamMarks(Mark("team_me"), Mark(RivalMarks[RivalIndex]));
         BgmPlayer.Jingle("bgm-playball", 7f);
         _stage.SetShot(new Vector3(0f, 9f, -14f), new Vector3(0f, 40f, 130f), 0.3f, true);
         _stage.SetShot(new Vector3(0f, 5f, -9f), new Vector3(0f, 30f, 130f), 1.6f, false);
@@ -47,8 +51,8 @@ public partial class AtBatController
     {
         string me = AppShell.PlayerName;
         string mine = string.IsNullOrEmpty(me) ? "じぶんのチーム" : me + "のチーム";
-        string rival = RivalNames[Mathf.Abs(_gs.GameNo - 1) % RivalNames.Length];
-        _ui.ShowVersus(mine, Heads(_userTeam), rival, Heads(_oppTeam), _gs.UserBatsFirst);
+        string rival = RivalNames[RivalIndex];
+        _ui.ShowVersus(mine, Heads(_userTeam), rival, Heads(_oppTeam), _gs.UserBatsFirst, Mark("team_me"), Mark(RivalMarks[RivalIndex]));
     }
 
     // 投手 + 打順の上から3人の顔

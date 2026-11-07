@@ -239,6 +239,32 @@ public class BattingUI
         r.anchoredPosition = topLeft;
     }
 
+    // 得点表示の「自」「相」をチームの印にする(印がなければ文字のまま)
+    private readonly Image[] _chipMark = new Image[2];
+    public void SetTeamMarks(Sprite me, Sprite opp)
+    {
+        var marks = new[] { me, opp };
+        for (int i = 0; i < 2; i++)
+        {
+            var chip = _teamChip[i];
+            if (chip == null) continue;
+            if (_chipMark[i] == null)
+            {
+                _chipMark[i] = NewImage(chip.transform, "Mark", Color.white);
+                _chipMark[i].preserveAspect = true;
+                _chipMark[i].raycastTarget = false;
+                var r = _chipMark[i].rectTransform;
+                r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+                r.sizeDelta = new Vector2(30f, 30f);
+            }
+            bool has = marks[i] != null;
+            _chipMark[i].sprite = marks[i];
+            _chipMark[i].gameObject.SetActive(has);
+            var t = chip.transform.Find("T");
+            if (t != null) t.gameObject.SetActive(!has);
+        }
+    }
+
     private Image Chip(Transform parent, string label, Color c, float x, float y)
     {
         var img = NewImage(parent, "Chip" + label, c);
@@ -624,6 +650,7 @@ public class BattingUI
     private RectTransform _vsRoot, _vsLeft, _vsRight;
     private Text _vsLeftName, _vsRightName, _vsLeftSide, _vsRightSide, _vsMark;
     private Image[] _vsLeftHeads = new Image[4], _vsRightHeads = new Image[4];
+    private Image _vsLeftMark, _vsRightMark;
     private Image _vsFlash;
     private float _vsT = -99f;
     private bool _vsOn;
@@ -645,6 +672,8 @@ public class BattingUI
             out _vsLeftName, out _vsLeftSide, _vsLeftHeads);
         _vsRight = VsBand("Right", new Color(0.14f, 0.26f, 0.72f, 0.95f), new Vector2(30f, -92f), false,
             out _vsRightName, out _vsRightSide, _vsRightHeads);
+        _vsLeftMark = VsMark(_vsLeft, true);
+        _vsRightMark = VsMark(_vsRight, false);
         TelopFx fx;
         _vsMark = NewTelop(_vsRoot, "VS", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -2f),
             96, TextAnchor.MiddleCenter, new Color(1f, 0.9f, 0.4f), TelopFx.Kind.Stamp, out fx);
@@ -698,9 +727,25 @@ public class BattingUI
         return r;
     }
 
-    public void ShowVersus(string leftName, Sprite[] leftHeads, string rightName, Sprite[] rightHeads, bool leftFirst)
+    // チームの印(帯の外側の端、チーム名の外)
+    private Image VsMark(RectTransform band, bool left)
+    {
+        var m = NewImage(band, "Mark", Color.white);
+        m.preserveAspect = true; m.raycastTarget = false;
+        var r = m.rectTransform;
+        r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+        r.sizeDelta = new Vector2(112f, 112f);
+        r.anchoredPosition = new Vector2(left ? -325f : 325f, 0f);   // チーム名のすぐ外。縦長の画面でも端で切れない位置
+        m.gameObject.SetActive(false);
+        return m;
+    }
+
+    public void ShowVersus(string leftName, Sprite[] leftHeads, string rightName, Sprite[] rightHeads, bool leftFirst,
+        Sprite leftMark = null, Sprite rightMark = null)
     {
         BuildVersus();
+        _vsLeftMark.sprite = leftMark; _vsLeftMark.gameObject.SetActive(leftMark != null);
+        _vsRightMark.sprite = rightMark; _vsRightMark.gameObject.SetActive(rightMark != null);
         SetVsBand(_vsLeftName, _vsLeftSide, _vsLeftHeads, leftName, leftHeads, leftFirst);
         SetVsBand(_vsRightName, _vsRightSide, _vsRightHeads, rightName, rightHeads, !leftFirst);
         _vsMark.text = "";
@@ -746,6 +791,7 @@ public class BattingUI
             if (t >= 0.32f && _vsMark.text.Length == 0)
             {
                 _vsMark.text = "VS";
+                BgmPlayer.Jingle("bgm-versus");
                 _vsFlash.color = new Color(1f, 1f, 1f, 0.7f);
             }
             var fc = _vsFlash.color;

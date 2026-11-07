@@ -16,7 +16,7 @@ public partial class AppShell
     private readonly List<RectTransform> _titleCards = new List<RectTransform>();
     private Vector2[] _titleCardHome;
     private JellyText _logo1, _logo2;
-    private RectTransform _titleCont;
+    private RectTransform _titleCont, _titleEmblem;
     private bool _titleIntroDone, _titleIntroRunning, _titleSkip;
 
     private IEnumerator TitleStep(float dur, Action<float> f)
@@ -73,9 +73,11 @@ public partial class AppShell
         var flash = UiKit.Img(_title, "Flash", SpriteFactory.White, new Color(1f, 1f, 1f, 0f));
         UiKit.Fill(flash.rectTransform);
         logo1.localScale = Vector3.zero; logo2.localScale = Vector3.zero; _titleCont.localScale = Vector3.zero;
+        if (_titleEmblem != null) _titleEmblem.localScale = Vector3.zero;
         raysImg.color = new Color(raysC.r, raysC.g, raysC.b, 0f);
         // ロゴとボタンは幕より手前(幕は背景・カードだけを暗くする)
         curtain.transform.SetSiblingIndex(_titleRays.GetSiblingIndex() + 1);
+        if (_titleEmblem != null) _titleEmblem.SetAsLastSibling();
         logo1.SetAsLastSibling(); logo2.SetAsLastSibling(); _titleCont.SetAsLastSibling();
         flash.transform.SetAsLastSibling();
         _namePanel.SetAsLastSibling();   // 名前入力はいつも一番手前
@@ -110,6 +112,7 @@ public partial class AppShell
             GameAudio.Play(Sfx.HitPerfect, 1f, 0.75f);
             GameAudio.Play(Sfx.BigCheer, 0.6f);
             BgmPlayer.PlayBase(BgmPlayer.Home);
+            BgmPlayer.Jingle("bgm-title");
             _logo2.Boost = 0.8f;
             for (int k = 0; k < 4; k++)
                 _fx.Firework(new Vector2(UnityEngine.Random.Range(-420f, 420f), -300f), UnityEngine.Random.Range(330f, 470f),
@@ -118,6 +121,7 @@ public partial class AppShell
         Vector2 home = _title.anchoredPosition;
         yield return TitleStep(0.3f, u =>
         {
+            if (_titleEmblem != null) _titleEmblem.localScale = Vector3.one * BackOut(u);
             flash.color = new Color(1f, 1f, 1f, 0.75f * (1f - u));
             curtain.color = new Color(0f, 0f, 0f, Mathf.Lerp(0.55f, 0f, u));
             float amp = (1f - u) * 14f;
@@ -144,6 +148,7 @@ public partial class AppShell
         if (_titleSkip) BgmPlayer.PlayBase(BgmPlayer.Home);
         logo1.anchoredPosition = l1; logo2.anchoredPosition = l2;
         logo1.localScale = logo2.localScale = Vector3.one;
+        if (_titleEmblem != null) _titleEmblem.localScale = Vector3.one;
         _titleCont.localScale = Vector3.one;
         raysImg.color = raysC;
         _titleRays.localScale = Vector3.one;

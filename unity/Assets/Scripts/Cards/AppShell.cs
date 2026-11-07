@@ -213,6 +213,16 @@ public partial class AppShell : MonoBehaviour
         logo2.color = new Color(1f, 0.95f, 0.78f);
         UiKit.Style(logo1, TelopFx.Kind.Logo);
         UiKit.Style(logo2, TelopFx.Kind.Logo);
+        // ロゴの後ろの飾り(金のボール・王冠・月桂樹)。「ベースボール」の段の帯に重ねる
+        var emb = Resources.Load<Sprite>("Presentation/title_emblem");
+        if (emb != null)
+        {
+            var e = UiKit.Img(_title, "Emblem", emb, Color.white);
+            e.preserveAspect = true;
+            UiKit.Place(e.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -142f), new Vector2(900f, 450f));
+            e.transform.SetSiblingIndex(logo1.transform.GetSiblingIndex());
+            _titleEmblem = e.rectTransform;
+        }
         _logo1 = logo1.gameObject.AddComponent<JellyText>();
         _logo2 = logo2.gameObject.AddComponent<JellyText>();
         _logo2.Amp = 3f; _logo2.Wave = 0.025f;

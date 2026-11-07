@@ -46,18 +46,7 @@ def main():
         im = im.crop(im.getchannel('A').getbbox()); im.thumbnail((128, 128), Image.LANCZOS)
         c = Image.new('RGBA', (128, 128), (0, 0, 0, 0)); c.paste(im, ((128 - im.width) // 2, (128 - im.height) // 2))
         S(c, n + '.png')
-    # 試作(フェーズE): 決めポーズ3枚は Aポーズと同じ台紙(512x768)・同じ縮尺。足の下端の高さを proto_meta.txt に書く
-    meta = []
-    rig = os.path.join(src, '..', '..', 'chara', 'rig-src', 'ojisan')
-    for n in ('swing_ready', 'swing_follow', 'pitch_release'):
-        f = os.path.join(rig, 'ojisan_' + n + '.png')
-        if not os.path.exists(f): continue
-        im = Image.open(f).convert('RGBA').resize((512, 768), Image.LANCZOS)
-        bb = im.getchannel('A').point(lambda v: 255 if v > 40 else 0).getbbox()
-        S(im, 'proto_ojisan_' + n + '.png'); meta.append('proto_ojisan_%s %d %d' % (n, bb[3], bb[3] - bb[1]))
-    im = Image.open(O('ojisan_run_side.png')).convert('RGBA'); im = im.crop(im.getchannel('A').getbbox())
-    im = fit_w(im, 768); S(im, 'proto_ojisan_run_side.png'); meta.append('proto_ojisan_run_side %d %d' % (im.height, im.height))
-    open(os.path.join(dst, 'proto_meta.txt'), 'w').write('\n'.join(meta) + '\n')
+    # 決めポーズ・走り絵は Tools/chara-rig/prep_poses.py(Resources/Chara/Pose)へ移った
     print('ok', sorted(os.listdir(dst)))
 
 if __name__ == '__main__':
