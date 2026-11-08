@@ -79,7 +79,10 @@ public class CharaImportSettings : AssetPostprocessor
         if (body || prop)
         {
             ti.alphaIsTransparency = true;
-            ti.mipmapEnabled = true;
+            // 体(512×768)と持ち物(横長・寸法まちまち)は2の累乗でない。2の累乗でない絵にミップマップを付けると、
+            // ブラウザ版では ASTC に圧縮されず無圧縮(1枚2MB)で入ってしまう(ダウンロードが約150MBになっていた原因)。
+            // 遠くの選手はビルボード絵に切り替えるので、ここではミップマップを付けない。
+            ti.mipmapEnabled = false;
             ti.maxTextureSize = body ? 1024 : 512;
             var bs = new TextureImporterSettings();
             ti.ReadTextureSettings(bs);
