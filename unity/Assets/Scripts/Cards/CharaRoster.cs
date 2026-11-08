@@ -130,30 +130,50 @@ public static class CharaRoster
     }
 
     // ---- 打順・投手 ------------------------------------------------
-    public class Team { public List<CharaDef> Lineup = new List<CharaDef>(); public CharaDef Pitcher; }
+    // Field: 守備位置ごとの選手(添字は FieldingModel の順: 0投 1捕 2一 3二 4三 5遊 6左 7中 8右)。null なら自動で割り当てる
+    public class Team { public List<CharaDef> Lineup = new List<CharaDef>(); public CharaDef Pitcher; public CharaDef[] Field; }
+
+    // 守備位置を決める: 編成で決めてあればそれ、なければカードの守備(捕手・内野手・外野手)から割り当てる。打者専門は指名打者に回す
+    public static CharaDef[] FieldOf(Team t)
+    {
+        if (t.Field != null && t.Field.Length == 9) return t.Field;
+        var f = new CharaDef[9];
+        f[0] = t.Pitcher;
+        var pool = new List<CharaDef>(t.Lineup);
+        System.Func<string, CharaDef> take = pos =>
+        {
+            var d = pool.Find(x => x != null && x.Position == pos);
+            if (d != null) pool.Remove(d);
+            return d;
+        };
+        f[1] = take("捕手");
+        for (int i = 2; i <= 5; i++) f[i] = take("内野手");
+        for (int i = 6; i <= 8; i++) f[i] = take("外野手");
+        // 空いた位置は、打者専門以外 → 打者専門の順で埋める
+        pool.Sort((a, b) => (a.Position == "打者専門" ? 1 : 0) - (b.Position == "打者専門" ? 1 : 0));
+        for (int i = 1; i <= 8; i++) if (f[i] == null && pool.Count > 0) { f[i] = pool[0]; pool.RemoveAt(0); }
+        t.Field = f;
+        return f;
+    }
 
 
+    // 自分のチーム: 編成(ポジションごとの9人+投手と打順)をそのまま使う。保存がなければ自動で組む
     public static Team UserTeam()
     {
-        var t = new Team();
-        var owned = new List<CharaDef>();
-        var all = new List<CharaDef>();
-        foreach (var d in CharaCatalog.All) { all.Add(d); if (Collection.Owned(d.Id)) owned.Add(d); }
-        // 投手: 所持の中で一番レアな投手。いなければ「寝坊助エース」
-        foreach (var d in owned) if (Role(d) == CharaRole.Pitcher) { t.Pitcher = d; break; }
-        if (t.Pitcher == null) t.Pitcher = CharaCatalog.Get("sleepyhead");
-        // 打者: 所持(レア度順)→ 足りなければおまかせ(★3〜★1の野手から)
-        foreach (var d in owned) if (Role(d) != CharaRole.Pitcher && Fields(d) && t.Lineup.Count < 9) t.Lineup.Add(d);
-        string[] fallback = { "rookie", "ceo", "carpenter", "umpire", "teacher", "bigeater", "chef", "student", "suntan", "cat", "farmer", "guard" };
-        foreach (var id in fallback)
+        var l = TeamSetup.Load();
+        var t = new Team { Pitcher = l.Pitcher, Field = new CharaDef[9] };
+        t.Field[0] = l.Pitcher;
+        foreach (var e in l.Order)
         {
-            if (t.Lineup.Count >= 9) break;
-            var d = CharaCatalog.Get(id);
-            if (!t.Lineup.Contains(d)) t.Lineup.Add(d);
+            t.Lineup.Add(e.D);
+            int fi = TeamSetup.FielderIndex(e.S);
+            if (fi > 0) t.Field[fi] = e.D;
         }
-        Order(t.Lineup);
         return t;
     }
+
+    // 所持カードが足りないときに打線を埋める選手(編成でも選べる)
+    public static readonly string[] FreeAgents = { "rookie", "ceo", "carpenter", "umpire", "teacher", "bigeater", "chef", "student", "suntan", "cat", "farmer", "guard", "sleepyhead" };
 
     public static Team OpponentTeam(Team user, int seed)
     {
@@ -180,7 +200,7 @@ public static class CharaRoster
     }
 
     // 打順: 1-2番に俊足・巧打、3-5番に長打、残りはそのまま
-    private static void Order(List<CharaDef> lineup)
+    public static void Order(List<CharaDef> lineup)
     {
         var speed = new List<CharaDef>(); var contact = new List<CharaDef>(); var power = new List<CharaDef>();
         foreach (var d in lineup)

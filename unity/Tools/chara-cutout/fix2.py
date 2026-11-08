@@ -19,10 +19,11 @@ def save(im,a,cid):
     ys,xs=np.where(a>0.05); H,W=a.shape
     y0,y1=max(0,ys.min()-4),min(H,ys.max()+5); x0,x1=max(0,xs.min()-4),min(W,xs.max()+5)
     Image.fromarray(rgba[y0:y1,x0:x1]).save(os.path.join(out,cid+'.png'))
-# 審判: 3コマの一番下だけ使う
-u=Image.open(os.path.join(src,'umpire.png')).convert('RGB'); W,H=u.size
-uc=u.crop((0,int(H*0.665),int(W*0.78),H))
-a=np.clip((matte(uc)-0.25)/0.5,0,1); save(uc,a,'umpire')
+# 審判: 3コマの一番下だけ使う(2026-11-07 に1コマの umpire_v2.png へ作り直し済みなら何もしない)
+if not os.path.exists(os.path.join(src,'umpire_v2.png')):
+    u=Image.open(os.path.join(src,'umpire.png')).convert('RGB'); W,H=u.size
+    uc=u.crop((0,int(H*0.665),int(W*0.78),H))
+    a=np.clip((matte(uc)-0.25)/0.5,0,1); save(uc,a,'umpire')
 # 幽霊: 半透明なので色(彩度が低い/青い)で抜く
 g=Image.open(os.path.join(src,'ghost.png')).convert('RGB'); W,H=g.size
 gc=g.crop((int(W*0.08),int(H*0.08),int(W*0.97),int(H*0.90)))

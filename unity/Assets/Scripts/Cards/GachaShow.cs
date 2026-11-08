@@ -19,7 +19,27 @@ public partial class AppShell
     public void Pull(int times)
     {
         if (_busy) return;
-        StartCoroutine(PullRoutine(times));
+        List<PullResult> results;
+        if (!Gacha.TryPullCoins(times, out results))
+        {
+            GameAudio.Play(Sfx.Boing, 0.5f, 1.2f);
+            return;
+        }
+        RefreshGacha();
+        StartCoroutine(PullRoutineFixed(results));
+    }
+
+    private void Scout()
+    {
+        if (_busy) return;
+        List<PullResult> results;
+        if (!Gacha.TryScout(out results))
+        {
+            GameAudio.Play(Sfx.Boing, 0.5f, 1.2f);
+            return;
+        }
+        RefreshGacha();
+        StartCoroutine(PullRoutineFixed(results));
     }
 
     // 検証用: 指定のキャラで演出だけ見る(所持は増やさない)
@@ -31,15 +51,18 @@ public partial class AppShell
         StartCoroutine(PullRoutineFixed(new List<PullResult> { r }));
     }
 
-    private IEnumerator PullRoutine(int times)
-    {
-        var results = Gacha.Pull(times);
-        yield return PullRoutineFixed(results);
-    }
-
     private IEnumerator PullRoutineFixed(List<PullResult> results)
     {
         _busy = true;
+        // ダイヤルをぐるっと回して、マシンを揺らしてから演出へ
+        if (_gachaDial != null && _gacha.gameObject.activeSelf)
+        {
+            _dialSpin = 1400f;
+            GameAudio.Play(Sfx.Whoosh, 0.6f, 0.7f);
+            float t = 0f;
+            while (t < 0.55f && !_tapped) { t += Time.unscaledDeltaTime; yield return null; }
+            _tapped = false;
+        }
         BgmPlayer.Jingle("bgm-gacha-pull", 3.5f);
         _skipAll = false;
         ClearChildren(_show);
@@ -159,9 +182,7 @@ public partial class AppShell
             var stamp = UiKit.Txt(stage, "Stamp", secret ? "SECRET" : "★5", secret ? 110 : 130,
                 secret ? new Color(1f, 0.75f, 1f) : UiKit.GoldLight, TextAnchor.MiddleCenter);
             UiKit.Place(stamp.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 160f));
-            var ssh = stamp.gameObject.AddComponent<Shadow>();
-            ssh.effectColor = new Color(0.5f, 0f, 0f, 1f);
-            ssh.effectDistance = new Vector2(5f, -6f);
+            UiKit.Style(stamp, TelopFx.Kind.Big);
             GameAudio.Play(Sfx.HitPerfect, 1f, 0.8f);
             BgmPlayer.Jingle(secret ? "bgm-rarity-secret" : "bgm-rarity-5");
             GameAudio.Play(Sfx.BigCheer, 0.9f);
@@ -199,8 +220,9 @@ public partial class AppShell
         card.Root.anchoredPosition = new Vector2(0f, 20f);
         card.Frame.raycastTarget = false;
         flash.transform.SetAsLastSibling();
-        var name = UiKit.Txt(stage, "Name", d.Name, 32, Color.white, TextAnchor.MiddleCenter);
+        var name = UiKit.Style(UiKit.Txt(stage, "Name", d.Name, 32, Color.white, TextAnchor.MiddleCenter), TelopFx.Kind.Heading);
         UiKit.Place(name.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -222f), new Vector2(700f, 44f));
+        UiKit.FitName(name, d.Name, 680f, 0f, 32, 24);
         string sub = r.Add.Capped ? "MAX" : (r.Add.IsNew ? "" : "重ね " + r.Add.After + " / " + CharaCatalog.StackMax(d));
         var subT = UiKit.Txt(stage, "Sub", sub, 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
         UiKit.Place(subT.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -252f), new Vector2(500f, 28f));

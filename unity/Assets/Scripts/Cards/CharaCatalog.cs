@@ -16,16 +16,9 @@ public class CharaDef
     public int StackLimit = 1;
     public int ExchangePoints = 1;
     public string ImageFile = "";
-    private int _hasImage = -1;
-    // 画像があるか(ない51体はプレースホルダで表示。画像を置けば自動で差し替わる)
-    public bool HasImage
-    {
-        get
-        {
-            if (_hasImage < 0) _hasImage = Resources.Load<Sprite>("Chara/Thumb/" + Id) != null ? 1 : 0;
-            return _hasImage == 1;
-        }
-    }
+    // 小さい索引だけを読む。相手チームの編成で全員の画像をロードしない。
+    public bool HasImage { get { return CharaCatalog.HasImage(Id); } }
+
 }
 
 // ============================================================
@@ -163,42 +156,156 @@ public static class CharaCatalog
         }
     }
 
+    // 画像追加時は Editor/CharaImageIndex が自動更新する。
+    private static HashSet<string> _imageIds;
+    public static bool HasImage(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return false;
+        if (_imageIds == null)
+        {
+            _imageIds = new HashSet<string>(System.StringComparer.Ordinal);
+            var index = Resources.Load<TextAsset>("Chara/image-index");
+            if (index != null)
+                foreach (string line in index.text.Split('\n'))
+                {
+                    string key = line.Trim();
+                    if (key.Length > 0) _imageIds.Add(key);
+                }
+        }
+        return _imageIds.Contains(id);
+    }
+
     // ---- 画像の読み込み(拡大用は必要なときだけ読む) ----
     private static readonly Dictionary<string, Sprite> Thumbs = new Dictionary<string, Sprite>();
 
-    public static Sprite Thumb(string id)
-    {
-        Sprite s;
-        if (Thumbs.TryGetValue(id, out s) && s != null) return s;
-        s = Resources.Load<Sprite>("Chara/Thumb/" + id);
-        Thumbs[id] = s;
-        return s;
-    }
+    public static Sprite Thumb(string id) { return Load(Thumbs, "Thumb", id); }
 
     // 試合用: 背景を抜いた立ち姿(足元が原点) / 頭(円形に切り抜き)
     private static readonly Dictionary<string, Sprite> Cuts = new Dictionary<string, Sprite>();
     private static readonly Dictionary<string, Sprite> Heads = new Dictionary<string, Sprite>();
 
-    public static Sprite Cut(string id)
+    public static Sprite Cut(string id) { return Load(Cuts, "Cut", id); }
+    public static Sprite Head(string id) { return Load(Heads, "Head", id); }
+    public static Sprite Full(string id) { return Load(Fulls, "Full", id); }
+
+    // 試合で動かす用: Aポーズの立ち絵(Body) / 持ち物(Bat。握る側が左) / グローブ(Glove)。Tools/chara-rig/prep_body.py で作る
+    private static readonly Dictionary<string, Sprite> Bodies = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<string, Sprite> Bats = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<string, Sprite> Gloves = new Dictionary<string, Sprite>();
+    public static Sprite Body(string id) { return Load(Bodies, "Body", id); }
+
+    // 遠景用のビルボード絵(512×512、足の裏が下から16px)。BillboardHeightPx はその絵の体の高さ(px)
+    private static readonly Dictionary<string, Sprite> Billboards = new Dictionary<string, Sprite>();
+    private static Dictionary<string, float> _bbMeta;
+    public static Sprite Billboard(string id) { return Load(Billboards, "Billboard", id); }
+    public static float BillboardHeightPx(string id)
     {
+        if (_bbMeta == null)
+        {
+            _bbMeta = new Dictionary<string, float>();
+            var ta = Resources.Load<TextAsset>("Chara/billboard_meta");
+            if (ta != null)
+                foreach (var line in ta.text.Split('\n'))
+                {
+                    var f = line.Trim().Split(' ');
+                    float v;
+                    if (f.Length == 2 && float.TryParse(f[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v)) _bbMeta[f[0]] = v;
+                }
+        }
+        float h;
+        return _bbMeta.TryGetValue(id ?? "", out h) ? h : 480f;
+    }
+    public static Sprite BatArt(string id) { return Load(Bats, "Bat", id); }
+    public static Sprite GloveArt(string id) { return Load(Gloves, "Glove", id); }
+
+    // ---- 画像のメモリ管理 ----
+    // 読んだ画像は最後に使った時刻を覚えておく。種類ごとの上限を超えたら、画面で使われていない古いものから
+    // 手放し(辞書から外す)、Resources.UnloadUnusedAssets でどこからも参照されていない画像だけをメモリから消す。
+    // 使用中(表示中の UI・スプライト・選手の体)の画像は消さない。必要になればまた読み込む。
+    private static readonly Dictionary<string, Sprite> Fulls = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<string, float> LastUse = new Dictionary<string, float>();
+    public static int MaxThumbs = 40, MaxCuts = 32, MaxHeads = 32, MaxFulls = 4, MaxBodies = 24, MaxProps = 24;   // Cut・Head は両チームの打順(18人)が収まる数
+    public static int Loads { get; private set; }
+    public static int Released { get; private set; }
+
+    private static Sprite Load(Dictionary<string, Sprite> dict, string kind, string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+        LastUse[kind + "/" + id] = Time.realtimeSinceStartup;
         Sprite s;
-        if (Cuts.TryGetValue(id, out s) && s != null) return s;
-        s = Resources.Load<Sprite>("Chara/Cut/" + id);
-        Cuts[id] = s;
+        if (dict.TryGetValue(id, out s) && s != null) return s;
+        s = Resources.Load<Sprite>("Chara/" + kind + "/" + id);
+        dict[id] = s;
+        if (s != null) Loads++;
         return s;
     }
 
-    public static Sprite Head(string id)
+    public static int Cached { get { return Thumbs.Count + Cuts.Count + Heads.Count + Fulls.Count + Bodies.Count + Bats.Count + Gloves.Count; } }
+
+    public static bool OverBudget
     {
-        Sprite s;
-        if (Heads.TryGetValue(id, out s) && s != null) return s;
-        s = Resources.Load<Sprite>("Chara/Head/" + id);
-        Heads[id] = s;
-        return s;
+        get
+        {
+            return Thumbs.Count > MaxThumbs || Cuts.Count > MaxCuts || Heads.Count > MaxHeads || Fulls.Count > MaxFulls
+                || Bodies.Count > MaxBodies || Bats.Count > MaxProps || Gloves.Count > MaxProps;
+        }
     }
 
-    public static Sprite Full(string id)
+    // 上限を超えた分を手放す。unload=true なら参照の切れた画像をメモリから消す(画面の切り替え時など)。
+    public static int TrimArt(bool unload)
     {
-        return Resources.Load<Sprite>("Chara/Full/" + id);
+        int n = 0;
+        if (OverBudget)
+        {
+            var used = UsedTextures();
+            n += TrimKind(Thumbs, "Thumb", MaxThumbs, used);
+            n += TrimKind(Cuts, "Cut", MaxCuts, used);
+            n += TrimKind(Heads, "Head", MaxHeads, used);
+            n += TrimKind(Fulls, "Full", MaxFulls, used);
+            n += TrimKind(Bodies, "Body", MaxBodies, used);
+            n += TrimKind(Bats, "Bat", MaxProps, used);
+            n += TrimKind(Gloves, "Glove", MaxProps, used);
+            Released += n;
+        }
+        if (unload && n > 0) Resources.UnloadUnusedAssets();
+        return n;
+    }
+
+    private static HashSet<Texture> UsedTextures()
+    {
+        var set = new HashSet<Texture>();
+        foreach (var im in Object.FindObjectsOfType<UnityEngine.UI.Image>()) if (im.sprite != null) set.Add(im.sprite.texture);
+        foreach (var sr in Object.FindObjectsOfType<SpriteRenderer>()) if (sr.sprite != null) set.Add(sr.sprite.texture);
+        foreach (var mr in Object.FindObjectsOfType<MeshRenderer>())
+        {
+            var m = mr.sharedMaterial;
+            if (m != null && m.HasProperty("_MainTex") && m.mainTexture != null) set.Add(m.mainTexture);
+        }
+        return set;
+    }
+
+    private static readonly List<string> _trimKeys = new List<string>();
+    private static int TrimKind(Dictionary<string, Sprite> dict, string kind, int max, HashSet<Texture> used)
+    {
+        if (dict.Count <= max) return 0;
+        _trimKeys.Clear();
+        _trimKeys.AddRange(dict.Keys);
+        _trimKeys.Sort((a, b) => Last(kind, a).CompareTo(Last(kind, b)));
+        int removed = 0;
+        for (int i = 0; i < _trimKeys.Count && dict.Count > max; i++)
+        {
+            var s = dict[_trimKeys[i]];
+            if (s != null && used.Contains(s.texture)) continue;   // 表示中は守る
+            dict.Remove(_trimKeys[i]);
+            LastUse.Remove(kind + "/" + _trimKeys[i]);
+            removed++;
+        }
+        return removed;
+    }
+
+    private static float Last(string kind, string id)
+    {
+        float t;
+        return LastUse.TryGetValue(kind + "/" + id, out t) ? t : 0f;
     }
 }

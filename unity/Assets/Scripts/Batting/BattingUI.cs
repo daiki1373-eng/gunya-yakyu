@@ -5,22 +5,28 @@ using UnityEngine.UI;
 // BattingUI.cs
 // ミニマルなHUD。ラベル・数値・短い状態表示・SWINGボタンだけ(説明文なし)。
 // ============================================================
-public class BattingUI
+public partial class BattingUI
 {
     private Text _count, _batter, _speed, _rank, _result, _quirk, _banner;
     private Image[] _bases = new Image[4];
     private Text _swingLabel, _comm, _replayTag;
     private float _commStart = -99f;
+    private TelopFx _commFx;
+    private GameObject _batterPlate;
+    private Text _headline;
+    private Sprite _pitchOff, _pitchOn;
     private const float CommDur = 1.9f;
     // 投球UI
     private Image[] _pitchBtn = new Image[5];
     private Text[] _pitchTxt = new Text[5];
     private bool[] _pitchAvail = new bool[5];
     private int _pitchSel;
+    private readonly float[] _pitchRowY = { 70f, 24f, -22f, -68f, -114f };
     private RectTransform _meterRoot, _meterMarker;
     private Image _meterGood, _meterPerfect;
     private const float MeterW = 440f;
-    private RectTransform _swingRect;
+    private RectTransform _swingRect, _stealRect;
+    private Text _stealLabel;
     private Image _swingImg;
     private Font _font;
     private float _swingPulseUntil;
@@ -56,12 +62,38 @@ public class BattingUI
         }
     }
 
+    // SWING／投げるボタンは使わない(打つ=指を離す、投げる=場所に触れる)。いつも隠しておく
+    public void SetControlsVisible(bool on)
+    {
+        if (_swingRect != null) _swingRect.gameObject.SetActive(false);
+    }
+
+    private static Sprite _topShade;
+    private static Sprite TopShadeSprite()
+    {
+        if (_topShade != null) return _topShade;
+        const int h = 64;
+        var tex = new Texture2D(1, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        for (int y = 0; y < h; y++)
+        {
+            float t = y / (h - 1f);   // 0=下端, 1=上端
+            tex.SetPixel(0, y, new Color(0.01f, 0.02f, 0.06f, 0.95f * Mathf.Pow(t, 1.2f)));
+        }
+        tex.Apply();
+        _topShade = Sprite.Create(tex, new Rect(0, 0, 1, h), new Vector2(0.5f, 0.5f), 100f);
+        return _topShade;
+    }
+
+    // 試合のUIの画面(タイトル・ホームの間は AppShell が隠す)
+    public static Canvas RootCanvas { get; private set; }
+
     private void BuildInternal(Transform parent)
     {
         var canvasGo = new GameObject("BattingUI");
         canvasGo.transform.SetParent(parent, false);
         var canvas = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        RootCanvas = canvas;
         var scaler = canvasGo.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(960f, 540f);
@@ -79,6 +111,18 @@ public class BattingUI
         vrt.anchorMax = Vector2.one;
         vrt.offsetMin = Vector2.zero;
         vrt.offsetMax = Vector2.zero;
+
+        // 上端の帯(上から下へ薄くなる影)。表示を読みやすくし、球場の電光掲示板の端を隠す
+        var topShade = new GameObject("TopShade");
+        topShade.transform.SetParent(canvasGo.transform, false);
+        var ts = topShade.AddComponent<Image>();
+        ts.sprite = TopShadeSprite();
+        ts.raycastTarget = false;
+        var tsr = ts.rectTransform;
+        tsr.anchorMin = new Vector2(0f, 1f); tsr.anchorMax = new Vector2(1f, 1f);
+        tsr.pivot = new Vector2(0.5f, 1f);
+        tsr.sizeDelta = new Vector2(0f, 150f);
+        tsr.anchoredPosition = Vector2.zero;
 
         // ---- 中継風スコア表示(左上) ----
         var bug = NewImage(canvasGo.transform, "ScoreBug", new Color(0.03f, 0.05f, 0.12f, 0.86f));
@@ -118,6 +162,7 @@ public class BattingUI
 
         // ---- 打者名(右上) ----
         var plate = NewImage(canvasGo.transform, "BatterPlate", new Color(0.03f, 0.05f, 0.12f, 0.80f));
+        _batterPlate = plate.gameObject;
         var pRt = plate.rectTransform;
         pRt.anchorMin = pRt.anchorMax = new Vector2(1f, 1f);
         pRt.pivot = new Vector2(1f, 1f);
@@ -126,25 +171,35 @@ public class BattingUI
         _batter = NewText(plate.transform, "Batter", new Vector2(1f, 1f), new Vector2(-12f, -2f),
             new Vector2(360f, 30f), 18, TextAnchor.MiddleRight, Color.white);
 
-        _speed = NewText(canvasGo.transform, "Speed", new Vector2(0.5f, 1f), new Vector2(0f, -56f),
-            new Vector2(300f, 34f), 24, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.95f));
-        _rank = NewText(canvasGo.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0f, 150f),
-            new Vector2(700f, 70f), 52, TextAnchor.MiddleCenter, Color.white);
-        _rank.fontStyle = FontStyle.Bold;
-        _result = NewText(canvasGo.transform, "Result", new Vector2(0.5f, 0.5f), new Vector2(0f, 96f),
-            new Vector2(800f, 50f), 34, TextAnchor.MiddleCenter, new Color(1f, 0.95f, 0.6f));
-        _result.fontStyle = FontStyle.Bold;
-        // 結果の文字はグラデーション + 弾んで出る
-        _rank.gameObject.AddComponent<UiFxText>();
-        _result.gameObject.AddComponent<UiFxText>().PopScale = 1.3f;
+        // ---- テロップ ----
+        // 文字の重なりを避けるため、縦の置き場所を決めておく(基準 960x540 の中央からの高さ)
+        //   判定 +150 / 区切りの見出し +78 / 珍プレー +55 / 得点・コイン -20 / 実況 -92 / 結果の札 -168 / 球速は左下の札
+        TelopFx fx;
+        var navy = new Color(0.03f, 0.05f, 0.13f, 0.90f);
+        var speedPlate = NewPlate(canvasGo.transform, "SpeedPlate", new Vector2(0f, 0f), new Vector2(0f, 0.5f),
+            new Vector2(0f, 44f), 42f, navy, UiKit.Gold);
+        _speed = NewTelop(canvasGo.transform, "Speed", new Vector2(0f, 0f), new Vector2(0f, 0.5f), new Vector2(30f, 44f),
+            20, TextAnchor.MiddleLeft, Color.white, TelopFx.Kind.Plain, out fx);
+        fx.Mode = TelopFx.Anim.Slide; fx.SlideFrom = -40f; fx.PopTime = 0.2f;
+        fx.SetPlate(speedPlate); fx.PlatePad = 90f; fx.PlateMinW = 160f;
 
-        _quirk = NewText(canvasGo.transform, "Quirk", new Vector2(0.5f, 0.5f), new Vector2(0f, 40f),
-            new Vector2(800f, 70f), 46, TextAnchor.MiddleCenter, new Color(1f, 0.55f, 0.15f));
-        _quirk.fontStyle = FontStyle.Bold;
-        _quirk.gameObject.AddComponent<UiFxText>().PopScale = 1.7f;
-        _banner = NewText(canvasGo.transform, "Banner", new Vector2(0.5f, 0.5f), new Vector2(0f, -60f),
-            new Vector2(800f, 60f), 38, TextAnchor.MiddleCenter, Color.white);
-        _banner.fontStyle = FontStyle.Bold;
+        _rank = NewTelop(canvasGo.transform, "Rank", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 150f),
+            56, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Rank, out fx);
+
+        var resultPlate = NewPlate(canvasGo.transform, "ResultPlate", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -168f), 54f, navy, UiKit.Gold);
+        _result = NewTelop(canvasGo.transform, "Result", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -168f),
+            30, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Plain, out fx);
+        fx.SetPlate(resultPlate);
+
+        _quirk = NewTelop(canvasGo.transform, "Quirk", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 55f),
+            62, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Stamp, out fx);
+        _banner = NewTelop(canvasGo.transform, "Banner", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -20f),
+            46, TextAnchor.MiddleCenter, Color.white, TelopFx.Kind.Gold, out fx);
+        // 試合の区切り(PLAY BALL・チェンジ・試合終了・サヨナラ)は大きな見出しで出す
+        _headline = NewTelop(canvasGo.transform, "Headline", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 78f),
+            84, TextAnchor.MiddleCenter, new Color(1f, 0.9f, 0.45f), TelopFx.Kind.Logo, out fx);
+        fx.Mode = TelopFx.Anim.Pop; fx.PopScale = 1.8f; fx.PopTime = 0.34f;
 
         // 塁ランプ(ひし形)
         Vector2[] bp = { Vector2.zero, new Vector2(22f, 0f), new Vector2(0f, 22f), new Vector2(-22f, 0f) };
@@ -176,16 +231,31 @@ public class BattingUI
         label.text = "SWING";
         _swingLabel = label;
         label.fontStyle = FontStyle.Bold;
+        var sfx = TelopFx.Apply(label, TelopFx.Kind.Label);
+        sfx.Skew = 0.14f; sfx.Outer = new Color(0.35f, 0.02f, 0.03f, 1f); sfx.OuterWidth = 2.2f;
 
-        // 実況字幕(大きく弾むように出す)
-        _comm = NewText(canvasGo.transform, "Commentary", new Vector2(0.5f, 0.5f), new Vector2(0f, 210f),
-            new Vector2(900f, 90f), 60, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.35f));
-        _comm.fontStyle = FontStyle.Bold;
-        _comm.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        var steal = NewImage(canvasGo.transform, "StealButton", Color.white);
+        steal.sprite = UiKit.ButtonRed;
+        steal.type = Image.Type.Sliced;
+        _stealRect = steal.rectTransform;
+        _stealRect.anchorMin = _stealRect.anchorMax = new Vector2(1f, 0f);
+        _stealRect.pivot = new Vector2(1f, 0f);
+        _stealRect.sizeDelta = new Vector2(118f, 54f);
+        _stealRect.anchoredPosition = new Vector2(-238f, 24f);
+        _stealLabel = NewText(_stealRect, "Label", new Vector2(0.5f, 0.5f), Vector2.zero,
+            new Vector2(118f, 54f), 23, TextAnchor.MiddleCenter, Color.white);
+        _stealLabel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        ShowSteal(false, false);
+
+        // 実況字幕(バラエティ番組のような太い縁で、横から滑り込む)
+        _comm = NewTelop(canvasGo.transform, "Commentary", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -92f),
+            48, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.35f), TelopFx.Kind.Comment, out _commFx);
         _comm.text = "";
-        _replayTag = NewText(canvasGo.transform, "ReplayTag", new Vector2(1f, 1f), new Vector2(-16f, -52f),
-            new Vector2(300f, 34f), 24, TextAnchor.MiddleRight, new Color(1f, 0.4f, 0.35f));
-        _replayTag.fontStyle = FontStyle.Bold;
+        var replayPlate = NewPlate(canvasGo.transform, "ReplayPlate", new Vector2(1f, 1f), new Vector2(1f, 0.5f),
+            new Vector2(0f, -66f), 36f, new Color(0.72f, 0.05f, 0.08f, 0.95f), UiKit.GoldLight);
+        _replayTag = NewTelop(canvasGo.transform, "ReplayTag", new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(-34f, -66f),
+            19, TextAnchor.MiddleRight, Color.white, TelopFx.Kind.Plain, out fx);
+        fx.SetPlate(replayPlate); fx.PlatePad = 70f; fx.PlateMinW = 150f;
         _replayTag.text = "";
 
         BuildIntroCard(canvasGo.transform);
@@ -207,6 +277,32 @@ public class BattingUI
         r.anchoredPosition = topLeft;
     }
 
+    // 得点表示の「自」「相」をチームの印にする(印がなければ文字のまま)
+    private readonly Image[] _chipMark = new Image[2];
+    public void SetTeamMarks(Sprite me, Sprite opp)
+    {
+        var marks = new[] { me, opp };
+        for (int i = 0; i < 2; i++)
+        {
+            var chip = _teamChip[i];
+            if (chip == null) continue;
+            if (_chipMark[i] == null)
+            {
+                _chipMark[i] = NewImage(chip.transform, "Mark", Color.white);
+                _chipMark[i].preserveAspect = true;
+                _chipMark[i].raycastTarget = false;
+                var r = _chipMark[i].rectTransform;
+                r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+                r.sizeDelta = new Vector2(30f, 30f);
+            }
+            bool has = marks[i] != null;
+            _chipMark[i].sprite = marks[i];
+            _chipMark[i].gameObject.SetActive(has);
+            var t = chip.transform.Find("T");
+            if (t != null) t.gameObject.SetActive(!has);
+        }
+    }
+
     private Image Chip(Transform parent, string label, Color c, float x, float y)
     {
         var img = NewImage(parent, "Chip" + label, c);
@@ -217,21 +313,44 @@ public class BattingUI
         return img;
     }
 
-    public void SetCount(int inning, bool top, int balls, int strikes, int outs, int runs, int oppRuns)
+    public void SetCount(int inning, bool top, int balls, int strikes, int outs, int runs, int oppRuns, bool? userBatting = null)
     {
         _count.text = inning + (top ? "回表" : "回裏");
         _scoreTxt[0].text = runs.ToString();
         _scoreTxt[1].text = oppRuns.ToString();
-        // 攻撃中のチームのチップを明るく
-        _teamChip[0].color = top ? new Color(0.90f, 0.18f, 0.18f) : new Color(0.45f, 0.12f, 0.12f);
-        _teamChip[1].color = top ? new Color(0.10f, 0.18f, 0.45f) : new Color(0.18f, 0.34f, 0.90f);
-        int[] v = { balls, strikes, outs };
+        // 表・裏と自チームの攻撃は別々に扱う。
+        bool attacking = userBatting ?? top;
+        _teamChip[0].color = attacking ? new Color(0.90f, 0.18f, 0.18f) : new Color(0.45f, 0.12f, 0.12f);
+        _teamChip[1].color = attacking ? new Color(0.10f, 0.18f, 0.45f) : new Color(0.18f, 0.34f, 0.90f);
         for (int r = 0; r < 3; r++)
             for (int k = 0; k < _lamps[r].Length; k++)
-                _lamps[r][k].color = k < v[r] ? _lampOn[r] : new Color(1f, 1f, 1f, 0.15f);
+                _lamps[r][k].color = k < (r == 0 ? balls : (r == 1 ? strikes : outs)) ? _lampOn[r] : new Color(1f, 1f, 1f, 0.15f);
     }
 
-    public void SetBatterLabel(string text) { _batter.text = text; }
+    public void SetBatterLabel(string text) { SetBatterText(text); }
+
+    // 打者札: 能力の数字を金色にし、長い名前は札に収まるまで文字を小さくする
+    private void SetBatterText(string text)
+    {
+        text = text ?? "";
+        _batter.text = System.Text.RegularExpressions.Regex.Replace(text, @"(\d+)", "<color=#FFD54A>$1</color>");
+        if (_batterPlate != null) _batterPlate.SetActive(text.Length > 0);   // 空の札は出さない
+        _batter.fontSize = 18;
+        while (_batter.fontSize > 12 && _batter.preferredWidth > 356f) _batter.fontSize--;
+    }
+
+    public void ShowSteal(bool available, bool queued)
+    {
+        if (_stealRect == null) return;
+        _stealRect.gameObject.SetActive(available);
+        _stealLabel.text = queued ? "盗塁  ✓" : "盗塁";
+    }
+
+    public bool OverSteal(Vector2 screenPos)
+    {
+        return _stealRect != null && _stealRect.gameObject.activeSelf
+            && RectTransformUtility.RectangleContainsScreenPoint(_stealRect, screenPos, null);
+    }
 
     public void SetSwingLabel(string text) { if (_swingLabel != null) _swingLabel.text = text; }
 
@@ -244,24 +363,38 @@ public class BattingUI
     // ---- 投球UI(球種ボタン・タイミングメーター) ----
     private void BuildPitchPanel(Transform canvas)
     {
+        // 球種のボタン: 小さな札(色の点+名前)を、打者と反対側の端に縦に並べる。番号の表示はなし
         for (int i = 0; i < 5; i++)
         {
-            var img = NewImage(canvas, "PitchBtn" + i, new Color(0f, 0f, 0f, 0.45f));
+            if (_pitchOff == null)
+            {
+                _pitchOff = TelopFx.PlateSprite(new Color(0.03f, 0.05f, 0.13f, 0.80f), new Color(1f, 1f, 1f, 0.18f));
+                _pitchOn = TelopFx.PlateSprite(new Color(0.70f, 0.07f, 0.09f, 0.96f), UiKit.GoldLight);
+            }
+            var img = NewImage(canvas, "PitchBtn" + i, Color.white);
+            img.sprite = _pitchOff;
             var r = img.rectTransform;
-            r.anchorMin = r.anchorMax = new Vector2(0f, 0.5f);
-            r.pivot = new Vector2(0f, 0.5f);
-            r.sizeDelta = new Vector2(190f, 40f);
-            r.anchoredPosition = new Vector2(14f, 70f - i * 46f);
-            var t = NewText(r, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190f, 40f),
-                20, TextAnchor.MiddleCenter, Color.white);
-            t.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            t.text = (i + 1) + "  " + PitchRepertoire.All[i].Name;
+            r.anchorMin = r.anchorMax = new Vector2(1f, 0.5f);
+            r.pivot = new Vector2(1f, 0.5f);
+            r.sizeDelta = new Vector2(150f, 40f);
+            var dot = NewImage(r, "Dot", PitchColors[i]);
+            dot.sprite = SpriteFactory.Circle; dot.raycastTarget = false;
+            var dr = dot.rectTransform;
+            dr.anchorMin = dr.anchorMax = new Vector2(0f, 0.5f);
+            dr.pivot = new Vector2(0.5f, 0.5f);
+            dr.sizeDelta = new Vector2(14f, 14f);
+            dr.anchoredPosition = new Vector2(20f, 0f);
+            var t = NewText(r, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110f, 40f),
+                19, TextAnchor.MiddleLeft, Color.white);
+            t.rectTransform.anchorMin = new Vector2(0f, 0f); t.rectTransform.anchorMax = new Vector2(1f, 1f);
+            t.rectTransform.offsetMin = new Vector2(36f, 0f); t.rectTransform.offsetMax = new Vector2(-8f, 0f);
+            t.text = PitchRepertoire.All[i].Name;
             _pitchBtn[i] = img;
             _pitchTxt[i] = t;
             img.gameObject.SetActive(false);
         }
 
-        var root = NewImage(canvas, "Meter", new Color(0f, 0f, 0f, 0.55f));
+        var root = NewImage(canvas, "Meter", new Color(0.03f, 0.05f, 0.13f, 0.85f));
         _meterRoot = root.rectTransform;
         _meterRoot.anchorMin = _meterRoot.anchorMax = new Vector2(0.5f, 0f);
         _meterRoot.pivot = new Vector2(0.5f, 0.5f);
@@ -270,6 +403,16 @@ public class BattingUI
         // 良い帯(緑)と完璧の帯(黄)。位置は SetMeterZones で決める
         _meterGood = NewImage(_meterRoot, "Good", new Color(0.35f, 0.85f, 0.4f, 0.75f));
         _meterPerfect = NewImage(_meterRoot, "Perfect", new Color(1f, 0.88f, 0.2f, 0.95f));
+        // 上下の金の線
+        for (int k = 0; k < 2; k++)
+        {
+            var ln = NewImage(_meterRoot, "Edge" + k, new Color(1f, 0.82f, 0.3f, 0.95f));
+            var lr = ln.rectTransform;
+            lr.anchorMin = new Vector2(0f, k); lr.anchorMax = new Vector2(1f, k);
+            lr.pivot = new Vector2(0.5f, 0.5f);
+            lr.sizeDelta = new Vector2(4f, 2f);
+            lr.anchoredPosition = Vector2.zero;
+        }
         var mk = NewImage(_meterRoot, "Marker", Color.white);
         _meterMarker = mk.rectTransform;
         _meterMarker.anchorMin = _meterMarker.anchorMax = new Vector2(0f, 0.5f);
@@ -306,13 +449,30 @@ public class BattingUI
         _meterMarker.anchoredPosition = new Vector2(Mathf.Clamp01(u) * MeterW, 0f);
     }
 
-    // available[i]=その球種を投げられるか
-    public void ShowPitchPanel(bool on, bool[] available, int selected)
+    // 球種ごとの色(投球の軌跡と同じ)
+    public static readonly Color[] PitchColors =
     {
+        new Color(1f, 1f, 1f), new Color(0.45f, 0.70f, 1f), new Color(0.50f, 0.95f, 0.55f),
+        new Color(1f, 0.62f, 0.25f), new Color(1f, 0.95f, 0.45f)
+    };
+    private bool _pitchRight = true;
+
+    // available[i]=その球種を投げられるか。batSide<0(右打者=画面の左に立つ)なら札は右端、そうでなければ左端
+    public void ShowPitchPanel(bool on, bool[] available, int selected, int batSide = -1)
+    {
+        _pitchRight = batSide < 0;
+        int n = 0;
+        for (int i = 0; i < 5; i++) if (available != null && available[i]) n++;
+        int row = 0;
         for (int i = 0; i < 5; i++)
         {
             _pitchAvail[i] = available != null && available[i];
             _pitchBtn[i].gameObject.SetActive(on && _pitchAvail[i]);
+            var r = _pitchBtn[i].rectTransform;
+            r.anchorMin = r.anchorMax = new Vector2(_pitchRight ? 1f : 0f, 0.5f);
+            r.pivot = new Vector2(_pitchRight ? 1f : 0f, 0.5f);
+            // 使える球種だけを隙間なく、画面の縦の真ん中より少し下にそろえて並べる
+            if (_pitchAvail[i]) { _pitchRowY[i] = (n - 1) * 23f - 30f - row * 46f; row++; }
         }
         SelectPitch(selected);
     }
@@ -322,7 +482,13 @@ public class BattingUI
         _pitchSel = k;
         for (int i = 0; i < 5; i++)
         {
-            _pitchBtn[i].color = i == k ? new Color(1f, 0.6f, 0.15f, 0.85f) : new Color(0f, 0f, 0f, 0.45f);
+            bool sel = i == k;
+            _pitchBtn[i].sprite = sel ? _pitchOn : _pitchOff;
+            _pitchBtn[i].color = Color.white;
+            float x = sel ? 22f : 14f;
+            _pitchBtn[i].rectTransform.anchoredPosition = new Vector2(_pitchRight ? -x : x, _pitchRowY[i]);
+            _pitchBtn[i].rectTransform.localScale = Vector3.one * (sel ? 1.06f : 1f);
+            if (_pitchTxt[i] != null) _pitchTxt[i].color = sel ? new Color(1f, 0.93f, 0.55f) : new Color(1f, 1f, 1f, 0.85f);
         }
     }
 
@@ -352,6 +518,7 @@ public class BattingUI
         _comm.text = text ?? "";
         _comm.color = c;
         _commStart = Time.unscaledTime;
+        if (_commFx != null) _commFx.Restart();
     }
 
     public void SetReplay(bool on, string label = "● REPLAY")
@@ -364,12 +531,12 @@ public class BattingUI
 
     public void ShowPitch(string name, float kmh)
     {
-        _speed.text = name + "  " + Mathf.RoundToInt(kmh) + " km/h";
+        _speed.text = name + "  " + SpeedNum(kmh);
     }
 
     public void SetBatter(PlayerStats p)
     {
-        _batter.text = p.Name + "  ミート " + p.Meet + "  パワー " + p.Power;
+        SetBatterText(p.Name + "  ミート " + p.Meet + "  パワー " + p.Power);
     }
 
     public void SetSpeed(string text)
@@ -379,22 +546,40 @@ public class BattingUI
 
     public void ShowSpeed(float kmh)
     {
-        _speed.text = Mathf.RoundToInt(kmh) + " km/h";
+        _speed.text = SpeedNum(kmh);
     }
 
     public void ShowRank(HitRank r, string suffix)
     {
-        _rank.text = RankText(r) + (string.IsNullOrEmpty(suffix) ? "" : "  " + suffix);
+        _rank.text = RankText(r) + (string.IsNullOrEmpty(suffix) ? "" : "  <size=28>" + suffix + "</size>");
         _rank.color = RankColor(r);
     }
 
     public void ShowResult(string text)
     {
-        _result.text = text ?? "";
+        text = text ?? "";
+        // 区切りの言葉は大きな見出しに、残り(点数など)は結果の札に
+        string head = "";
+        if (text == "PLAY BALL" || text == "チェンジ") { head = text; text = ""; }
+        else if (text.StartsWith("試合終了")) { head = "試合終了"; text = text.Substring(4).Trim(); }
+        else if (text.StartsWith("サヨナラ")) { head = "サヨナラ！"; text = text.Substring(4).Trim(); }
+        if (_headline != null) _headline.text = head;
+        if (text.Length > 0 || head.Length > 0) ShowMeter(false);   // 結果が出たら投球メーターは片付ける
+        // 珍プレーのはんこと同じ言葉なら、札は出さない(同じ文字が2つ並ばないように)
+        if (text.Length > 0 && _quirk != null && _quirk.text.Length > 0 && _quirk.text.TrimEnd('！', '!') == text.TrimEnd('！', '!'))
+            text = "";
+        // 飛距離(58m など)は金色で目立たせる
+        _result.text = System.Text.RegularExpressions.Regex.Replace(text, @"(\d+m)", "<color=#FFD54A>$1</color>");
+    }
+
+    private static string SpeedNum(float kmh)
+    {
+        return "<color=#FFD54A><size=27>" + Mathf.RoundToInt(kmh) + "</size></color> km/h";
     }
 
     public void ClearCenter()
     {
+        if (_headline != null) _headline.text = "";
         _rank.text = "";
         _result.text = "";
         if (_quirk != null) _quirk.text = "";
@@ -433,6 +618,8 @@ public class BattingUI
         _card.pivot = new Vector2(0f, 0f);
         _card.sizeDelta = new Vector2(560f, 140f);
         _card.anchoredPosition = new Vector2(CardHidden, 130f);
+        _cardGroup = bg.gameObject.AddComponent<CanvasGroup>();
+        _cardGroup.alpha = 0f;
         _cardStripe = NewImage(_card, "Stripe", Color.red);
         Place(_cardStripe.rectTransform, Vector2.zero, new Vector2(14f, 140f));
         var line = NewImage(_card, "Line", new Color(1f, 0.78f, 0.15f, 1f));
@@ -445,8 +632,10 @@ public class BattingUI
         _cardTitle = NewText(_card, "Title", new Vector2(0f, 1f), new Vector2(32f, -8f), new Vector2(500f, 24f), 18, TextAnchor.MiddleLeft, new Color(0.8f, 0.85f, 1f));
         _cardName = NewText(_card, "Name", new Vector2(0f, 1f), new Vector2(30f, -30f), new Vector2(500f, 54f), 44, TextAnchor.MiddleLeft, Color.white);
         _cardName.fontStyle = FontStyle.Bold;
+        TelopFx.Apply(_cardName, TelopFx.Kind.Heading);
         _cardStats = NewText(_card, "Stats", new Vector2(0f, 1f), new Vector2(32f, -86f), new Vector2(500f, 22f), 18, TextAnchor.MiddleLeft, Color.white);
         _cardCopy = NewText(_card, "Copy", new Vector2(0f, 1f), new Vector2(32f, -110f), new Vector2(500f, 24f), 19, TextAnchor.MiddleLeft, new Color(1f, 0.88f, 0.35f));
+        TelopFx.Apply(_cardCopy, TelopFx.Kind.Heading).Skew = 0.06f;
         _cardSkip = NewText(_card, "Skip", new Vector2(1f, 1f), new Vector2(-12f, -8f), new Vector2(120f, 20f), 14, TextAnchor.MiddleRight, new Color(1f, 1f, 1f, 0.55f));
         _cardSkip.text = "TAP ▶";
         // キャラ画像の札(カードの上にはみ出して立てる)
@@ -460,6 +649,7 @@ public class BattingUI
     }
 
     private Image _cardPortrait, _cardPortraitFrame;
+    private CanvasGroup _cardGroup;
 
     public void ShowIntroCard(string title, string name, string stats, string copy, Color stripe, Sprite portrait = null)
     {
@@ -478,6 +668,9 @@ public class BattingUI
         _cardName.rectTransform.anchoredPosition = new Vector2(x - 2f, _cardName.rectTransform.anchoredPosition.y);
         _cardTitle.text = title;
         _cardName.text = name;
+        // 長い名前は1行のまま札に収める
+        _cardName.fontSize = 44;
+        while (_cardName.fontSize > 26 && _cardName.preferredWidth > 560f - x - 24f) _cardName.fontSize--;
         _cardStats.text = stats;
         _cardCopy.text = copy;
         _cardStripe.color = stripe;
@@ -492,34 +685,204 @@ public class BattingUI
         _cardT = Time.unscaledTime;
     }
 
+    // 札は画面の外から滑り込ませず、最終位置のすぐ左から短く寄せながら浮かび上がらせる
+    // (途中で名前や数値が画面の外に隠れたり、中身のない札だけが見えたりしないように)
     private void TickCard()
     {
         if (_card == null) return;
-        float u = Mathf.Clamp01((Time.unscaledTime - _cardT) / 0.28f);
+        float dur = _cardOn ? 0.22f : 0.16f;
+        float u = Mathf.Clamp01((Time.unscaledTime - _cardT) / dur);
         float e = 1f - (1f - u) * (1f - u);
-        float x = _cardOn ? Mathf.Lerp(CardHidden, CardX, e) : Mathf.Lerp(CardX, CardHidden, e);
+        float x, a;
+        if (_cardOn) { x = Mathf.Lerp(CardX - 48f, CardX, e); a = e; }
+        else { x = Mathf.Lerp(CardX, CardX - 24f, e); a = 1f - e; }
+        if (!_cardOn && u >= 1f) x = CardHidden;
         _card.anchoredPosition = new Vector2(x, 130f);
+        if (_cardGroup != null) _cardGroup.alpha = a;
     }
 
     public void Tick()
     {
         TickCard();
+        TickResult();
+        TickVersus();
         if (_comm != null && _comm.text.Length > 0)
         {
             float u = (Time.unscaledTime - _commStart) / CommDur;
             if (u >= 1f) _comm.text = "";
             else
             {
-                float pop = Mathf.Clamp01(u / 0.14f);
-                float sc = Mathf.Lerp(2.0f, 1f, 1f - (1f - pop) * (1f - pop));
-                float wob = Mathf.Sin(u * 30f) * (1f - u) * 2.5f;
-                _comm.rectTransform.localScale = Vector3.one * sc;
-                _comm.rectTransform.localRotation = Quaternion.Euler(0f, 0f, wob);
                 var c = _comm.color; c.a = Mathf.Clamp01((1f - u) / 0.25f); _comm.color = c;
             }
         }
         if (_swingImg != null && Time.unscaledTime > _swingPulseUntil)
             _swingImg.color = new Color(1f, 1f, 1f, 0.80f);
+    }
+
+    // ---- 試合開始の対戦カード(両チームの帯が左右から滑り込み、真ん中に VS) ----
+    private RectTransform _vsRoot, _vsLeft, _vsRight;
+    private Text _vsLeftName, _vsRightName, _vsLeftSide, _vsRightSide, _vsMark;
+    private Image[] _vsLeftHeads = new Image[4], _vsRightHeads = new Image[4];
+    private Image _vsLeftMark, _vsRightMark;
+    private Image _vsFlash;
+    private float _vsT = -99f;
+    private bool _vsOn;
+    private const float VsSlide = 1500f;
+
+    private void BuildVersus()
+    {
+        if (_vsRoot != null) return;
+        var canvas = _swingRect.parent;
+        var go = new GameObject("Versus");
+        go.transform.SetParent(canvas, false);
+        _vsRoot = go.AddComponent<RectTransform>();
+        _vsRoot.anchorMin = Vector2.zero; _vsRoot.anchorMax = Vector2.one;
+        _vsRoot.offsetMin = Vector2.zero; _vsRoot.offsetMax = Vector2.zero;
+        var dim = NewImage(_vsRoot, "Dim", new Color(0f, 0f, 0f, 0.35f));
+        dim.raycastTarget = false;
+        var dr = dim.rectTransform; dr.anchorMin = Vector2.zero; dr.anchorMax = Vector2.one; dr.offsetMin = dr.offsetMax = Vector2.zero;
+        _vsLeft = VsBand("Left", new Color(0.80f, 0.12f, 0.12f, 0.95f), new Vector2(-30f, 88f), true,
+            out _vsLeftName, out _vsLeftSide, _vsLeftHeads);
+        _vsRight = VsBand("Right", new Color(0.14f, 0.26f, 0.72f, 0.95f), new Vector2(30f, -92f), false,
+            out _vsRightName, out _vsRightSide, _vsRightHeads);
+        _vsLeftMark = VsMark(_vsLeft, true);
+        _vsRightMark = VsMark(_vsRight, false);
+        TelopFx fx;
+        _vsMark = NewTelop(_vsRoot, "VS", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -2f),
+            96, TextAnchor.MiddleCenter, new Color(1f, 0.9f, 0.4f), TelopFx.Kind.Stamp, out fx);
+        fx.Rotation = -8f; fx.PopScale = 3f;
+        _vsFlash = NewImage(_vsRoot, "Flash", new Color(1f, 1f, 1f, 0f));
+        _vsFlash.raycastTarget = false;
+        var fr = _vsFlash.rectTransform; fr.anchorMin = Vector2.zero; fr.anchorMax = Vector2.one; fr.offsetMin = fr.offsetMax = Vector2.zero;
+        _vsRoot.gameObject.SetActive(false);
+    }
+
+    // チームの帯: 斜めの色帯 + 金の線 + 顔4つ + チーム名 + 先攻/後攻
+    private RectTransform VsBand(string name, Color c, Vector2 pos, bool left, out Text teamName, out Text side, Image[] heads)
+    {
+        var band = NewImage(_vsRoot, name, c);
+        band.raycastTarget = false;
+        var r = band.rectTransform;
+        r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+        r.pivot = new Vector2(0.5f, 0.5f);
+        r.sizeDelta = new Vector2(1300f, 150f);
+        r.anchoredPosition = pos;
+        r.localRotation = Quaternion.Euler(0f, 0f, -6f);
+        foreach (float y in new[] { 75f, -75f })
+        {
+            var ln = NewImage(r, "Line", new Color(1f, 0.82f, 0.3f, 1f));
+            ln.raycastTarget = false;
+            var lr = ln.rectTransform; lr.anchorMin = lr.anchorMax = new Vector2(0.5f, 0.5f);
+            lr.sizeDelta = new Vector2(1300f, 4f); lr.anchoredPosition = new Vector2(0f, y);
+        }
+        float dir = left ? -1f : 1f;      // 顔の並び: 左チームは右寄り(中央の VS 側)、右チームは左寄り
+        for (int i = 0; i < 4; i++)
+        {
+            var ring = NewImage(r, "Ring" + i, new Color(1f, 0.85f, 0.35f, 1f));
+            ring.sprite = SpriteFactory.Circle; ring.raycastTarget = false;
+            var rr = ring.rectTransform; rr.anchorMin = rr.anchorMax = new Vector2(0.5f, 0.5f);
+            rr.sizeDelta = new Vector2(104f, 104f);
+            rr.anchoredPosition = new Vector2(-dir * (110f + i * 112f), 0f);
+            var h = NewImage(rr, "Head", Color.white);
+            h.raycastTarget = false; h.preserveAspect = true;
+            var hr = h.rectTransform; hr.anchorMin = hr.anchorMax = new Vector2(0.5f, 0.5f); hr.sizeDelta = new Vector2(96f, 96f);
+            heads[i] = h;
+        }
+        teamName = NewText(r, "Name", new Vector2(0.5f, 0.5f), new Vector2(-dir * 240f, 46f), new Vector2(520f, 50f),
+            38, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, Color.white);
+        teamName.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);
+        teamName.rectTransform.anchoredPosition = new Vector2(left ? 40f : -40f, 16f);
+        TelopFx.Apply(teamName, TelopFx.Kind.Heading);
+        side = NewText(r, "Side", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 30f),
+            22, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, new Color(1f, 0.9f, 0.5f));
+        side.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);
+        side.rectTransform.anchoredPosition = new Vector2(left ? 40f : -40f, -34f);
+        return r;
+    }
+
+    // チームの印(帯の外側の端、チーム名の外)
+    private Image VsMark(RectTransform band, bool left)
+    {
+        var m = NewImage(band, "Mark", Color.white);
+        m.preserveAspect = true; m.raycastTarget = false;
+        var r = m.rectTransform;
+        r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
+        r.sizeDelta = new Vector2(112f, 112f);
+        r.anchoredPosition = new Vector2(left ? -325f : 325f, 0f);   // チーム名のすぐ外。縦長の画面でも端で切れない位置
+        m.gameObject.SetActive(false);
+        return m;
+    }
+
+    public void ShowVersus(string leftName, Sprite[] leftHeads, string rightName, Sprite[] rightHeads, bool leftFirst,
+        Sprite leftMark = null, Sprite rightMark = null)
+    {
+        BuildVersus();
+        _vsLeftMark.sprite = leftMark; _vsLeftMark.gameObject.SetActive(leftMark != null);
+        _vsRightMark.sprite = rightMark; _vsRightMark.gameObject.SetActive(rightMark != null);
+        SetVsBand(_vsLeftName, _vsLeftSide, _vsLeftHeads, leftName, leftHeads, leftFirst);
+        SetVsBand(_vsRightName, _vsRightSide, _vsRightHeads, rightName, rightHeads, !leftFirst);
+        _vsMark.text = "";
+        _vsRoot.gameObject.SetActive(true);
+        _vsRoot.SetAsLastSibling();
+        _vsOn = true;
+        _vsT = Time.unscaledTime;
+        TickVersus();
+    }
+
+    private static void SetVsBand(Text name, Text side, Image[] heads, string team, Sprite[] faces, bool first)
+    {
+        name.text = team ?? "";
+        name.fontSize = 38;
+        while (name.fontSize > 22 && name.preferredWidth > 440f) name.fontSize--;
+        side.text = first ? "先攻" : "後攻";
+        for (int i = 0; i < heads.Length; i++)
+        {
+            bool has = faces != null && i < faces.Length && faces[i] != null;
+            heads[i].transform.parent.gameObject.SetActive(has);
+            if (has) heads[i].sprite = faces[i];
+        }
+    }
+
+    public void HideVersus(bool instant = false)
+    {
+        if (_vsRoot == null || !_vsOn) return;
+        _vsOn = false;
+        _vsT = instant ? -99f : Time.unscaledTime;
+        if (instant) _vsRoot.gameObject.SetActive(false);
+    }
+
+    private void TickVersus()
+    {
+        if (_vsRoot == null || !_vsRoot.gameObject.activeSelf) return;
+        float t = Time.unscaledTime - _vsT;
+        if (_vsOn)
+        {
+            float u = Mathf.Clamp01(t / 0.32f);
+            float e = 1f - (1f - u) * (1f - u) * (1f - u);
+            _vsLeft.anchoredPosition = new Vector2(Mathf.Lerp(-VsSlide, -30f, e), 88f);
+            _vsRight.anchoredPosition = new Vector2(Mathf.Lerp(VsSlide, 30f, e), -92f);
+            if (t >= 0.32f && _vsMark.text.Length == 0)
+            {
+                _vsMark.text = "VS";
+                BgmPlayer.Jingle("bgm-versus");
+                _vsFlash.color = new Color(1f, 1f, 1f, 0.7f);
+            }
+            var fc = _vsFlash.color;
+            if (fc.a > 0f) { fc.a = Mathf.Max(0f, fc.a - Time.unscaledDeltaTime * 3f); _vsFlash.color = fc; }
+        }
+        else
+        {
+            float u = Mathf.Clamp01(t / 0.25f);
+            float e = u * u;
+            _vsLeft.anchoredPosition = new Vector2(Mathf.Lerp(-30f, -VsSlide, e), 88f);
+            _vsRight.anchoredPosition = new Vector2(Mathf.Lerp(30f, VsSlide, e), -92f);
+            _vsMark.color = new Color(_vsMark.color.r, _vsMark.color.g, _vsMark.color.b, 1f - u);
+            if (u >= 1f)
+            {
+                _vsRoot.gameObject.SetActive(false);
+                _vsMark.color = new Color(_vsMark.color.r, _vsMark.color.g, _vsMark.color.b, 1f);
+            }
+        }
     }
 
     // ---- 部品 ----
@@ -552,10 +915,48 @@ public class BattingUI
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
         text.verticalOverflow = VerticalWrapMode.Overflow;
         text.raycastTarget = false;
-        var ol = go.AddComponent<Outline>();
-        ol.effectColor = new Color(0f, 0f, 0f, 0.85f);
-        ol.effectDistance = new Vector2(1.5f, -1.5f);
+        TelopFx.Apply(text, TelopFx.Kind.Label);   // 縁取り + 影(全画面で同じ仕上げ)
         return text;
+    }
+
+    private Text NewTelop(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 pos,
+        int fontSize, TextAnchor align, Color color, TelopFx.Kind kind, out TelopFx fx)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = rt.anchorMax = anchor;
+        rt.pivot = pivot;
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(900f, fontSize * 1.5f);
+        var text = go.AddComponent<Text>();
+        text.font = _font;
+        text.fontSize = fontSize;
+        text.fontStyle = FontStyle.Bold;
+        text.alignment = align;
+        text.color = color;
+        text.supportRichText = true;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
+        fx = go.AddComponent<TelopFx>();
+        fx.Preset(kind);
+        return text;
+    }
+
+    private RectTransform NewPlate(Transform parent, string name, Vector2 anchor, Vector2 pivot, Vector2 pos,
+        float height, Color body, Color line)
+    {
+        var img = NewImage(parent, name, Color.white);
+        img.sprite = TelopFx.PlateSprite(body, line);
+        img.raycastTarget = false;
+        var r = img.rectTransform;
+        r.anchorMin = r.anchorMax = anchor;
+        r.pivot = pivot;
+        r.anchoredPosition = pos;
+        r.sizeDelta = new Vector2(300f, height);
+        img.gameObject.SetActive(false);
+        return r;
     }
 
     public static Font GetFont()

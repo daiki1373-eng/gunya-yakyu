@@ -16,7 +16,7 @@ public struct RunnerMove
 
 public class GameState
 {
-    public const int InningsPerGame = 3;     // 1試合のイニング数(P2の仮置き。P3で9回まで)
+    public const int InningsPerGame = 3;     // 3回制
     public const int MaxQuirksPerGame = 2;   // 1試合あたりの目立つ珍プレー上限
 
     public int GameNo = 1;
@@ -24,7 +24,13 @@ public class GameState
     public int Outs;
     public int Runs;                         // 自チームの得点
     public int OppRuns;                      // 相手の得点
-    public bool UserBatting = true;          // true=表(自分が打つ) / false=裏(自分が投げる)
+    public bool UserBatting = true;          // 攻撃しているチーム
+    public bool UserBatsFirst = true;        // 次の試合では先攻・後攻を交代
+    public bool IsTop { get { return UserBatting == UserBatsFirst; } }
+    public bool IsWalkOff { get; private set; }
+    private bool _finished;
+    public int UserHits, UserSteals;
+    public bool RewardClaimed;
     public int Balls, Strikes;
     public int QuirkCount;
     public int PlateAppearances;
@@ -33,12 +39,16 @@ public class GameState
     public int LastRuns;                     // 直前のプレーで入った得点
 
     public bool QuirkAllowed { get { return QuirkCount < MaxQuirksPerGame; } }
-    public bool GameOver { get { return Inning > InningsPerGame; } }
+    public bool GameOver { get { return _finished || Inning > InningsPerGame; } }
 
     public void NewGame()
     {
         GameNo++;
-        Inning = 1; Outs = 0; Runs = 0; OppRuns = 0; UserBatting = true; QuirkCount = 0; PlateAppearances = 0;
+        UserBatsFirst = !UserBatsFirst;
+        Inning = 1; Outs = 0; Runs = 0; OppRuns = 0; UserBatting = UserBatsFirst; QuirkCount = 0; PlateAppearances = 0;
+        UserHits = UserSteals = LastRuns = 0;
+        IsWalkOff = _finished = RewardClaimed = false;
+        Moves.Clear();
         ClearBases();
         ResetCount();
     }
@@ -57,27 +67,60 @@ public class GameState
         return n;
     }
 
-    // 3アウトで攻守交代。表(自分が打つ)→裏(自分が投げる)→次の回の表…
+    // 最終回表終了時に後攻がリードしていれば裏を省略する。
     public bool EndInningIfNeeded()
     {
-        if (Outs < 3) return false;
+        if (Outs < 3 || GameOver) return false;
+        bool top = IsTop;
         Outs = 0;
         ClearBases();
-        if (UserBatting) UserBatting = false;
-        else { UserBatting = true; Inning++; }
+        ResetCount();
+        Moves.Clear();
+        LastRuns = 0;
+        if (Inning >= InningsPerGame && (!top || HomeRuns > AwayRuns))
+        {
+            _finished = true;
+            return true;
+        }
+        UserBatting = !UserBatting;
+        if (!top) Inning++;
+        return true;
+    }
+
+    private int HomeRuns { get { return UserBatsFirst ? OppRuns : Runs; } }
+    private int AwayRuns { get { return UserBatsFirst ? Runs : OppRuns; } }
+
+    // 二盗・三盗のみ。重なった走者や試合終了後の操作は受け付けない。
+    public bool CanSteal(int from)
+    {
+        return !GameOver && Outs < 3 && from >= 1 && from <= 2 && Base[from] && !Base[from + 1];
+    }
+
+    public bool ApplySteal(int from, bool success)
+    {
+        if (!CanSteal(from)) return false;
+        Begin();
+        for (int b = 3; b >= 1; b--)
+        {
+            if (!Base[b]) continue;
+            if (b == from) Go(b, success ? b + 1 : -1, b + 1);
+            else Hold(b);
+        }
+        Finish();
+        if (success && UserBatting) UserSteals++;
         return true;
     }
 
     // ------------------------------------------------------------
     // 進塁の計算
     // ------------------------------------------------------------
-    private bool[] _nb;
+    private readonly bool[] _nb = new bool[4];
     private int _runs, _outsAdded;
 
     private void Begin()
     {
         Moves.Clear();
-        _nb = new bool[4];
+        for (int i = 0; i < _nb.Length; i++) _nb[i] = false;
         _runs = 0;
         _outsAdded = 0;
     }
@@ -112,6 +155,11 @@ public class GameState
         Outs = newOuts;
         if (UserBatting) Runs += _runs; else OppRuns += _runs;
         LastRuns = _runs;
+        if (_runs > 0 && Inning == InningsPerGame && !IsTop && HomeRuns > AwayRuns)
+        {
+            IsWalkOff = true;
+            _finished = true;
+        }
         for (int i = 0; i < 4; i++) Base[i] = _nb[i];
         return _runs;
     }
@@ -119,6 +167,7 @@ public class GameState
     // 四球・死球(押し出し式)
     public int ApplyWalk()
     {
+        if (GameOver) return 0;
         Begin();
         if (Base[1])
         {
@@ -142,6 +191,7 @@ public class GameState
     // ヒット(単打=1, 二塁打=2, 三塁打=3, 本塁打=4) / エラー扱いの進塁も同じ
     public int ApplyHit(int bases)
     {
+        if (GameOver) return 0;
         Begin();
         if (bases >= 4)
         {
@@ -185,6 +235,7 @@ public class GameState
     // 三振(振り逃げなし)
     public int ApplyStrikeout()
     {
+        if (GameOver) return 0;
         Begin();
         for (int b = 3; b >= 1; b--) if (Base[b]) Hold(b);
         Go(0, -1);
@@ -194,6 +245,7 @@ public class GameState
     // 飛球・ゴロなどのアウト。fielder=処理した野手(2..8)、depth=打球の飛距離(m)
     public int ApplyOut(PlayKind kind, int fielder, float depth)
     {
+        if (GameOver) return 0;
         Begin();
         bool fly = kind == PlayKind.FlyOut || kind == PlayKind.LineOut
                 || kind == PlayKind.PopOut || kind == PlayKind.FoulFlyOut;

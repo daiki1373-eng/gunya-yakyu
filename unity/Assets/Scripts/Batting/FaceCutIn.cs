@@ -107,7 +107,7 @@ public class FaceCutIn : MonoBehaviour
         // 目が回る(空振りで崩れるたびに出る)は出さない。大事な場面は後に続く がっかり/怒り で出る
         if (e == Expr.Normal || e == Expr.Focus || e == Expr.Dizzy) return;
         if (seconds < 1f || seconds > 5f) return;            // 一瞬の驚き・登場ポーズは出さない
-        if (_ctl.Replaying || AppShell.MenuOpen) return;
+        if (_ctl.Replaying || _ctl.MatchOver || AppShell.MenuOpen) return;
         // 打者は右・投手は左
         bool batter = p.Bat != null;
         var s = batter ? _right : _left;
@@ -131,7 +131,7 @@ public class FaceCutIn : MonoBehaviour
     private void Tick(Slot s, float dt)
     {
         if (!s.On) return;
-        if (s.Who == null || AppShell.MenuOpen || _ctl.Replaying) { Hide(s); return; }
+        if (s.Who == null || AppShell.MenuOpen || _ctl.Replaying || _ctl.MatchOver) { Hide(s); return; }
         s.T += dt;
         // 横からすべり込んで、少し行き過ぎて戻る。最後はすべり出る
         float inU = Mathf.Clamp01(s.T / 0.16f);

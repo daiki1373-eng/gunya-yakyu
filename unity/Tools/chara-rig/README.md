@@ -55,3 +55,31 @@ python Tools/chara-rig/preview.py Assets/Resources/Chara/Cut Assets/Resources/Ch
 - 表情が大きく変わった瞬間は、顔のアップを画面の横に差し込む(`Scripts/Batting/FaceCutIn.cs`。打者は右・投手は左、表情の色の背景+金枠、リプレイ中とメニュー中は出さない)
 - 試合での使い分け: 見逃し三振・凡打=打者がっかり / 被本塁打=投手が崩れてからがっかり / 四球・エラー=投手が怒る / 死球=打者が怒る
 - 確認: 再生中に `FaceShot.Run(new[]{"monk","dog"})` → `Recordings/faces/<id>.png` に5表情が並ぶ
+
+## Aポーズの立ち絵で動かす(2026-11-07〜、こちらが優先)
+
+決めポーズの元絵を曲げる代わりに、動かす用に描いた正面のAポーズの立ち絵を体にする。
+腕・脚が胴から離れて描かれているので、胴・左右の腕・左右の脚を別々の部品にして関節で回せる(伸びない・裂けない)。
+バットとグローブもキャラごとの別画像。素材の依頼書はリポジトリ直下の `BRIEF_muse_rig_images.md`。
+
+```
+cd unity
+# 1) 素材(chara/rig-src/<id>/<id>_apose.png・_bat.png・_bat2.png・_glove.png、_v2 などは新しい番号を優先)を試合用に整える
+python Tools/chara-rig/prep_body.py ../chara/rig-src Assets/Resources/Chara      # → Body/ Bat/ Glove/
+# 2) 関節(Aポーズ用。全員に flag apose が付く)
+python Tools/chara-rig/pose.py Assets/Resources/Chara/Body Tools/chara-rig/pose_body_raw.json
+python Tools/chara-rig/build.py Tools/chara-rig/pose_body_raw.json Tools/chara-rig/rig_body_manual.txt Assets/Resources/Chara/rig_body.txt --apose
+# 3) 部品の塗り分け(胴/左腕/右腕/左脚/右脚。骨の線から、絵の不透明な所だけを伝って広げる)
+python Tools/chara-rig/labels.py Assets/Resources/Chara/Body Assets/Resources/Chara/rig_body.txt Assets/Resources/Chara/BodyLabel
+# 確認: 関節の重ね絵
+python Tools/chara-rig/preview.py Assets/Resources/Chara/Body Assets/Resources/Chara/rig_body.txt body_check
+```
+
+- 試合では Body があるキャラは自動でこちらを使う(`RigSkin.UseBodyArt=false` で全員を元絵の体に戻せる)。Body がないキャラは従来どおり Cut。
+- 腕・脚の向きは、ラグドールの腕・脚の向きそのまま(Aポーズの開きは打ち消す)。立っているときは腕を下ろし、構えればバットを握る形になる。
+- 部品の境目は `Resources/Shaders/GunyaRigParts.shader` が画素単位で切る(BodyLabel を読む)。
+- バット: 打者はラグドールのバットの見た目を `Bat/<id>.png` にする(握る側が左。長さの比は絵のまま、標準=横512px)。`Bat/<id>_2.png` があれば打席ごとにどちらか。
+- グローブ: 投手と守備の選手は `Glove/<id>.png` を後ろの腕の手に付ける。
+- 2人並んだ絵(双子)は prep_body.py の HALF_LEFT で左の1人だけを使う。
+- 関節がずれるキャラは `rig_body_manual.txt` に正しい座標を書いて build し直す。使わないキャラは `id flag skip`。
+- `Dev/PuppetShot.Run(ids)` で守備・走者の人形を一覧で確認できる(Recordings/puppets/)。

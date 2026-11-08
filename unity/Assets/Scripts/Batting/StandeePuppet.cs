@@ -33,10 +33,22 @@ public class StandeePuppet : MonoBehaviour
     private int _act;                        // 0=なし 1=捕る 2=投げる
     private float _actT, _actDur;
     private int _order;
+    public float PlaybackSpeed = 1f;
+    private float _animationTime;
+    private Sprite _source;
+    private float _sourceHeight;
     // 元絵の体(RigSkin)用の骨
     private RigSkin _skin;
     private Transform _bones;
     private Transform _pel, _chest, _head, _aFU, _aFF, _aBU, _aBF, _lFU, _lFF, _lBU, _lBF;
+
+    // 遠景のビルボード: カメラから遠いあいだは、体を動かす絵(RigSkin)の代わりに簡略な一枚絵を出す
+    public bool AllowBillboard;              // 守備の選手だけ true(走者は走る動きを見せるため使わない)
+    public static float BillboardOn = 26f, BillboardOff = 22f;   // 切り替える距離(行き来しないよう差を付ける)
+    private SpriteRenderer _bb;
+    private bool _bbOn;
+    private float _bbScale = 1f;
+    public bool ShowingBillboard { get { return _bbOn; } }
 
     public static float DebugRun = -1f;      // 検証用: 0..1 で走りの強さを固定(-1=実際の動きから)
     private static readonly Dictionary<string, Sprite[]> Cache = new Dictionary<string, Sprite[]>();
@@ -86,12 +98,18 @@ public class StandeePuppet : MonoBehaviour
     {
         if (cut == null) { gameObject.SetActive(false); return; }
         gameObject.SetActive(true);
+        if (_source == cut && Mathf.Approximately(_sourceHeight, height)) return;
+        _source = cut;
+        _sourceHeight = height;
+        ResetMotion();
         LoadMeta();
         string id = cut.name;
-        if (_skin != null) { Destroy(_skin.gameObject); _skin = null; }
+        if (_skin != null) { _skin.gameObject.SetActive(false); Destroy(_skin.gameObject); _skin = null; }
+        HideBillboard();
         if (RigSkin.CanRig(id))
         {
             BuildBones();
+            ResetBindPose();
             _baseScale = height / RigSkin.TargetHeight;
             _body.localScale = Vector3.one * _baseScale;
             _up.enabled = _legL.enabled = _legR.enabled = false;
@@ -103,7 +121,13 @@ public class StandeePuppet : MonoBehaviour
                 HeadPop = () => _headPop
             };
             _skin = RigSkin.TryAttach(body, id);
-            if (_skin != null) return;
+            if (_skin != null)
+            {
+                if (WithGlove) _skin.AttachGlove(CharaCatalog.GloveArt(id));
+                SetupRunCard(id);
+                SetupBillboard(id);
+                return;
+            }
         }
         _up.enabled = true;
         Vector2 b = cut.bounds.size;
@@ -169,18 +193,138 @@ public class StandeePuppet : MonoBehaviour
         return t;
     }
 
+    // 別キャラへ差し替える前に、前の走り/送球の角度を新しい基準姿勢にしない。
+    private void ResetBindPose()
+    {
+        _body.localPosition = Vector3.zero;
+        _headPop = 1f;
+        _pel.localPosition = new Vector3(0f, 0.90f, 0f);
+        Rot(_pel, 0f); Rot(_chest, 0f); Rot(_head, 0f);
+        Rot(_aFU, 0f); Rot(_aFF, 0f); Rot(_aBU, 0f); Rot(_aBF, 0f);
+        Rot(_lFU, 0f); Rot(_lFF, 0f); Rot(_lBU, 0f); Rot(_lBF, 0f);
+    }
+
     private static void Rot(Transform t, float deg) { t.localRotation = Quaternion.Euler(0f, 0f, deg); }
+
+    // ---- 試作(フェーズE): 横向きの走り絵。走っている間だけ体の代わりに出す(PoseCardProto.Enabled のときだけ) ----
+    private SpriteRenderer _runCard;
+    private readonly Sprite[] _runFrames = new Sprite[2];
+    private bool _runShown;
+
+    private void SetupRunCard(string id)
+    {
+        if (_runCard != null) { Destroy(_runCard.gameObject); _runCard = null; }
+        _runShown = false;
+        if (!PoseCardProto.Enabled || _skin == null || !_skin.UsesBodyArt) return;
+        var rig = CharaRig.GetBody(id);
+        float stand = rig != null ? (rig.Box.w - rig.Box.y) * 0.92f : 0f;
+        var sp = PoseCardProto.Make(id + "_run_side", _skin, stand);
+        if (sp == null) return;
+        _runFrames[0] = sp;
+        _runFrames[1] = PoseCardProto.Make(id + "_run_side_2", _skin, stand) ?? sp;
+        var go = new GameObject("RunCard");
+        go.transform.SetParent(_skin.transform.parent, false);
+        go.transform.localPosition = new Vector3(_skin.FootLocal.x, _skin.FootLocal.y, -0.02f);
+        go.layer = _skin.gameObject.layer;
+        _runCard = go.AddComponent<SpriteRenderer>();
+        _runCard.sprite = sp;
+        _runCard.sortingOrder = _order + 1;
+        _runCard.enabled = false;
+    }
+
+    private void TickRunCard(float t)
+    {
+        if (_runCard == null) return;
+        bool on = _run > 0.45f && Mathf.Abs(_dirX) > 0.25f;
+        if (on)
+        {
+            _runCard.flipX = _dirX < 0f;         // 絵は右向き
+            _runCard.sprite = _runFrames[(Mathf.Sin(_phase) >= 0f) ? 0 : 1];   // 脚の振りに合わせて2コマを交互に
+            // 体(_body)は横向きのとき細く縮めているので、走り絵はその分を戻す
+            float turn = Mathf.Abs(_dirX);
+            _runCard.transform.localScale = new Vector3(1f / Mathf.Max(0.5f, 1f - 0.16f * turn), 1f, 1f);
+            float bob = Mathf.Abs(Mathf.Sin(_phase)) * 0.06f;
+            _runCard.transform.localPosition = new Vector3(_skin.FootLocal.x, _skin.FootLocal.y + bob, -0.02f);
+        }
+        if (on == _runShown) return;
+        _runShown = on;
+        _runCard.enabled = on;
+        _skin.transform.localScale = on ? Vector3.zero : Vector3.one;
+    }
     private float _headPop = 1f;
+    public bool WithGlove;        // 守備の選手はグローブの絵を付ける(走者は付けない)
     private float _dirX;          // -1=画面の左へ / +1=右へ走っている
     private float _baseScale = 1f;
 
     public void Catch() { _act = 1; _actT = 0f; _actDur = 0.45f; }
     public void Throw() { _act = 2; _actT = 0f; _actDur = 0.50f; }
 
+    public void ResetMotion()
+    {
+        _hasLast = false;
+        _run = _dirX = 0f;
+        _act = 0;
+        _actT = 0f;
+    }
+
+    private void OnEnable() { ResetMotion(); }
+
+    private void SetupBillboard(string id)
+    {
+        var sp = AllowBillboard ? CharaCatalog.Billboard(id) : null;
+        if (sp == null) { HideBillboard(); return; }
+        if (_bb == null)
+        {
+            _bb = MakeSr("Billboard", transform, _order + 1);
+            _bb.gameObject.layer = gameObject.layer;
+        }
+        _bb.sprite = sp;
+        // 体を動かす絵と同じ身長にする(ビルボード絵の体の高さ px → ワールド)
+        float worldH = _baseScale * _skin.FigureHeight;
+        float spriteH = CharaCatalog.BillboardHeightPx(id) / sp.pixelsPerUnit;
+        _bbScale = worldH / Mathf.Max(0.01f, spriteH);
+        _bb.transform.localPosition = Vector3.zero;
+        _bb.transform.localScale = Vector3.one * _bbScale;
+        _bb.enabled = false;
+        _bbOn = false;
+    }
+
+    private void HideBillboard()
+    {
+        if (_bb != null) _bb.enabled = false;
+        if (_bbOn && _skin != null) _skin.gameObject.SetActive(true);
+        _bbOn = false;
+    }
+
+    // 遠い・止まっている(走っていない・捕る/投げるの最中でない)ときだけビルボードにする
+    private void TickBillboard(Camera cam, float t)
+    {
+        if (_bb == null || _bb.sprite == null || _skin == null || cam == null) return;
+        float d = Vector3.Distance(cam.transform.position, transform.position);
+        bool far = _bbOn ? d > BillboardOff : d > BillboardOn;
+        bool want = far && _act == 0 && _run < 0.35f;
+        if (want != _bbOn)
+        {
+            _bbOn = want;
+            _bb.enabled = want;
+            _skin.gameObject.SetActive(!want);
+        }
+        if (_bbOn)
+        {
+            // 呼吸と、わずかな左右の揺れ(止まった一枚絵に見えないように)
+            float br = Mathf.Sin(t * 2.6f);
+            _bb.transform.localScale = new Vector3(_bbScale * (1f - 0.01f * br), _bbScale * (1f + 0.018f * br), 1f);
+            _bb.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 1.9f) * 1.2f + (-7f * _run));
+        }
+    }
+
     private void LateUpdate()
     {
-        float dt = Time.deltaTime;
+        // メニューで試合を止めている間も、背景の選手は待機の動き(呼吸・揺れ)だけ続ける
+        float dt = Time.timeScale > 0f ? Time.deltaTime * PlaybackSpeed
+                 : (AppShell.MenuOpen ? Time.unscaledDeltaTime * 0.8f : 0f);
         if (dt <= 0f) return;
+        _animationTime += dt;
         float g = BattingConfig.GunyaLevel;
         Vector3 pos = _root != null ? _root.position : transform.position;
         float speed = _hasLast ? Vector3.Distance(pos, _last) / dt : 0f;
@@ -193,13 +337,19 @@ public class StandeePuppet : MonoBehaviour
         _run = Mathf.MoveTowards(_run, Mathf.Clamp01(speed / 4f), dt * 6f);
         if (DebugRun >= 0f) { _run = DebugRun; speed = 6f * DebugRun; }
         _phase += dt * (7f + Mathf.Min(speed, 10f) * 0.9f);
-        float t = Time.time + _seed;
+        float t = _animationTime + _seed;
 
         float legA = Mathf.Sin(_phase) * 28f * _run * (0.7f + 0.3f * g);
         float bob = Mathf.Abs(Mathf.Sin(_phase)) * (_legs ? 0.10f : 0.22f) * _run;
         float lean = -7f * _run;
         float sway = Mathf.Sin(t * 1.9f) * 1.6f * (1f - _run);
-        if (_skin != null) { PoseBones(dt, g, t, legA, Mathf.Abs(Mathf.Sin(_phase)) * 0.10f * _run, lean, sway); return; }
+        if (_skin != null)
+        {
+            TickBillboard(cam, t);
+            PoseBones(dt, g, t, legA, Mathf.Abs(Mathf.Sin(_phase)) * 0.10f * _run, lean, sway);
+            TickRunCard(t);
+            return;
+        }
         float breathe = 1f + 0.014f * Mathf.Sin(t * 2.6f) * (1f - _run);
         float upRot = lean + sway, sx = 1f, sy = breathe, spread = 0f;
 

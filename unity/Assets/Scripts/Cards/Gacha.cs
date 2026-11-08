@@ -23,6 +23,14 @@ public static class Gacha
     private const int PSecret = 100, P5 = 10000, P4 = 30000, P3 = 120000, P2 = 350000;
 
     public static System.Random Rng = new System.Random();
+    private static readonly List<CharaDef>[] Pools = BuildPools();
+
+    private static List<CharaDef>[] BuildPools()
+    {
+        var pools = new List<CharaDef>[7];
+        for (int r = 1; r <= 6; r++) pools[r] = CharaCatalog.OfRarity((Rarity)r);
+        return pools;
+    }
 
     public static Rarity RollRarity(System.Random rng)
     {
@@ -50,13 +58,31 @@ public static class Gacha
             byPity = true;
         }
         pity = r >= Rarity.R4 ? 0 : pity + 1;
-        var pool = CharaCatalog.OfRarity(r);
+        var pool = Pools[(int)r];
         return pool[rng.Next(pool.Count)];
     }
 
-    public static List<PullResult> Pull(int times)
+    public static bool TryPullCoins(int times, out List<PullResult> results)
     {
-        var list = new List<PullResult>();
+        results = null;
+        if ((times != 1 && times != 10) || !Collection.TrySpendCoins(times * Collection.PullCoinCost)) return false;
+        results = Pull(times);
+        return true;
+    }
+
+    public static bool TryScout(out List<PullResult> results)
+    {
+        results = null;
+        if (Collection.Points < Collection.ScoutCost) return false;
+        Collection.Points -= Collection.ScoutCost;
+        results = Pull(1);
+        return true;
+    }
+
+    // 通貨の消費は上の入口に集約。演出から無料の排出を呼び出さない。
+    private static List<PullResult> Pull(int times)
+    {
+        var list = new List<PullResult>(times);
         int pity = Collection.PityCount;
         for (int i = 0; i < times; i++)
         {
