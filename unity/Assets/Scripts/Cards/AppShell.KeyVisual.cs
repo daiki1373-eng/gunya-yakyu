@@ -114,11 +114,17 @@ public partial class AppShell
             pos = new Vector3(Mathf.Sin(a) * 6f, Mathf.Lerp(1.0f, 2.0f, k), Mathf.Lerp(-3f, -9f, k));
             look = new Vector3(Mathf.Sin(a + 0.6f) * 18f, Mathf.Lerp(14f, 86f, k), 130f);   // 夜空と照明塔(電光掲示板は画面の外)
         }
-        else
+        else if (MenuScreenOn())
         {
-            // ホームは一塁側から左翼側の照明と夜空を見上げる
+            // カード・ガチャ・編成・オンラインは、文字が読みやすいよう照明と夜空を見上げる
             pos = new Vector3(14f + Mathf.Sin(a) * 3f, 2.2f, 2f);
             look = new Vector3(-30f + Mathf.Sin(a * 0.7f) * 10f, 74f, 110f);
+        }
+        else
+        {
+            // ホームは本塁の後ろの高いところから、照明に照らされた球場全体を見る
+            pos = new Vector3(Mathf.Sin(a) * 4f, 7f, -20f);
+            look = new Vector3(Mathf.Sin(a * 0.7f) * 10f, 15f, 95f);
         }
         _stageRef.SetShot(pos, look, 0.9f, false);
         if (t > _nextBurst && !_titleIntroRunning)

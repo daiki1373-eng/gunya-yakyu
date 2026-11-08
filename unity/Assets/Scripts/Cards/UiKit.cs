@@ -169,13 +169,15 @@ public static class UiKit
         cb.pressedColor = new Color(0.8f, 0.7f, 0.6f);
         b.colors = cb;
         b.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.6f, 1.2f); if (onClick != null) onClick(); });
-        var t = Txt(img.transform, "Label", label, fontSize, primary ? Color.white : GoldLight, TextAnchor.MiddleCenter);
+        var t = Txt(img.transform, "Label", label, fontSize, Color.white, TextAnchor.MiddleCenter);
+        HomeSkin.NavText(t, 2f);
+        if (primary) { var fx = t.GetComponent<TelopFx>(); fx.Outer = new Color(0.42f, 0.13f, 0f, 1f); }
         Fill(t.rectTransform);
         return b;
     }
 
     // ---- 生成画像 ------------------------------------------------------
-    private static Sprite _rays, _frame, _btnRed, _btnDark, _bgRadial, _shine, _plate;
+    private static Sprite _rays, _frame, _bgRadial, _shine, _plate;
 
     // 放射状の光(白。色はImage側で付ける)
     public static Sprite Rays
@@ -283,8 +285,7 @@ public static class UiKit
     {
         get
         {
-            if (_btnRed == null) _btnRed = MakeButton(new Color(0.95f, 0.22f, 0.16f), new Color(0.55f, 0.03f, 0.05f), Gold);
-            return _btnRed;
+            return HomeSkin.BtnMain;   // ホームと同じつやのある橙
         }
     }
 
@@ -292,8 +293,7 @@ public static class UiKit
     {
         get
         {
-            if (_btnDark == null) _btnDark = MakeButton(new Color(0.22f, 0.10f, 0.08f), new Color(0.08f, 0.03f, 0.03f), Gold * 0.8f);
-            return _btnDark;
+            return HomeSkin.BtnSub;    // ホームと同じつやのある青
         }
     }
 
