@@ -68,6 +68,7 @@ public partial class AtBatController
         Vector2 target = FieldingModel.BasePos(from + 1);
         int receiver = from == 1 ? 5 : 4;
         _stage.SetFielderPos(receiver, target);
+        _ui.ClearCenter();   // 直前の打撃の判定(MISS など)を消して、盗塁の表示だけにする
         _ui.ShowResult("盗塁！");
         BgmPlayer.StopJingle(0.1f);
         Music(safe ? "bgm-steal-ok" : "bgm-steal-out", 3f);
