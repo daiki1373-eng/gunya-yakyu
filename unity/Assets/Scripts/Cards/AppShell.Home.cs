@@ -146,7 +146,9 @@ public partial class AppShell
 
         string[] labels = { "ホーム", "編成", "カード", "ガチャ", "オンライン" };
         string[] icons = { "icon_nav_home", "icon_nav_team", "icon_nav_cards", "icon_nav_gacha", "icon_nav_online" };
-        System.Action[] acts = { ShowHome, ShowLineup, ShowCards, ShowGacha, ShowOnline };
+        // 編成: フォーム作成から戻るときは、選んでいた選手の行のまま
+        System.Action lineup = () => { if (_formScr != null && _formScr.gameObject.activeSelf) ShowLineupKeep(); else ShowLineup(); };
+        System.Action[] acts = { ShowHome, lineup, ShowCards, ShowGacha, ShowOnline };
         for (int i = 0; i < labels.Length; i++)
         {
             var hit = UiKit.Img(nav, "Tab" + i, SpriteFactory.White, new Color(1f, 1f, 1f, 0f), true);
@@ -167,7 +169,8 @@ public partial class AppShell
             var rr = r;
             b.onClick.AddListener(() =>
             {
-                if (_busy || idx == _navIdx) return;   // ガチャの演出中・今いる画面のタブは何もしない
+                if (_busy) return;   // ガチャの演出中は押せない
+                if (idx == _navIdx && !(idx == 1 && _formScr != null && _formScr.gameObject.activeSelf)) return;   // 今いる画面のタブは何もしない
                 GameAudio.Play(Sfx.Click, 0.6f, 1.2f); StartCoroutine(PopIn(rr, 0.18f)); act();
             });
             _tabs[i] = r;
@@ -205,7 +208,7 @@ public partial class AppShell
     {
         if (_navLayer == null) return;
         int idx = screen == null ? -1
-            : screen == _home ? 0 : screen == _lineup ? 1 : screen == _cards ? 2 : screen == _gacha ? 3 : screen == _onlineScr ? 4 : -1;
+            : screen == _home ? 0 : screen == _lineup || screen == _formScr ? 1 : screen == _cards ? 2 : screen == _gacha ? 3 : screen == _onlineScr ? 4 : -1;
         _navIdx = idx;
         _navLayer.gameObject.SetActive(idx >= 0);
         for (int i = 0; i < _tabOn.Length; i++)

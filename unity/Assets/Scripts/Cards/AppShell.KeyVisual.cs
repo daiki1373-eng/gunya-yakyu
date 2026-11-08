@@ -141,7 +141,8 @@ public partial class AppShell
     private bool MenuScreenOn()
     {
         return (_cards != null && _cards.gameObject.activeSelf) || (_gacha != null && _gacha.gameObject.activeSelf)
-            || (_lineup != null && _lineup.gameObject.activeSelf) || (_onlineScr != null && _onlineScr.gameObject.activeSelf);
+            || (_lineup != null && _lineup.gameObject.activeSelf) || (_onlineScr != null && _onlineScr.gameObject.activeSelf)
+            || (_formScr != null && _formScr.gameObject.activeSelf);
     }
 
     private void SnapBackdrop()

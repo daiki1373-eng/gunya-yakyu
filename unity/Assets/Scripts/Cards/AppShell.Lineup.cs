@@ -41,7 +41,10 @@ public partial class AppShell
         _poolTitle = UiKit.Txt(_lineup, "PoolTitle", "", 20, UiKit.GoldLight, TextAnchor.MiddleLeft);
         var pt = _poolTitle.rectTransform;
         pt.anchorMin = new Vector2(0f, 1f); pt.anchorMax = new Vector2(1f, 1f); pt.pivot = new Vector2(0f, 1f);
-        pt.offsetMin = new Vector2(14f + 360f + 18f, -100f); pt.offsetMax = new Vector2(-16f, -70f);
+        pt.offsetMin = new Vector2(14f + 360f + 18f, -100f); pt.offsetMax = new Vector2(-16f - 130f, -70f);
+        // 選んでいる選手のフォームを作る
+        var fb = UiKit.Btn(_lineup, "FormButton", "フォーム", new Vector2(124f, 34f), true, OpenForm, 18);
+        UiKit.Place(fb.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -68f), new Vector2(124f, 34f));
         var view = UiKit.Rect(_lineup, "Pool");
         view.anchorMin = Vector2.zero; view.anchorMax = Vector2.one;
         view.offsetMin = new Vector2(14f + 360f + 16f, NavReserve); view.offsetMax = new Vector2(-16f, -104f);

@@ -75,6 +75,7 @@ public partial class AppShell : MonoBehaviour
         BuildGacha();
         BuildLineup();
         BuildOnline();
+        BuildForm();
         _navLayer.SetAsLastSibling();   // 下の帯は画面より手前、カード拡大・ガチャ演出より奥
         OnlineService.Create(gameObject);
         _detail = UiKit.Fill(UiKit.Rect(_root, "Detail"));
@@ -132,6 +133,12 @@ public partial class AppShell : MonoBehaviour
 
     private void TopBar(RectTransform screen, string title, out Text titleText)
     {
+        TopBar(screen, title, out titleText, null);
+    }
+
+    // back: ← を押したときの行き先(null ならホーム)
+    private void TopBar(RectTransform screen, string title, out Text titleText, System.Action onBack)
+    {
         // ホームと同じ青紫の帯。左に戻るボタン、続けて見出し
         var bar = UiKit.Img(screen, "TopBar", HomeSkin.Bar, Color.white).rectTransform;
         bar.anchorMin = new Vector2(0f, 1f); bar.anchorMax = new Vector2(1f, 1f); bar.pivot = new Vector2(0.5f, 1f);
@@ -139,7 +146,7 @@ public partial class AppShell : MonoBehaviour
         var back = UiKit.Img(screen, "Back", HomeSkin.TabOn, Color.white, true);
         UiKit.Place(back.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(16f, -10f), new Vector2(66f, 44f));
         var bb = back.gameObject.AddComponent<Button>();
-        bb.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.6f, 1.2f); ShowHome(); });
+        bb.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.6f, 1.2f); if (onBack != null) onBack(); else ShowHome(); });
         var arrow = HomeSkin.NavText(UiKit.Txt(back.rectTransform, "Label", "←", 28, Color.white, TextAnchor.MiddleCenter));
         UiKit.Fill(arrow.rectTransform);
         titleText = HomeSkin.Title(UiKit.Txt(screen, "Title", title, 28, Color.white, TextAnchor.MiddleLeft),
@@ -463,6 +470,8 @@ public partial class AppShell : MonoBehaviour
         _gacha.gameObject.SetActive(r == _gacha);
         if (_lineup != null) _lineup.gameObject.SetActive(r == _lineup);
         if (_onlineScr != null) _onlineScr.gameObject.SetActive(r == _onlineScr);
+        if (_formScr != null) _formScr.gameObject.SetActive(r == _formScr);
+        if (_preview != null && r != _formScr) _preview.Hide();
         _detail.gameObject.SetActive(false);
         _show.gameObject.SetActive(false);
         _fx.Clear();
