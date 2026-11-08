@@ -42,6 +42,22 @@ public partial class AppShell
         _codeInput.placeholder = ph;
         _codeInput.characterLimit = 6;
         _codeInput.contentType = InputField.ContentType.IntegerNumber;
+        if (WebPrompt.Available)
+        {
+            // ブラウザ版は入力欄を押すと標準の入力ダイアログを出す
+            _codeInput.readOnly = true;
+            var fb = field.gameObject.AddComponent<Button>();
+            fb.transition = Selectable.Transition.None;
+            fb.onClick.AddListener(() =>
+            {
+                string r = WebPrompt.Ask("相手の番号（6けた）", _codeInput.text);
+                if (r == null) return;
+                var sb = new System.Text.StringBuilder();
+                foreach (char c in r) if (c >= '0' && c <= '9' && sb.Length < 6) sb.Append(c);
+                else if (c >= '０' && c <= '９' && sb.Length < 6) sb.Append((char)('0' + (c - '０')));
+                _codeInput.text = sb.ToString();
+            });
+        }
 
         _vsButton = UiKit.Btn(col, "Vs", "対戦する", new Vector2(300f, 70f), true, OnOnlineVs, 30);
         UiKit.Place(_vsButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -250f), new Vector2(300f, 70f));

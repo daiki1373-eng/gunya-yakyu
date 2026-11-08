@@ -35,27 +35,41 @@ public partial class AtBatController
     //   打つ: 画面に触れている間はミートの円が指を追い(指で隠れないよう少し上)、指を離した瞬間にスイング
     //   投げる: 投げたい場所に触れた瞬間、その場所へ投げる(長押し・メーターなし)。球種は画面のボタンで選ぶ
     //   盗塁・球種のボタンに触れた指は、離してもスイングしない
-    private bool _pointerArmed;
+    private bool _pointerArmed, _hadTouch;
+    public static bool InputDebug = false;   // 確認用の記録(ブラウザのコンソールに出す)
 
     private void HandleInput()
     {
         if (_presentationInput)
         {
-            _pointerArmed = false;
+            // 演出中のタップは飛ばす操作。演出の前から押していた指はそのまま(離せば振る)
             bool tap = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space)
                 || Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.Return);
-            for (int i = 0; i < Input.touchCount; i++)
-                if (Input.GetTouch(i).phase == TouchPhase.Began) tap = true;
+            bool nowTouch = Input.touchCount > 0;
+            if (nowTouch && (!_hadTouch || Input.GetTouch(0).phase == TouchPhase.Began)) { tap = true; _pointerArmed = false; }
+            if (Input.GetMouseButtonDown(0)) _pointerArmed = false;
+            if (!nowTouch && _hadTouch) _pointerArmed = false;   // 演出中に離した指では振らない
+            _hadTouch = nowTouch;
             if (tap) _skipQueued = true;
             return;
         }
         bool swing = false, havePointer = false, pitchTap = false;
         Vector2 screen = Vector2.zero, tapScreen = Vector2.zero;
 
-        if (Input.touchCount > 0)
+        // 指が触れた・離れたは、phase に頼らず「前のフレームに指があったか」で判断する
+        // (ブラウザ版では、離した瞬間のフレームに Ended が来ないことがあるため)
+        bool touching = Input.touchCount > 0;
+        if (!touching && _hadTouch)
+        {
+            if (InputDebug) Debug.Log("[Input] released armed=" + _pointerArmed);
+            if (_pointerArmed && _gs.UserBatting) swing = true;   // 離したら振る
+            _pointerArmed = false;
+        }
+        if (touching)
         {
             Touch t0 = Input.GetTouch(0);
-            if (t0.phase == TouchPhase.Began)
+            bool began = !_hadTouch || t0.phase == TouchPhase.Began;
+            if (began)
             {
                 int tb = _ui.PitchButtonAt(t0.position);
                 if (_ui.OverSteal(t0.position)) { ToggleSteal(); _pointerArmed = false; }
@@ -70,11 +84,15 @@ public partial class AtBatController
             {
                 screen = t0.position + new Vector2(0f, Screen.height * 0.08f);
                 havePointer = true;
-                if (t0.phase == TouchPhase.Ended) swing = true;      // 離したら振る
+                // 離したら振る(ブラウザでは離したときに Canceled が来ることがあるので同じに扱う)
+                if (t0.phase == TouchPhase.Ended || t0.phase == TouchPhase.Canceled) { swing = true; _pointerArmed = false; }
             }
-            if (t0.phase == TouchPhase.Ended || t0.phase == TouchPhase.Canceled) _pointerArmed = false;
+            if (t0.phase == TouchPhase.Canceled) _pointerArmed = false;
+            if (InputDebug && (began || t0.phase == TouchPhase.Ended || t0.phase == TouchPhase.Canceled))
+                Debug.Log("[Input] touch " + t0.phase + " began=" + began + " armed=" + _pointerArmed + " swing=" + swing);
         }
-        else
+        _hadTouch = touching && Input.GetTouch(0).phase != TouchPhase.Ended && Input.GetTouch(0).phase != TouchPhase.Canceled;
+        if (!touching)
         {
             Vector3 mp = Input.mousePosition;
             if ((mp - _lastMouse).sqrMagnitude > 4f) _keyboardMode = false;
@@ -131,7 +149,11 @@ public partial class AtBatController
             swing = true;
         }
         if (swing) _skipQueued = true;   // 登場演出のスキップ用
-        if (swing && (_gs.UserBatting || _defTapOk)) _swingQueued = true;
+        if (swing && (_gs.UserBatting || _defTapOk))
+        {
+            _swingQueued = true;
+            if (InputDebug) Debug.Log("[Input] queued batting=" + _gs.UserBatting);
+        }
     }
 
     // 画面の点 → ストライクゾーンの面(z=0)の上の点

@@ -269,6 +269,18 @@ public partial class AppShell : MonoBehaviour
     {
         if (string.IsNullOrEmpty(PlayerName))
         {
+            // ブラウザ版はブラウザ標準の入力ダイアログで名前を聞く(スマホでも確実にキーボードが出る)
+            if (WebPrompt.Available)
+            {
+                string r = WebPrompt.Ask("なまえ（10文字まで）", "");
+                r = r == null ? "" : r.Trim();
+                if (r.Length > 10) r = r.Substring(0, 10);
+                if (r.Length == 0) r = "ななし";
+                PlayerPrefs.SetString(NameKey, r);
+                PlayerPrefs.Save();
+                ShowHome();
+                return;
+            }
             _namePanel.gameObject.SetActive(true);
             _nameInput.text = "";
             _nameInput.ActivateInputField();
