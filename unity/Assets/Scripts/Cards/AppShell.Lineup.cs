@@ -20,12 +20,13 @@ public partial class AppShell
     private readonly List<Text> _poolLabels = new List<Text>();
     private Text _lineupTitle;
 
-    private static readonly Color RowColor = new Color(0.10f, 0.05f, 0.08f, 0.88f);
+    private static readonly Color RowColor = new Color(0.04f, 0.06f, 0.15f, 0.88f);
     private static readonly Color RowSel = new Color(0.62f, 0.42f, 0.06f, 0.95f);
 
     private void BuildLineup()
     {
         _lineup = MakeScreen("Lineup", 0.42f);
+        UseMenuBackdrop(_lineup);
         TopBar(_lineup, "編成", out _lineupTitle);
 
         _lineupRows = UiKit.Rect(_lineup, "Rows");

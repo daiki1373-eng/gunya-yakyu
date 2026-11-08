@@ -62,10 +62,26 @@ public class BattingUI
         }
     }
 
-    // 試合開始の演出の間は、操作ボタンを隠す(絵と重ねない)
+    // SWING／投げるボタンは使わない(打つ=指を離す、投げる=場所に触れる)。いつも隠しておく
     public void SetControlsVisible(bool on)
     {
-        if (_swingRect != null) _swingRect.gameObject.SetActive(on);
+        if (_swingRect != null) _swingRect.gameObject.SetActive(false);
+    }
+
+    private static Sprite _topShade;
+    private static Sprite TopShadeSprite()
+    {
+        if (_topShade != null) return _topShade;
+        const int h = 64;
+        var tex = new Texture2D(1, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+        for (int y = 0; y < h; y++)
+        {
+            float t = y / (h - 1f);   // 0=下端, 1=上端
+            tex.SetPixel(0, y, new Color(0.01f, 0.02f, 0.06f, 0.95f * Mathf.Pow(t, 1.2f)));
+        }
+        tex.Apply();
+        _topShade = Sprite.Create(tex, new Rect(0, 0, 1, h), new Vector2(0.5f, 0.5f), 100f);
+        return _topShade;
     }
 
     // 試合のUIの画面(タイトル・ホームの間は AppShell が隠す)
@@ -95,6 +111,18 @@ public class BattingUI
         vrt.anchorMax = Vector2.one;
         vrt.offsetMin = Vector2.zero;
         vrt.offsetMax = Vector2.zero;
+
+        // 上端の帯(上から下へ薄くなる影)。表示を読みやすくし、球場の電光掲示板の端を隠す
+        var topShade = new GameObject("TopShade");
+        topShade.transform.SetParent(canvasGo.transform, false);
+        var ts = topShade.AddComponent<Image>();
+        ts.sprite = TopShadeSprite();
+        ts.raycastTarget = false;
+        var tsr = ts.rectTransform;
+        tsr.anchorMin = new Vector2(0f, 1f); tsr.anchorMax = new Vector2(1f, 1f);
+        tsr.pivot = new Vector2(0.5f, 1f);
+        tsr.sizeDelta = new Vector2(0f, 150f);
+        tsr.anchoredPosition = Vector2.zero;
 
         // ---- 中継風スコア表示(左上) ----
         var bug = NewImage(canvasGo.transform, "ScoreBug", new Color(0.03f, 0.05f, 0.12f, 0.86f));
@@ -335,24 +363,32 @@ public class BattingUI
     // ---- 投球UI(球種ボタン・タイミングメーター) ----
     private void BuildPitchPanel(Transform canvas)
     {
+        // 球種のボタン: 小さな札(色の点+名前)を、打者と反対側の端に縦に並べる。番号の表示はなし
         for (int i = 0; i < 5; i++)
         {
             if (_pitchOff == null)
             {
-                _pitchOff = TelopFx.PlateSprite(new Color(0.03f, 0.05f, 0.13f, 0.88f), new Color(1f, 0.78f, 0.2f, 0.55f));
-                _pitchOn = TelopFx.PlateSprite(new Color(0.74f, 0.06f, 0.08f, 0.95f), UiKit.GoldLight);
+                _pitchOff = TelopFx.PlateSprite(new Color(0.03f, 0.05f, 0.13f, 0.80f), new Color(1f, 1f, 1f, 0.18f));
+                _pitchOn = TelopFx.PlateSprite(new Color(0.70f, 0.07f, 0.09f, 0.96f), UiKit.GoldLight);
             }
             var img = NewImage(canvas, "PitchBtn" + i, Color.white);
             img.sprite = _pitchOff;
             var r = img.rectTransform;
-            r.anchorMin = r.anchorMax = new Vector2(0f, 0.5f);
-            r.pivot = new Vector2(0f, 0.5f);
-            r.sizeDelta = new Vector2(190f, 40f);
-            r.anchoredPosition = new Vector2(14f, 70f - i * 46f);
-            var t = NewText(r, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(190f, 40f),
-                20, TextAnchor.MiddleCenter, Color.white);
-            t.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            t.text = "<size=15>" + (i + 1) + "</size>   " + PitchRepertoire.All[i].Name;
+            r.anchorMin = r.anchorMax = new Vector2(1f, 0.5f);
+            r.pivot = new Vector2(1f, 0.5f);
+            r.sizeDelta = new Vector2(150f, 40f);
+            var dot = NewImage(r, "Dot", PitchColors[i]);
+            dot.sprite = SpriteFactory.Circle; dot.raycastTarget = false;
+            var dr = dot.rectTransform;
+            dr.anchorMin = dr.anchorMax = new Vector2(0f, 0.5f);
+            dr.pivot = new Vector2(0.5f, 0.5f);
+            dr.sizeDelta = new Vector2(14f, 14f);
+            dr.anchoredPosition = new Vector2(20f, 0f);
+            var t = NewText(r, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110f, 40f),
+                19, TextAnchor.MiddleLeft, Color.white);
+            t.rectTransform.anchorMin = new Vector2(0f, 0f); t.rectTransform.anchorMax = new Vector2(1f, 1f);
+            t.rectTransform.offsetMin = new Vector2(36f, 0f); t.rectTransform.offsetMax = new Vector2(-8f, 0f);
+            t.text = PitchRepertoire.All[i].Name;
             _pitchBtn[i] = img;
             _pitchTxt[i] = t;
             img.gameObject.SetActive(false);
@@ -413,16 +449,30 @@ public class BattingUI
         _meterMarker.anchoredPosition = new Vector2(Mathf.Clamp01(u) * MeterW, 0f);
     }
 
-    // available[i]=その球種を投げられるか
-    public void ShowPitchPanel(bool on, bool[] available, int selected)
+    // 球種ごとの色(投球の軌跡と同じ)
+    public static readonly Color[] PitchColors =
     {
+        new Color(1f, 1f, 1f), new Color(0.45f, 0.70f, 1f), new Color(0.50f, 0.95f, 0.55f),
+        new Color(1f, 0.62f, 0.25f), new Color(1f, 0.95f, 0.45f)
+    };
+    private bool _pitchRight = true;
+
+    // available[i]=その球種を投げられるか。batSide<0(右打者=画面の左に立つ)なら札は右端、そうでなければ左端
+    public void ShowPitchPanel(bool on, bool[] available, int selected, int batSide = -1)
+    {
+        _pitchRight = batSide < 0;
+        int n = 0;
+        for (int i = 0; i < 5; i++) if (available != null && available[i]) n++;
         int row = 0;
         for (int i = 0; i < 5; i++)
         {
             _pitchAvail[i] = available != null && available[i];
             _pitchBtn[i].gameObject.SetActive(on && _pitchAvail[i]);
-            // 使える球種だけを隙間なく並べる
-            if (_pitchAvail[i]) { _pitchRowY[i] = 70f - row * 46f; row++; }
+            var r = _pitchBtn[i].rectTransform;
+            r.anchorMin = r.anchorMax = new Vector2(_pitchRight ? 1f : 0f, 0.5f);
+            r.pivot = new Vector2(_pitchRight ? 1f : 0f, 0.5f);
+            // 使える球種だけを隙間なく、画面の縦の真ん中より少し下にそろえて並べる
+            if (_pitchAvail[i]) { _pitchRowY[i] = (n - 1) * 23f - 30f - row * 46f; row++; }
         }
         SelectPitch(selected);
     }
@@ -435,8 +485,10 @@ public class BattingUI
             bool sel = i == k;
             _pitchBtn[i].sprite = sel ? _pitchOn : _pitchOff;
             _pitchBtn[i].color = Color.white;
-            _pitchBtn[i].rectTransform.anchoredPosition = new Vector2(sel ? 26f : 14f, _pitchRowY[i]);
-            if (_pitchTxt[i] != null) _pitchTxt[i].color = sel ? new Color(1f, 0.93f, 0.55f) : Color.white;
+            float x = sel ? 22f : 14f;
+            _pitchBtn[i].rectTransform.anchoredPosition = new Vector2(_pitchRight ? -x : x, _pitchRowY[i]);
+            _pitchBtn[i].rectTransform.localScale = Vector3.one * (sel ? 1.06f : 1f);
+            if (_pitchTxt[i] != null) _pitchTxt[i].color = sel ? new Color(1f, 0.93f, 0.55f) : new Color(1f, 1f, 1f, 0.85f);
         }
     }
 

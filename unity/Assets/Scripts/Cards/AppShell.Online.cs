@@ -16,6 +16,7 @@ public partial class AppShell
     private void BuildOnline()
     {
         _onlineScr = MakeScreen("Online", 0.42f);
+        UseMenuBackdrop(_onlineScr);
         Text title;
         TopBar(_onlineScr, "オンライン対戦", out title);
         var col = UiKit.Rect(_onlineScr, "Column");

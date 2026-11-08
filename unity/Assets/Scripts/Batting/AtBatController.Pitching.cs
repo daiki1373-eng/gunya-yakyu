@@ -50,6 +50,7 @@ public partial class AtBatController
         _ui.ShowBanner("");
         if (_gs.UserBatting) _cursor.ResetColor();
         _cursorLocked = false;
+        if (_gs.UserBatting && !_pointerArmed) _cursorPos = _cursorTarget = new Vector2(0f, BattingConfig.ZoneCenterY);   // 毎球ゾーンの真ん中から
         _stage.HideBall();
         _stage.ClearTrail();
         _ui.ShowMeter(false);
@@ -257,12 +258,14 @@ public partial class AtBatController
     // ------------------------------------------------------------
     // 守り(投球)の操作
     // ------------------------------------------------------------
+    // 守り(シンプル版): 球種のボタンで球種を選び、投げたい場所に触れるとすぐ投げる。メーターはなし
     private IEnumerator DefenseInput()
     {
         for (int i = 0; i < 5; i++) _avail[i] = _pitcherStats.Brk >= PitchRepertoire.All[i].MinBrk;
         if (!_avail[_selKind]) _selKind = 0;
-        _ui.ShowPitchPanel(true, _avail, _selKind);
+        _ui.ShowPitchPanel(true, _avail, _selKind, _batSide);
         _cursorLocked = false;
+        _cursorPos = _cursorTarget = new Vector2(0f, BattingConfig.ZoneCenterY);   // 狙いは毎球ゾーンの真ん中から
         _reticleOn = true;
         _reticleCol = Color.white;
         yield return StartCoroutine(Wait(BattingConfig.PitchReadySeconds));
@@ -281,7 +284,6 @@ public partial class AtBatController
             tAutoStart = Time.time + 0.2f;
         }
 
-        // ① 球種 ② コース: 決まったら1回目のタップ
         bool started = false;
         while (!started)
         {
@@ -291,59 +293,24 @@ public partial class AtBatController
             yield return null;
         }
         _swingQueued = false;
+        _defTapOk = false;
         PitchKind kind = (PitchKind)_selKind;
         Vector2 aim = _cursorPos;
         _cursorLocked = true;
         _reticleCol = new Color(1f, 1f, 1f, 0.45f);
         _ui.ShowPitchPanel(false, _avail, _selKind);
         _ui.SetSpeed(PitchRepertoire.Get(kind).Name);
+        GameAudio.Play(Sfx.Click, 0.5f, 1.2f);
 
-        // ③ モーションに合わせてもう一度タップ
         _pitcher.DoPitchMotion();
-        float t0 = Time.time;
-        float tRel = t0 + BattingConfig.WindupSeconds;
-        float tSweet = tRel - SweetBeforeRelease;
-        float sweetU = (tSweet - t0) / BattingConfig.WindupSeconds;
-        // 完璧=±25ms、良い=品質0.5(±105ms)の幅をメーターの帯にする
-        _ui.SetMeterZones(sweetU, 0.105f / BattingConfig.WindupSeconds, 0.025f / BattingConfig.WindupSeconds);
-        _ui.ShowMeter(true);
-
-        bool pressed = false;
-        float tPress = 0f;
-        float autoOff = AutoPlay ? PitchAI.Normal(0.050f) : 0f;
-        while (Time.time < tRel)
-        {
-            float u = (Time.time - t0) / BattingConfig.WindupSeconds;
-            if (FreezeKind == -60 && u > 0.7f) { FreezeKind = -99; Time.timeScale = 0f; }
-            if (!pressed)
-            {
-                _ui.SetMeter(u);
-                if (AutoPlay)
-                {
-                    if (Time.time >= tSweet + autoOff) { pressed = true; tPress = Time.time; }
-                }
-                else if (ConsumeSwing())
-                {
-                    if (Time.time - t0 > 0.12f) { pressed = true; tPress = Time.time; }   // 直後の連打は無視
-                }
-            }
-            yield return null;
-        }
-        float timingMs = pressed ? (tPress - tSweet) * 1000f : 185f;
-        float q = PitchAI.TimingQuality(timingMs);
-        string txt; Color col;
-        if (!pressed) { txt = "MISS"; col = new Color(1f, 0.38f, 0.34f); }
-        else if (q >= 0.99f) { txt = "PERFECT!"; col = new Color(1f, 0.86f, 0.18f); }
-        else if (q >= 0.5f) { txt = "GOOD"; col = new Color(0.45f, 0.95f, 0.45f); }
-        else { txt = timingMs < 0f ? "EARLY" : "LATE"; col = new Color(0.62f, 0.78f, 1f); }
-        _ui.ShowTiming(txt, col);
-        _defTapOk = false;
-        _swingQueued = false;
+        float tRel = Time.time + BattingConfig.WindupSeconds;
+        while (Time.time < tRel) yield return null;
         _reticleOn = false;
+        // 制球は投手の能力だけで決まる(タイミングの要素はなし)
+        const float timingMs = 0f;
         _defPlan = PitchAI.PlanFromUser(_pitcherStats, kind, aim, _batSide, timingMs);
         _defTRelease = tRel;
         Count("Pitch_" + kind);
-        Count(pressed ? (q >= 0.99f ? "Timing_Perfect" : (q >= 0.5f ? "Timing_Good" : "Timing_Bad")) : "Timing_None");
     }
 
     // 打者AI: 球が放たれたあと、スイングするなら適切な時刻に振る

@@ -60,6 +60,16 @@ public partial class AppShell
         img.color = Color.white;
     }
 
+    // メニュー画面(カード・ガチャ・編成・オンライン): 球場の背景の上に、読みやすいよう紺の幕を重ねる
+    private static void UseMenuBackdrop(RectTransform screen, float dim = 0.6f)
+    {
+        UseStadiumBackdrop(screen);
+        var d = UiKit.Img(screen, "Dim", SpriteFactory.White, new Color(0.02f, 0.03f, 0.09f, dim));
+        d.raycastTarget = false;
+        UiKit.Fill(d.rectTransform);
+        d.transform.SetSiblingIndex(1);
+    }
+
     private KvChara AddChara(RectTransform parent, string poseName, bool left)
     {
         var sp = Resources.Load<Sprite>("Chara/Pose/" + poseName);
@@ -89,7 +99,7 @@ public partial class AppShell
     private void TickBackdrop(float t)
     {
         bool titleOn = _title != null && _title.gameObject.activeSelf;
-        bool homeOn = _home != null && _home.gameObject.activeSelf;
+        bool homeOn = (_home != null && _home.gameObject.activeSelf) || MenuScreenOn();
         bool pre = !_gameStarted && (titleOn || homeOn);
         if (BattingUI.RootCanvas != null) BattingUI.RootCanvas.enabled = !pre;
         if (!pre) return;
@@ -116,6 +126,12 @@ public partial class AppShell
             _nextBurst = t + UnityEngine.Random.Range(5f, 8f);
             _stageRef.Stadium.LaunchFireworks(2);
         }
+    }
+
+    private bool MenuScreenOn()
+    {
+        return (_cards != null && _cards.gameObject.activeSelf) || (_gacha != null && _gacha.gameObject.activeSelf)
+            || (_lineup != null && _lineup.gameObject.activeSelf) || (_onlineScr != null && _onlineScr.gameObject.activeSelf);
     }
 
     private void SnapBackdrop()

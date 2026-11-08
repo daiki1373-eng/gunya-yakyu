@@ -132,7 +132,7 @@ public partial class AppShell : MonoBehaviour
 
     private void TopBar(RectTransform screen, string title, out Text titleText)
     {
-        var bar = UiKit.Img(screen, "TopBar", SpriteFactory.White, new Color(0.10f, 0.02f, 0.02f, 0.85f));
+        var bar = UiKit.Img(screen, "TopBar", SpriteFactory.White, new Color(0.02f, 0.03f, 0.09f, 0.88f));
         UiKit.Place(bar.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(2000f, 60f));
         var line = UiKit.Img(screen, "TopLine", SpriteFactory.White, UiKit.Gold);
         UiKit.Place(line.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(2000f, 3f));
@@ -291,6 +291,7 @@ public partial class AppShell : MonoBehaviour
     private void BuildCards()
     {
         _cards = MakeScreen("Cards", 0.42f);
+        UseMenuBackdrop(_cards);
         TopBar(_cards, "カード", out _cardsTitle);
 
         var view = UiKit.Rect(_cards, "Viewport");
@@ -407,7 +408,8 @@ public partial class AppShell : MonoBehaviour
     private void BuildGacha()
     {
         _gacha = MakeScreen("Gacha", 1f);
-        _gachaRays = AddRays(_gacha, new Color(1f, 0.85f, 0.35f, 0.55f), 1500f, new Vector2(0f, 30f));
+        UseMenuBackdrop(_gacha, 0.35f);
+        _gachaRays = AddRays(_gacha, new Color(1f, 0.85f, 0.35f, 0.28f), 1500f, new Vector2(0f, 30f));
         Text title;
         TopBar(_gacha, "ガチャ", out title);
         // 中央のガチャマシン(素材があれば)。ダイヤルは本体の飾り板の上に重ね、引くときに回す
