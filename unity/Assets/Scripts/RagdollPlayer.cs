@@ -15,7 +15,7 @@ using UnityEngine;
 //   スイング/投球/転倒の演出中は _poseHoldTimer / _flopTimer で制御を緩める。
 // - ResetPose() で初期姿勢に完全に戻せるので、1球ごとにリセットして使う。
 // ============================================================
-public class RagdollPlayer : MonoBehaviour
+public partial class RagdollPlayer : MonoBehaviour
 {
     public const int RagdollLayer = 8;
 
@@ -131,6 +131,7 @@ public class RagdollPlayer : MonoBehaviour
     // 再有効化時にUnityがIgnoreCollisionの状態を失う場合にも設定し直す。
     private void OnEnable()
     {
+        if (_isolated) { IgnoreBodyCollisions(); return; }
         if (!ActivePlayers.Contains(this)) ActivePlayers.Add(this);
         IgnoreBodyCollisions();
     }
@@ -548,6 +549,7 @@ public class RagdollPlayer : MonoBehaviour
         _walking = false;
         StandAssist = false;
         _pelvisHome = _pelvisHomeInit;
+        OnFormReset();
         ApplyExpression(Expr.Normal);
         for (int i = 0; i < _initialPose.Count; i++)
         {
@@ -564,15 +566,22 @@ public class RagdollPlayer : MonoBehaviour
 
     private void FixedUpdate()
     {
-        TickWalk(Time.fixedDeltaTime);
+        if (ManualStep) return;   // プレビューでは Step() から進める
+        Tick(Time.fixedDeltaTime);
+    }
+
+    private void Tick(float dt)
+    {
+        TickWalk(dt);
         ApplyHolds();
         if (StandAssist && _flopTimer <= 0f) ApplyStand();
         if (_flopTimer > 0f)
         {
-            _flopTimer -= Time.fixedDeltaTime;
+            _flopTimer -= dt;
             return; // 転倒中はバランス制御を切って、ぐにゃっとさせる
         }
-        if (_poseHoldTimer > 0f) _poseHoldTimer -= Time.fixedDeltaTime;
+        if (_poseHoldTimer > 0f) _poseHoldTimer -= dt;
+        TickForm(dt);
 
         // 腰をホームポジションへ弱く引き戻す(横方向のみ。縦は脚と地面に任せる)
         if (Pelvis != null)
@@ -581,11 +590,12 @@ public class RagdollPlayer : MonoBehaviour
             Pelvis.AddForce(new Vector2(dx * 16f, 0f));
         }
 
-        if (_poseHoldTimer <= 0f)
+        if (_poseHoldTimer <= 0f && !FormHoldsBody)
         {
-            BalancePart(Chest, 1.0f);
-            BalancePart(Head, 0.8f);
-            BalancePart(Pelvis, 0.5f);
+            float k = BalanceScale;
+            BalancePart(Chest, 1.0f * k);
+            BalancePart(Head, 0.8f * k);
+            BalancePart(Pelvis, 0.5f * k);
         }
     }
 
@@ -606,6 +616,7 @@ public class RagdollPlayer : MonoBehaviour
     public void DoPitchMotion()
     {
         if (_poseCard != null) _poseCard.OnPitch();
+        if (Form != null) { FormPitch(); return; }
         _poseHoldTimer = 0.35f;
         SetExpression(Expr.Focus, 0.7f);
         float f = Facing;
@@ -619,6 +630,7 @@ public class RagdollPlayer : MonoBehaviour
     public void DoSwing()
     {
         if (_poseCard != null) _poseCard.OnSwing();
+        if (Form != null) { FormSwing(); return; }
         _poseHoldTimer = 0.30f;
         if (_expr == Expr.Normal) SetExpression(Expr.Focus, 0.5f);
         float f = Facing;
@@ -635,6 +647,7 @@ public class RagdollPlayer : MonoBehaviour
     public void ThrowBat(float power)
     {
         if (Bat == null) return;
+        power *= OwnGunyaScale;
         foreach (var j in Bat.GetComponents<HingeJoint2D>()) j.enabled = false;
         BatThrown = true;
         float f = Facing;
@@ -645,6 +658,7 @@ public class RagdollPlayer : MonoBehaviour
     // 三振や大飛球のあとに、ぐにゃっと崩れる演出。
     public void Flop(float power)
     {
+        power *= OwnGunyaScale;
         _flopTimer = 0.9f;
         SetExpression(Expr.Dizzy, 1.6f);
         for (int i = 0; i < _allParts.Count; i++)
@@ -729,7 +743,7 @@ public class RagdollPlayer : MonoBehaviour
     private void AddHold(Rigidbody2D rb, float target, float seconds, bool wave = false)
     {
         if (rb == null) return;
-        _holds.Add(new Hold { Rb = rb, Target = target, Until = Time.time + seconds, Wave = wave });
+        _holds.Add(new Hold { Rb = rb, Target = target, Until = Now + seconds, Wave = wave });
     }
 
     private void ApplyHolds()
@@ -737,9 +751,9 @@ public class RagdollPlayer : MonoBehaviour
         for (int i = _holds.Count - 1; i >= 0; i--)
         {
             var h = _holds[i];
-            if (h.Rb == null || Time.time > h.Until) { _holds.RemoveAt(i); continue; }
+            if (h.Rb == null || Now > h.Until) { _holds.RemoveAt(i); continue; }
             float target = h.Target;
-            if (h.Wave) target += Mathf.Sin(Time.time * 12f) * 40f * Facing;
+            if (h.Wave) target += Mathf.Sin(Now * 12f) * 40f * Facing;
             float err = Mathf.DeltaAngle(h.Rb.rotation, target) * Mathf.Deg2Rad;
             float av = h.Rb.angularVelocity * Mathf.Deg2Rad;
             float alpha = 300f * err - 30f * av;

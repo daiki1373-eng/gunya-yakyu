@@ -104,6 +104,7 @@ public partial class AtBatController : MonoBehaviour
         _pitcher.transform.position = new Vector3(0f, 0f, BattingConfig.MoundZ);
         _stage.AddShadow(_pitcher.Pelvis.transform, 1.6f, jersey);
         ApplyStackLook(_pitcher, _pitcherStats, jersey == BattingConfig.UserJersey);
+        if (jersey == BattingConfig.UserJersey) _pitcher.SetForm(CharaForm.Load(_pitcherStats.CharaId));
     }
 
     private int _teamsFor = -1;

@@ -70,6 +70,15 @@ public class PoseCardProto : MonoBehaviour
         return c;
     }
 
+    // 決めポーズの絵をやめて、体(物理)だけに戻す(フォームを作った選手)
+    public void Remove()
+    {
+        if (_skin != null) _skin.transform.localScale = Vector3.one;
+        if (_batSr != null) _batSr.enabled = true;
+        if (_sr != null) Destroy(_sr.gameObject);
+        Destroy(this);
+    }
+
     public void OnSwing() { _swingT = Time.time; _waiting = false; }
     public void OnReset() { _waiting = true; }   // 投球ごとの構え直し: 次に振るまで構えの絵
     private bool _waiting;

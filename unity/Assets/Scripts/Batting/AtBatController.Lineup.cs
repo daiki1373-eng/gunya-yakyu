@@ -55,6 +55,7 @@ public partial class AtBatController
             _batterStats, uniform, accent, true, _gs.UserBatting);
         _stage.AddShadow(_batter.Pelvis.transform, 1.6f, uniform);
         ApplyStackLook(_batter, _batterStats, _gs.UserBatting);
+        if (_gs.UserBatting) _batter.SetForm(CharaForm.Load(_batterStats.CharaId));   // 編成で作ったフォーム(なければ従来どおり)
         _stage.Stadium.SetBoardBatter(_batterStats.Name);
 
         _cursor.Configure(HitJudge.CursorHalfW(_batterStats.Meet), HitJudge.CursorHalfH(_batterStats.Meet), _batSide);
