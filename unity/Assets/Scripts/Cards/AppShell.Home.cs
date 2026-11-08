@@ -5,6 +5,7 @@ using UnityEngine.UI;
 // AppShell.Home.cs
 // ホーム画面: 上の帯(ロゴ・名前・所持数)、左にキャラ、右にバナー2枚、
 // 下の帯(メニュー + まん中の大きな「試合」ボタン)。背景は球場。
+// 下の帯はホーム・編成・カード・ガチャ・オンラインで共通(今いる画面のタブを水色にする)。
 // ============================================================
 public partial class AppShell
 {
@@ -15,7 +16,12 @@ public partial class AppShell
     private readonly RectTransform[] _bannerArt = new RectTransform[2];
     private RectTransform _vsMe, _vsRival, _vsText;
     private readonly RectTransform[] _tabs = new RectTransform[5];
+    private readonly GameObject[] _tabOn = new GameObject[5];
+    private RectTransform _navLayer;
+    private int _navIdx = -1;
     private const float BarH = 64f, NavH = 80f, Edge = 10f, BattleW = 280f;
+    // 下の帯(と、はみ出す試合ボタン)の分だけ、各画面の中身を上に空ける高さ
+    private const float NavReserve = 8f + NavH + 18f;
 
     private void BuildHome()
     {
@@ -132,35 +138,38 @@ public partial class AppShell
     // ---- 下の帯(メニュー + 試合ボタン) ----
     private void BuildHomeNav()
     {
-        var nav = UiKit.Img(_home, "Nav", HomeSkin.Bar, Color.white).rectTransform;
+        // 帯は画面とは別の層に置き、ホーム以外のメニュー画面でも出す(Build で画面より手前へ)
+        _navLayer = UiKit.Fill(UiKit.Rect(_root, "NavLayer"));
+        var nav = UiKit.Img(_navLayer, "Nav", HomeSkin.Bar, Color.white).rectTransform;
         nav.anchorMin = Vector2.zero; nav.anchorMax = new Vector2(1f, 0f); nav.pivot = new Vector2(0.5f, 0f);
         nav.offsetMin = new Vector2(Edge, 8f); nav.offsetMax = new Vector2(-Edge, 8f + NavH);
 
         string[] labels = { "ホーム", "編成", "カード", "ガチャ", "オンライン" };
         string[] icons = { "icon_nav_home", "icon_nav_team", "icon_nav_cards", "icon_nav_gacha", "icon_nav_online" };
-        System.Action[] acts = { null, ShowLineup, ShowCards, ShowGacha, ShowOnline };
+        System.Action[] acts = { ShowHome, ShowLineup, ShowCards, ShowGacha, ShowOnline };
         for (int i = 0; i < labels.Length; i++)
         {
             var hit = UiKit.Img(nav, "Tab" + i, SpriteFactory.White, new Color(1f, 1f, 1f, 0f), true);
             var r = hit.rectTransform;
             r.anchorMin = r.anchorMax = new Vector2(0.5f, 0.5f);
-            if (i == 0)
-            {
-                var on = UiKit.Img(r, "On", HomeSkin.TabOn, Color.white);
-                UiKit.Fill(on.rectTransform, 2f);
-            }
+            var on = UiKit.Img(r, "On", HomeSkin.TabOn, Color.white);
+            UiKit.Fill(on.rectTransform, 2f);
+            on.gameObject.SetActive(i == 0);
+            _tabOn[i] = on.gameObject;
             var ic = Icon(r, icons[i], new Vector2(0.5f, 1f), new Vector2(0f, -26f), 46f);
             if (ic != null) ic.raycastTarget = false;
             var t = HomeSkin.NavText(UiKit.Txt(r, "Label", labels[i], 18, Color.white, TextAnchor.MiddleCenter));
             UiKit.Place(t.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 4f), new Vector2(140f, 24f));
             var act = acts[i];
-            if (act != null)
+            int idx = i;
+            var b = hit.gameObject.AddComponent<Button>();
+            b.transition = Selectable.Transition.None;
+            var rr = r;
+            b.onClick.AddListener(() =>
             {
-                var b = hit.gameObject.AddComponent<Button>();
-                b.transition = Selectable.Transition.None;
-                var rr = r;
-                b.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.6f, 1.2f); StartCoroutine(PopIn(rr, 0.18f)); act(); });
-            }
+                if (_busy || idx == _navIdx) return;   // ガチャの演出中・今いる画面のタブは何もしない
+                GameAudio.Play(Sfx.Click, 0.6f, 1.2f); StartCoroutine(PopIn(rr, 0.18f)); act();
+            });
             _tabs[i] = r;
         }
         // ガチャを何回引けるか(赤い丸)
@@ -171,12 +180,12 @@ public partial class AppShell
         UiKit.Fill(_gachaBadgeText.rectTransform);
 
         // 試合ボタン(帯から少しはみ出す)
-        var bb = UiKit.Img(_home, "Battle", HomeSkin.Orange, Color.white, true);
+        var bb = UiKit.Img(_navLayer, "Battle", HomeSkin.Orange, Color.white, true);
         _battleBtn = bb.rectTransform;
         UiKit.Place(_battleBtn, new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2(0f, 8f + NavH * 0.5f + 4f), new Vector2(BattleW, 92f));
         var btn = bb.gameObject.AddComponent<Button>();
         var cb = btn.colors; cb.pressedColor = new Color(0.85f, 0.75f, 0.65f); btn.colors = cb;
-        btn.onClick.AddListener(() => { GameAudio.Play(Sfx.Click, 0.6f, 1.2f); StartGame(); });
+        btn.onClick.AddListener(() => { if (_busy) return; GameAudio.Play(Sfx.Click, 0.6f, 1.2f); StartGame(); });
         var mask = UiKit.Rect(_battleBtn, "ShineMask");
         UiKit.Fill(mask, 7f);
         mask.gameObject.AddComponent<RectMask2D>();
@@ -191,6 +200,29 @@ public partial class AppShell
         UiKit.Place(_playLabel.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(30f, 2f), new Vector2(200f, 60f));
     }
 
+    // 下の帯: ホームとメニュー画面だけに出し、今いる画面のタブを水色にする
+    private void RefreshNav(RectTransform screen)
+    {
+        if (_navLayer == null) return;
+        int idx = screen == null ? -1
+            : screen == _home ? 0 : screen == _lineup ? 1 : screen == _cards ? 2 : screen == _gacha ? 3 : screen == _onlineScr ? 4 : -1;
+        _navIdx = idx;
+        _navLayer.gameObject.SetActive(idx >= 0);
+        for (int i = 0; i < _tabOn.Length; i++)
+            if (_tabOn[i] != null) _tabOn[i].SetActive(i == idx);
+        if (idx >= 0) RefreshNavBadge();
+    }
+
+    // ガチャを何回引けるか(赤い丸)
+    private void RefreshNavBadge()
+    {
+        if (_gachaBadge == null) return;
+        int pulls = Collection.Coins / Collection.PullCoinCost + Collection.Points / Collection.ScoutCost;
+        _gachaBadge.gameObject.SetActive(pulls > 0);
+        _gachaBadgeText.text = pulls > 99 ? "99+" : pulls.ToString();
+        _gachaBadge.sizeDelta = new Vector2(pulls > 9 ? 44f : 32f, 32f);
+    }
+
     // 所持数・名前・バッジを今の値にする
     private void RefreshHome()
     {
@@ -198,10 +230,7 @@ public partial class AppShell
         _homePoints.text = Collection.Points.ToString("N0");
         _homeOwned.text = Collection.OwnedKinds() + "/" + CharaCatalog.All.Count;
         _homeName.text = string.IsNullOrEmpty(PlayerName) ? "ななし" : PlayerName;
-        int pulls = Collection.Coins / Collection.PullCoinCost + Collection.Points / Collection.ScoutCost;
-        _gachaBadge.gameObject.SetActive(pulls > 0);
-        _gachaBadgeText.text = pulls > 99 ? "99+" : pulls.ToString();
-        _gachaBadge.sizeDelta = new Vector2(pulls > 9 ? 44f : 32f, 32f);
+        RefreshNavBadge();
         string code = OnlineService.MyCode;
         _onlineSub.text = string.IsNullOrEmpty(code) ? "" : "マイコード " + code;
         _playLabel.text = _gameStarted ? "試合に戻る" : "試合";
@@ -236,6 +265,13 @@ public partial class AppShell
         // 上の帯: 狭い画面では名前を出さない
         _homeNamePill.gameObject.SetActive(size.x - 2f * Edge >= 980f);
 
+        LayoutHomeChara(size, availH, bottom, bw, t);
+    }
+
+    private void LayoutNav(float t)
+    {
+        if (_navLayer == null || !_navLayer.gameObject.activeSelf) return;
+        var size = _root.rect.size;
         // 下の帯: 左に3つ、右に2つ
         float navW = size.x - 2f * Edge;
         float side = (navW - BattleW) * 0.5f - 12f;
@@ -249,6 +285,15 @@ public partial class AppShell
             _tabs[i].sizeDelta = new Vector2(Mathf.Min(tw, 150f) - 6f, NavH - 8f);
         }
 
+        // 試合ボタン: ゆっくり脈打ち、光が横切る
+        float pulse = 1f + 0.025f * Mathf.Sin(t * 4f);
+        _battleBtn.localScale = new Vector3(pulse, pulse, 1f);
+        float u = Mathf.Repeat(t * 0.55f, 1.8f);
+        _battleShine.anchoredPosition = new Vector2(Mathf.Lerp(-BattleW * 0.75f, BattleW * 0.75f, Mathf.Clamp01(u)), 0f);
+    }
+
+    private void LayoutHomeChara(Vector2 size, float availH, float bottom, float bw, float t)
+    {
         // キャラ: 左の空いたところに、帯と重ならない大きさで
         float freeL = Edge + 6f, freeR = size.x - Edge - 6f - bw - 16f;
         float freeW = Mathf.Max(80f, freeR - freeL);
@@ -267,11 +312,5 @@ public partial class AppShell
             _homeChara.Rt.localRotation = Quaternion.Euler(0f, 0f, 0.7f * Mathf.Sin(t * 1.15f));
             _homeShadow.localScale = new Vector3(1f + 0.03f * Mathf.Sin(t * 1.15f), 1f, 1f);
         }
-
-        // 試合ボタン: ゆっくり脈打ち、光が横切る
-        float pulse = 1f + 0.025f * Mathf.Sin(t * 4f);
-        _battleBtn.localScale = new Vector3(pulse, pulse, 1f);
-        float u = Mathf.Repeat(t * 0.55f, 1.8f);
-        _battleShine.anchoredPosition = new Vector2(Mathf.Lerp(-BattleW * 0.75f, BattleW * 0.75f, Mathf.Clamp01(u)), 0f);
     }
 }

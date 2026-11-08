@@ -32,9 +32,9 @@ public partial class AppShell
         _lineupRows = UiKit.Rect(_lineup, "Rows");
         _lineupRows.anchorMin = new Vector2(0f, 0f); _lineupRows.anchorMax = new Vector2(0f, 1f);
         _lineupRows.pivot = new Vector2(0f, 1f);
-        _lineupRows.offsetMin = new Vector2(14f, 8f); _lineupRows.offsetMax = new Vector2(14f + 360f, -70f);
+        _lineupRows.offsetMin = new Vector2(14f, NavReserve); _lineupRows.offsetMax = new Vector2(14f + 360f, -70f);
         var vl = _lineupRows.gameObject.AddComponent<VerticalLayoutGroup>();
-        vl.spacing = 3f; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = true;
+        vl.spacing = 2f; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = true;
         for (int i = 0; i < 10; i++) BuildRow(i);
 
         // 右: 見出し(どの位置の選手か)と、選手の一覧(スクロール)
@@ -44,7 +44,7 @@ public partial class AppShell
         pt.offsetMin = new Vector2(14f + 360f + 18f, -100f); pt.offsetMax = new Vector2(-16f, -70f);
         var view = UiKit.Rect(_lineup, "Pool");
         view.anchorMin = Vector2.zero; view.anchorMax = Vector2.one;
-        view.offsetMin = new Vector2(14f + 360f + 16f, 8f); view.offsetMax = new Vector2(-16f, -104f);
+        view.offsetMin = new Vector2(14f + 360f + 16f, NavReserve); view.offsetMax = new Vector2(-16f, -104f);
         view.gameObject.AddComponent<RectMask2D>();
         var hit = view.gameObject.AddComponent<Image>();
         hit.color = new Color(0f, 0f, 0f, 0f);
@@ -78,24 +78,24 @@ public partial class AppShell
         chip.raycastTarget = false;
         var cr = chip.rectTransform;
         cr.anchorMin = cr.anchorMax = new Vector2(0f, 0.5f); cr.pivot = new Vector2(0f, 0.5f);
-        cr.anchoredPosition = new Vector2(30f, 0f); cr.sizeDelta = new Vector2(30f, 28f);
+        cr.anchoredPosition = new Vector2(30f, 0f); cr.sizeDelta = new Vector2(28f, 24f);
         var pos = UiKit.Txt(chip.transform, "T", "", 18, Color.white, TextAnchor.MiddleCenter);
         UiKit.Fill(pos.rectTransform);
         var head = UiKit.Img(row.transform, "Head", null, Color.white);
         head.preserveAspect = true; head.raycastTarget = false;
         var hr = head.rectTransform;
         hr.anchorMin = hr.anchorMax = new Vector2(0f, 0.5f); hr.pivot = new Vector2(0f, 0.5f);
-        hr.anchoredPosition = new Vector2(66f, 0f); hr.sizeDelta = new Vector2(36f, 36f);
+        hr.anchoredPosition = new Vector2(66f, 0f); hr.sizeDelta = new Vector2(30f, 30f);
         var name = UiKit.Txt(row.transform, "Name", "", 18, Color.white, TextAnchor.MiddleLeft);
         name.rectTransform.anchorMin = new Vector2(0f, 0f); name.rectTransform.anchorMax = new Vector2(1f, 1f);
-        name.rectTransform.offsetMin = new Vector2(108f, 0f); name.rectTransform.offsetMax = new Vector2(-66f, 0f);
+        name.rectTransform.offsetMin = new Vector2(102f, 0f); name.rectTransform.offsetMax = new Vector2(-66f, 0f);
         if (i > 0)
         {
             // 打順の入れ替え(▲▼)
-            var up = UiKit.Btn(row.transform, "Up", "▲", new Vector2(28f, 26f), false, () => MoveOrder(idx, -1), 14);
-            UiKit.Place(up.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-34f, 0f), new Vector2(28f, 26f));
-            var dn = UiKit.Btn(row.transform, "Down", "▼", new Vector2(28f, 26f), false, () => MoveOrder(idx, 1), 14);
-            UiKit.Place(dn.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(28f, 26f));
+            var up = UiKit.Btn(row.transform, "Up", "▲", new Vector2(28f, 24f), false, () => MoveOrder(idx, -1), 14);
+            UiKit.Place(up.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-34f, 0f), new Vector2(28f, 24f));
+            var dn = UiKit.Btn(row.transform, "Down", "▼", new Vector2(28f, 24f), false, () => MoveOrder(idx, 1), 14);
+            UiKit.Place(dn.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(28f, 24f));
         }
         _rowBg.Add(row); _rowNo.Add(no); _rowPos.Add(pos); _rowHead.Add(head); _rowName.Add(name);
     }

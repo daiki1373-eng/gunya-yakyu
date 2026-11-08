@@ -20,23 +20,24 @@ public partial class AppShell
         Text title;
         TopBar(_onlineScr, "オンライン対戦", out title);
         var col = UiKit.Rect(_onlineScr, "Column");
-        UiKit.Place(col, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -30f), new Vector2(460f, 400f));
+        // 上の帯と下の帯のあいだの真ん中に置く(上は 64、下は NavReserve 空ける)
+        UiKit.Place(col, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, (NavReserve - 64f) * 0.5f), new Vector2(460f, 290f));
 
         var l1 = UiKit.Txt(col, "MyLabel", "あなたの番号", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
-        UiKit.Place(l1.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 0f), new Vector2(400f, 30f));
-        _myCode = UiKit.Txt(col, "MyCode", "------", 64, Color.white, TextAnchor.MiddleCenter);
-        UiKit.Place(_myCode.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -30f), new Vector2(440f, 80f));
+        UiKit.Place(l1.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 0f), new Vector2(400f, 26f));
+        _myCode = UiKit.Txt(col, "MyCode", "------", 56, Color.white, TextAnchor.MiddleCenter);
+        UiKit.Place(_myCode.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(440f, 66f));
         UiKit.Style(_myCode, TelopFx.Kind.Heading);
 
         var l2 = UiKit.Txt(col, "OppLabel", "相手の番号", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
-        UiKit.Place(l2.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -130f), new Vector2(400f, 30f));
+        UiKit.Place(l2.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(400f, 26f));
         // 入力欄は上の帯・所持数の札と同じ紺の丸い札(白い四角だと浮くため)
         var field = UiKit.Img(col, "Field", HomeSkin.Pill, Color.white, true);
-        UiKit.Place(field.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -166f), new Vector2(300f, 64f));
-        var txt = HomeSkin.NavText(UiKit.Txt(field.transform, "Text", "", 40, Color.white, TextAnchor.MiddleCenter, true, false));
+        UiKit.Place(field.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -124f), new Vector2(300f, 56f));
+        var txt = HomeSkin.NavText(UiKit.Txt(field.transform, "Text", "", 36, Color.white, TextAnchor.MiddleCenter, true, false));
         UiKit.Fill(txt.rectTransform, 6f);
         txt.supportRichText = false;
-        var ph = UiKit.Txt(field.transform, "Placeholder", "000000", 40, new Color(0.55f, 0.62f, 0.95f, 0.45f), TextAnchor.MiddleCenter, false, false);
+        var ph = UiKit.Txt(field.transform, "Placeholder", "000000", 36, new Color(0.55f, 0.62f, 0.95f, 0.45f), TextAnchor.MiddleCenter, false, false);
         UiKit.Fill(ph.rectTransform, 6f);
         _codeInput = field.gameObject.AddComponent<InputField>();
         _codeInput.textComponent = txt;
@@ -63,10 +64,10 @@ public partial class AppShell
             });
         }
 
-        _vsButton = UiKit.Btn(col, "Vs", "対戦する", new Vector2(300f, 70f), true, OnOnlineVs, 30);
-        UiKit.Place(_vsButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -250f), new Vector2(300f, 70f));
+        _vsButton = UiKit.Btn(col, "Vs", "対戦する", new Vector2(300f, 60f), true, OnOnlineVs, 28);
+        UiKit.Place(_vsButton.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -192f), new Vector2(300f, 60f));
         _onlineStatus = UiKit.Txt(col, "Status", "", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
-        UiKit.Place(_onlineStatus.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -330f), new Vector2(440f, 34f));
+        UiKit.Place(_onlineStatus.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -258f), new Vector2(440f, 30f));
     }
 
     public void ShowOnline()
