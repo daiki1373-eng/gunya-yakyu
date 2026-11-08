@@ -263,6 +263,10 @@ public partial class AtBatController
     {
         for (int i = 0; i < 5; i++) _avail[i] = _pitcherStats.Brk >= PitchRepertoire.All[i].MinBrk;
         if (!_avail[_selKind]) _selKind = 0;
+        // 球種の一覧は、打球を追っていたカメラが投球の画に戻ってから出す
+        _stage.SetCameraMode(CamMode.Catcher);
+        float settle = 0f;
+        while (!_stage.CatcherCameraSettled() && settle < 1.5f) { settle += Time.unscaledDeltaTime; yield return null; }
         _ui.ShowPitchPanel(true, _avail, _selKind, _batSide);
         _cursorLocked = false;
         _cursorPos = _cursorTarget = new Vector2(0f, BattingConfig.ZoneCenterY);   // 狙いは毎球ゾーンの真ん中から
