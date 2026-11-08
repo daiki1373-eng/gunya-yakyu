@@ -261,7 +261,9 @@ public class StandeePuppet : MonoBehaviour
 
     private void LateUpdate()
     {
-        float dt = Time.deltaTime * PlaybackSpeed;
+        // メニューで試合を止めている間も、背景の選手は待機の動き(呼吸・揺れ)だけ続ける
+        float dt = Time.timeScale > 0f ? Time.deltaTime * PlaybackSpeed
+                 : (AppShell.MenuOpen ? Time.unscaledDeltaTime * 0.8f : 0f);
         if (dt <= 0f) return;
         _animationTime += dt;
         float g = BattingConfig.GunyaLevel;

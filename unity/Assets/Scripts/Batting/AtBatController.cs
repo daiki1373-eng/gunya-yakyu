@@ -124,6 +124,14 @@ public partial class AtBatController : MonoBehaviour
         }
     }
 
+    // 試合の前(タイトル・ホームの背景)にも、守備位置に自分のチームの選手を立たせておく
+    // (仮の人形のまま止まって見えないように)。試合が始まれば ApplyTeams で本来のチームに替わる
+    public void PreviewFielders()
+    {
+        if (_teamsFor != -1 || _stage == null) return;
+        SkinFielders(CharaRoster.UserTeam());
+    }
+
     // 塁上の走者が誰か(キャラ)。打席が終わるたびに進塁の記録から更新する
     private readonly CharaDef[] _onBase = new CharaDef[4];
 

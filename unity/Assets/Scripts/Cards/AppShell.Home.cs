@@ -259,7 +259,14 @@ public partial class AppShell
         LayoutChara(_homeChara, size.y, frac, cx, bottom);
         _homeShadow.sizeDelta = new Vector2(w * 1.1f, Mathf.Max(18f, w * 0.16f));
         _homeShadow.anchoredPosition = new Vector2(cx + w * 0.5f, bottom + 2f);
-        if (_homeChara != null) _homeChara.Rt.localScale = new Vector3(1f, 1f + 0.008f * Mathf.Sin(t * 2.1f), 1f);
+        // 待機の動き: 呼吸(縦に少し伸び縮み)と、ゆっくりした左右の揺れ
+        if (_homeChara != null)
+        {
+            float br = Mathf.Sin(t * 2.2f);
+            _homeChara.Rt.localScale = new Vector3(1f - 0.006f * br, 1f + 0.016f * br, 1f);
+            _homeChara.Rt.localRotation = Quaternion.Euler(0f, 0f, 0.7f * Mathf.Sin(t * 1.15f));
+            _homeShadow.localScale = new Vector3(1f + 0.03f * Mathf.Sin(t * 1.15f), 1f, 1f);
+        }
 
         // 試合ボタン: ゆっくり脈打ち、光が横切る
         float pulse = 1f + 0.025f * Mathf.Sin(t * 4f);

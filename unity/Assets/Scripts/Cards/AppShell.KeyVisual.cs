@@ -103,6 +103,7 @@ public partial class AppShell
         bool pre = !_gameStarted && (titleOn || homeOn);
         if (BattingUI.RootCanvas != null) BattingUI.RootCanvas.enabled = !pre;
         if (!pre) return;
+        if (!_fieldersPreviewed && AtBatController.Current != null) { _fieldersPreviewed = true; AtBatController.Current.PreviewFielders(); }
         if (_stageRef == null) _stageRef = FindObjectOfType<BattingStage>();
         if (_stageRef == null) return;
         float a = (t - _kvT0) * 0.05f;
@@ -133,6 +134,8 @@ public partial class AppShell
             _stageRef.Stadium.LaunchFireworks(2);
         }
     }
+
+    private bool _fieldersPreviewed;
 
     private bool MenuScreenOn()
     {
