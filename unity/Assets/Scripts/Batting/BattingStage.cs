@@ -636,7 +636,7 @@ public class BattingStage : MonoBehaviour
     {
         if (index < 0 || index >= _fielders.Length) return;
         StandeePuppet stand;
-        if (_fielders[index] != null && _standees.TryGetValue(_fielders[index], out stand)) stand.WithGlove = true;
+        if (_fielders[index] != null && _standees.TryGetValue(_fielders[index], out stand)) { stand.WithGlove = true; stand.AllowBillboard = true; }
         SetDollSkin(_fielders[index], cut);
     }
 

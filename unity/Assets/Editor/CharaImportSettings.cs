@@ -91,6 +91,20 @@ public class CharaImportSettings : AssetPostprocessor
             ti.SetTextureSettings(bs);
             return;
         }
+        // 遠景用のビルボード絵(512×512、足の裏が下から16px)。遠くに映るのでミップマップあり
+        if (p.Contains("/Billboard/"))
+        {
+            ti.alphaIsTransparency = true;
+            ti.mipmapEnabled = true;
+            ti.maxTextureSize = 512;
+            var bb = new TextureImporterSettings();
+            ti.ReadTextureSettings(bb);
+            bb.spriteAlignment = (int)SpriteAlignment.Custom;
+            bb.spritePivot = new Vector2(0.5f, 16f / 512f);
+            bb.spriteMeshType = SpriteMeshType.FullRect;
+            ti.SetTextureSettings(bb);
+            return;
+        }
         // 試合で使う切り抜き(Cut=立ち姿 / Head=頭)。透明あり・遠くでもちらつかないようミップマップあり
         bool cut = p.Contains("/Cut/"), head = p.Contains("/Head/");
         if (cut || head)

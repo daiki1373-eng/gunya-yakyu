@@ -42,6 +42,14 @@ public class StandeePuppet : MonoBehaviour
     private Transform _bones;
     private Transform _pel, _chest, _head, _aFU, _aFF, _aBU, _aBF, _lFU, _lFF, _lBU, _lBF;
 
+    // 遠景のビルボード: カメラから遠いあいだは、体を動かす絵(RigSkin)の代わりに簡略な一枚絵を出す
+    public bool AllowBillboard;              // 守備の選手だけ true(走者は走る動きを見せるため使わない)
+    public static float BillboardOn = 26f, BillboardOff = 22f;   // 切り替える距離(行き来しないよう差を付ける)
+    private SpriteRenderer _bb;
+    private bool _bbOn;
+    private float _bbScale = 1f;
+    public bool ShowingBillboard { get { return _bbOn; } }
+
     public static float DebugRun = -1f;      // 検証用: 0..1 で走りの強さを固定(-1=実際の動きから)
     private static readonly Dictionary<string, Sprite[]> Cache = new Dictionary<string, Sprite[]>();
 
@@ -97,6 +105,7 @@ public class StandeePuppet : MonoBehaviour
         LoadMeta();
         string id = cut.name;
         if (_skin != null) { _skin.gameObject.SetActive(false); Destroy(_skin.gameObject); _skin = null; }
+        HideBillboard();
         if (RigSkin.CanRig(id))
         {
             BuildBones();
@@ -116,6 +125,7 @@ public class StandeePuppet : MonoBehaviour
             {
                 if (WithGlove) _skin.AttachGlove(CharaCatalog.GloveArt(id));
                 SetupRunCard(id);
+                SetupBillboard(id);
                 return;
             }
         }
@@ -259,6 +269,55 @@ public class StandeePuppet : MonoBehaviour
 
     private void OnEnable() { ResetMotion(); }
 
+    private void SetupBillboard(string id)
+    {
+        var sp = AllowBillboard ? CharaCatalog.Billboard(id) : null;
+        if (sp == null) { HideBillboard(); return; }
+        if (_bb == null)
+        {
+            _bb = MakeSr("Billboard", transform, _order + 1);
+            _bb.gameObject.layer = gameObject.layer;
+        }
+        _bb.sprite = sp;
+        // 体を動かす絵と同じ身長にする(ビルボード絵の体の高さ px → ワールド)
+        float worldH = _baseScale * _skin.FigureHeight;
+        float spriteH = CharaCatalog.BillboardHeightPx(id) / sp.pixelsPerUnit;
+        _bbScale = worldH / Mathf.Max(0.01f, spriteH);
+        _bb.transform.localPosition = Vector3.zero;
+        _bb.transform.localScale = Vector3.one * _bbScale;
+        _bb.enabled = false;
+        _bbOn = false;
+    }
+
+    private void HideBillboard()
+    {
+        if (_bb != null) _bb.enabled = false;
+        if (_bbOn && _skin != null) _skin.gameObject.SetActive(true);
+        _bbOn = false;
+    }
+
+    // 遠い・止まっている(走っていない・捕る/投げるの最中でない)ときだけビルボードにする
+    private void TickBillboard(Camera cam, float t)
+    {
+        if (_bb == null || _bb.sprite == null || _skin == null || cam == null) return;
+        float d = Vector3.Distance(cam.transform.position, transform.position);
+        bool far = _bbOn ? d > BillboardOff : d > BillboardOn;
+        bool want = far && _act == 0 && _run < 0.35f;
+        if (want != _bbOn)
+        {
+            _bbOn = want;
+            _bb.enabled = want;
+            _skin.gameObject.SetActive(!want);
+        }
+        if (_bbOn)
+        {
+            // 呼吸と、わずかな左右の揺れ(止まった一枚絵に見えないように)
+            float br = Mathf.Sin(t * 2.6f);
+            _bb.transform.localScale = new Vector3(_bbScale * (1f - 0.01f * br), _bbScale * (1f + 0.018f * br), 1f);
+            _bb.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 1.9f) * 1.2f + (-7f * _run));
+        }
+    }
+
     private void LateUpdate()
     {
         // メニューで試合を止めている間も、背景の選手は待機の動き(呼吸・揺れ)だけ続ける
@@ -286,6 +345,7 @@ public class StandeePuppet : MonoBehaviour
         float sway = Mathf.Sin(t * 1.9f) * 1.6f * (1f - _run);
         if (_skin != null)
         {
+            TickBillboard(cam, t);
             PoseBones(dt, g, t, legA, Mathf.Abs(Mathf.Sin(_phase)) * 0.10f * _run, lean, sway);
             TickRunCard(t);
             return;

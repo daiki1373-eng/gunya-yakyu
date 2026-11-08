@@ -93,6 +93,8 @@ public partial class RigSkin : MonoBehaviour
     private const float StretchHide = 2.2f;   // つなぎ目がこの倍率より伸びたら隠す
     private int Cell = 8;              // 網目の細かさ(画素)
     public const float TargetHeight = 2.45f;
+    // 体の絵の頭の上から足の裏までの高さ(骨の空間の単位)。遠景のビルボード絵の身長合わせに使う
+    public float FigureHeight { get { return _rig != null ? TargetHeight * _rig.Scale : TargetHeight; } }
 
     public static RigSkin TryAttach(RagdollPlayer p, string charaId) { return TryAttach(RigBody.From(p), charaId); }
 

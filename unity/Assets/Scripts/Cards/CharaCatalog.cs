@@ -193,6 +193,28 @@ public static class CharaCatalog
     private static readonly Dictionary<string, Sprite> Bats = new Dictionary<string, Sprite>();
     private static readonly Dictionary<string, Sprite> Gloves = new Dictionary<string, Sprite>();
     public static Sprite Body(string id) { return Load(Bodies, "Body", id); }
+
+    // 遠景用のビルボード絵(512×512、足の裏が下から16px)。BillboardHeightPx はその絵の体の高さ(px)
+    private static readonly Dictionary<string, Sprite> Billboards = new Dictionary<string, Sprite>();
+    private static Dictionary<string, float> _bbMeta;
+    public static Sprite Billboard(string id) { return Load(Billboards, "Billboard", id); }
+    public static float BillboardHeightPx(string id)
+    {
+        if (_bbMeta == null)
+        {
+            _bbMeta = new Dictionary<string, float>();
+            var ta = Resources.Load<TextAsset>("Chara/billboard_meta");
+            if (ta != null)
+                foreach (var line in ta.text.Split('\n'))
+                {
+                    var f = line.Trim().Split(' ');
+                    float v;
+                    if (f.Length == 2 && float.TryParse(f[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v)) _bbMeta[f[0]] = v;
+                }
+        }
+        float h;
+        return _bbMeta.TryGetValue(id ?? "", out h) ? h : 480f;
+    }
     public static Sprite BatArt(string id) { return Load(Bats, "Bat", id); }
     public static Sprite GloveArt(string id) { return Load(Gloves, "Glove", id); }
 
