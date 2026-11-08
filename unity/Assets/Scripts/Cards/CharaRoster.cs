@@ -133,32 +133,17 @@ public static class CharaRoster
     public class Team { public List<CharaDef> Lineup = new List<CharaDef>(); public CharaDef Pitcher; }
 
 
+    // 自分のチーム: 編成(ポジションごとの9人+投手と打順)をそのまま使う。保存がなければ自動で組む
     public static Team UserTeam()
     {
-        var t = new Team();
-        var owned = new List<CharaDef>();
-        var all = new List<CharaDef>();
-        foreach (var d in CharaCatalog.All) { all.Add(d); if (Collection.Owned(d.Id)) owned.Add(d); }
-        // 投手: 所持の中で一番レアな投手。いなければ「寝坊助エース」
-        foreach (var d in owned) if (Role(d) == CharaRole.Pitcher) { t.Pitcher = d; break; }
-        if (t.Pitcher == null) t.Pitcher = CharaCatalog.Get("sleepyhead");
-        // 打者: 所持(レア度順)→ 足りなければおまかせ(★3〜★1の野手から)
-        foreach (var d in owned) if (Role(d) != CharaRole.Pitcher && Fields(d) && t.Lineup.Count < 9) t.Lineup.Add(d);
-        foreach (var id in FreeAgents)
-        {
-            if (t.Lineup.Count >= 9) break;
-            var d = CharaCatalog.Get(id);
-            if (!t.Lineup.Contains(d)) t.Lineup.Add(d);
-        }
-        Order(t.Lineup);
-        // 編成で決めた打順があれば、それを使う
-        var saved = TeamSetup.SavedLineup();
-        if (saved != null) { t.Lineup.Clear(); t.Lineup.AddRange(saved); }
+        var l = TeamSetup.Load();
+        var t = new Team { Pitcher = l.Pitcher };
+        foreach (var e in l.Order) t.Lineup.Add(e.D);
         return t;
     }
 
     // 所持カードが足りないときに打線を埋める選手(編成でも選べる)
-    public static readonly string[] FreeAgents = { "rookie", "ceo", "carpenter", "umpire", "teacher", "bigeater", "chef", "student", "suntan", "cat", "farmer", "guard" };
+    public static readonly string[] FreeAgents = { "rookie", "ceo", "carpenter", "umpire", "teacher", "bigeater", "chef", "student", "suntan", "cat", "farmer", "guard", "sleepyhead" };
 
     public static Team OpponentTeam(Team user, int seed)
     {
@@ -185,7 +170,7 @@ public static class CharaRoster
     }
 
     // 打順: 1-2番に俊足・巧打、3-5番に長打、残りはそのまま
-    private static void Order(List<CharaDef> lineup)
+    public static void Order(List<CharaDef> lineup)
     {
         var speed = new List<CharaDef>(); var contact = new List<CharaDef>(); var power = new List<CharaDef>();
         foreach (var d in lineup)

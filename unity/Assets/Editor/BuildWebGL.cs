@@ -38,7 +38,7 @@ public static class BuildWebGL
         PlayerSettings.WebGL.maximumMemorySize = 2048;
         PlayerSettings.WebGL.memoryGrowthMode = WebGLMemoryGrowthMode.Geometric;
         PlayerSettings.WebGL.nameFilesAsHashes = true;
-        PlayerSettings.runInBackground = false;
+        PlayerSettings.runInBackground = true;    // エディタの再生確認が止まらないように(ブラウザでは裏に回ると自然に止まる)
         var opts = new BuildPlayerOptions
         {
             scenes = new[] { scenePath },

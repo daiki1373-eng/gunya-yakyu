@@ -4,24 +4,24 @@ using UnityEngine.UI;
 
 // ============================================================
 // AppShell.Lineup.cs
-// 編成: 左に打順(1〜9番)、右に選べる選手。
-//   打順の行を押して選び、右の選手を押すとその打順に入る(すでに打線にいる選手なら入れ替わる)。
-//   打順の行を2つ続けて押すと、打順を入れ替える。変えるたびに保存する。
+// 編成: 左に投手と打順(1〜9番、それぞれの守備位置つき)、右にその守備位置の選手だけ。
+//   行を押すと、その位置に入れられる選手だけが右に並ぶ。右の選手を押すとその位置に入る
+//   (同じ守備の別の枠にいる選手なら入れ替わる)。打順は行の ▲▼ で入れ替える。変えるたびに保存する。
 // ============================================================
 public partial class AppShell
 {
     private RectTransform _lineup, _lineupRows, _lineupPool;
-    private readonly List<CharaDef> _edit = new List<CharaDef>();
-    private int _selRow = -1;
-    private readonly List<Image> _rowBg = new List<Image>();
-    private readonly List<Image> _rowHead = new List<Image>();
-    private readonly List<Text> _rowName = new List<Text>(), _rowPos = new List<Text>();
+    private Text _lineupTitle, _poolTitle;
+    private TeamSetup.Lineup _edit;
+    private int _selRow = 1;   // 0=投手、1〜9=打順
+    private readonly List<Image> _rowBg = new List<Image>(), _rowHead = new List<Image>();
+    private readonly List<Text> _rowNo = new List<Text>(), _rowPos = new List<Text>(), _rowName = new List<Text>();
     private readonly List<KeyValuePair<CharaDef, Image>> _poolCells = new List<KeyValuePair<CharaDef, Image>>();
     private readonly List<Text> _poolLabels = new List<Text>();
-    private Text _lineupTitle;
 
     private static readonly Color RowColor = new Color(0.04f, 0.06f, 0.15f, 0.88f);
     private static readonly Color RowSel = new Color(0.62f, 0.42f, 0.06f, 0.95f);
+    private static readonly Color PosChip = new Color(0.70f, 0.08f, 0.10f, 1f);
 
     private void BuildLineup()
     {
@@ -32,40 +32,19 @@ public partial class AppShell
         _lineupRows = UiKit.Rect(_lineup, "Rows");
         _lineupRows.anchorMin = new Vector2(0f, 0f); _lineupRows.anchorMax = new Vector2(0f, 1f);
         _lineupRows.pivot = new Vector2(0f, 1f);
-        _lineupRows.offsetMin = new Vector2(16f, 10f); _lineupRows.offsetMax = new Vector2(16f + 330f, -72f);
+        _lineupRows.offsetMin = new Vector2(14f, 8f); _lineupRows.offsetMax = new Vector2(14f + 360f, -70f);
         var vl = _lineupRows.gameObject.AddComponent<VerticalLayoutGroup>();
-        vl.spacing = 4f; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = true;
-        for (int i = 0; i < 9; i++)
-        {
-            int idx = i;
-            var row = UiKit.Img(_lineupRows, "Row" + i, SpriteFactory.White, RowColor, true);
-            var b = row.gameObject.AddComponent<Button>();
-            b.transition = Selectable.Transition.None;
-            b.onClick.AddListener(() => OnRow(idx));
-            var num = UiKit.Txt(row.transform, "No", (i + 1).ToString(), 22, UiKit.GoldLight, TextAnchor.MiddleCenter);
-            num.rectTransform.anchorMin = new Vector2(0f, 0f); num.rectTransform.anchorMax = new Vector2(0f, 1f);
-            num.rectTransform.pivot = new Vector2(0f, 0.5f);
-            num.rectTransform.offsetMin = new Vector2(4f, 0f); num.rectTransform.offsetMax = new Vector2(34f, 0f);
-            var head = UiKit.Img(row.transform, "Head", null, Color.white);
-            head.preserveAspect = true; head.raycastTarget = false;
-            head.rectTransform.anchorMin = new Vector2(0f, 0.5f); head.rectTransform.anchorMax = new Vector2(0f, 0.5f);
-            head.rectTransform.pivot = new Vector2(0f, 0.5f);
-            head.rectTransform.anchoredPosition = new Vector2(38f, 0f);
-            head.rectTransform.sizeDelta = new Vector2(40f, 40f);
-            var name = UiKit.Txt(row.transform, "Name", "", 19, Color.white, TextAnchor.MiddleLeft);
-            name.rectTransform.anchorMin = new Vector2(0f, 0f); name.rectTransform.anchorMax = new Vector2(1f, 1f);
-            name.rectTransform.offsetMin = new Vector2(86f, 0f); name.rectTransform.offsetMax = new Vector2(-70f, 0f);
-            var pos = UiKit.Txt(row.transform, "Pos", "", 15, UiKit.GoldLight, TextAnchor.MiddleRight);
-            pos.rectTransform.anchorMin = new Vector2(1f, 0f); pos.rectTransform.anchorMax = new Vector2(1f, 1f);
-            pos.rectTransform.pivot = new Vector2(1f, 0.5f);
-            pos.rectTransform.offsetMin = new Vector2(-70f, 0f); pos.rectTransform.offsetMax = new Vector2(-8f, 0f);
-            _rowBg.Add(row); _rowHead.Add(head); _rowName.Add(name); _rowPos.Add(pos);
-        }
+        vl.spacing = 3f; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = true;
+        for (int i = 0; i < 10; i++) BuildRow(i);
 
-        // 右: 選べる選手(スクロール)
+        // 右: 見出し(どの位置の選手か)と、選手の一覧(スクロール)
+        _poolTitle = UiKit.Txt(_lineup, "PoolTitle", "", 20, UiKit.GoldLight, TextAnchor.MiddleLeft);
+        var pt = _poolTitle.rectTransform;
+        pt.anchorMin = new Vector2(0f, 1f); pt.anchorMax = new Vector2(1f, 1f); pt.pivot = new Vector2(0f, 1f);
+        pt.offsetMin = new Vector2(14f + 360f + 18f, -100f); pt.offsetMax = new Vector2(-16f, -70f);
         var view = UiKit.Rect(_lineup, "Pool");
         view.anchorMin = Vector2.zero; view.anchorMax = Vector2.one;
-        view.offsetMin = new Vector2(16f + 330f + 16f, 8f); view.offsetMax = new Vector2(-16f, -70f);
+        view.offsetMin = new Vector2(14f + 360f + 16f, 8f); view.offsetMax = new Vector2(-16f, -104f);
         view.gameObject.AddComponent<RectMask2D>();
         var hit = view.gameObject.AddComponent<Image>();
         hit.color = new Color(0f, 0f, 0f, 0f);
@@ -74,7 +53,7 @@ public partial class AppShell
         _lineupPool.pivot = new Vector2(0.5f, 1f);
         _lineupPool.anchoredPosition = Vector2.zero; _lineupPool.sizeDelta = Vector2.zero;
         var grid = _lineupPool.gameObject.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(92f, 118f);
+        grid.cellSize = new Vector2(92f, 120f);
         grid.spacing = new Vector2(8f, 8f);
         grid.padding = new RectOffset(4, 4, 4, 12);
         var fit = _lineupPool.gameObject.AddComponent<ContentSizeFitter>();
@@ -84,22 +63,69 @@ public partial class AppShell
         sr.movementType = ScrollRect.MovementType.Elastic; sr.scrollSensitivity = 30f;
     }
 
+    private void BuildRow(int i)
+    {
+        int idx = i;
+        var row = UiKit.Img(_lineupRows, "Row" + i, SpriteFactory.White, RowColor, true);
+        var b = row.gameObject.AddComponent<Button>();
+        b.transition = Selectable.Transition.None;
+        b.onClick.AddListener(() => OnRow(idx));
+        // 打順(投手の行は空)
+        var no = UiKit.Txt(row.transform, "No", "", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
+        Anchor(no.rectTransform, 2f, 26f);
+        // 守備位置(赤い札に1文字)
+        var chip = UiKit.Img(row.transform, "Pos", SpriteFactory.White, PosChip);
+        chip.raycastTarget = false;
+        var cr = chip.rectTransform;
+        cr.anchorMin = cr.anchorMax = new Vector2(0f, 0.5f); cr.pivot = new Vector2(0f, 0.5f);
+        cr.anchoredPosition = new Vector2(30f, 0f); cr.sizeDelta = new Vector2(30f, 28f);
+        var pos = UiKit.Txt(chip.transform, "T", "", 18, Color.white, TextAnchor.MiddleCenter);
+        UiKit.Fill(pos.rectTransform);
+        var head = UiKit.Img(row.transform, "Head", null, Color.white);
+        head.preserveAspect = true; head.raycastTarget = false;
+        var hr = head.rectTransform;
+        hr.anchorMin = hr.anchorMax = new Vector2(0f, 0.5f); hr.pivot = new Vector2(0f, 0.5f);
+        hr.anchoredPosition = new Vector2(66f, 0f); hr.sizeDelta = new Vector2(36f, 36f);
+        var name = UiKit.Txt(row.transform, "Name", "", 18, Color.white, TextAnchor.MiddleLeft);
+        name.rectTransform.anchorMin = new Vector2(0f, 0f); name.rectTransform.anchorMax = new Vector2(1f, 1f);
+        name.rectTransform.offsetMin = new Vector2(108f, 0f); name.rectTransform.offsetMax = new Vector2(-66f, 0f);
+        if (i > 0)
+        {
+            // 打順の入れ替え(▲▼)
+            var up = UiKit.Btn(row.transform, "Up", "▲", new Vector2(28f, 26f), false, () => MoveOrder(idx, -1), 14);
+            UiKit.Place(up.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-34f, 0f), new Vector2(28f, 26f));
+            var dn = UiKit.Btn(row.transform, "Down", "▼", new Vector2(28f, 26f), false, () => MoveOrder(idx, 1), 14);
+            UiKit.Place(dn.GetComponent<RectTransform>(), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(28f, 26f));
+        }
+        _rowBg.Add(row); _rowNo.Add(no); _rowPos.Add(pos); _rowHead.Add(head); _rowName.Add(name);
+    }
+
+    private static void Anchor(RectTransform r, float left, float width)
+    {
+        r.anchorMin = new Vector2(0f, 0f); r.anchorMax = new Vector2(0f, 1f); r.pivot = new Vector2(0f, 0.5f);
+        r.offsetMin = new Vector2(left, 0f); r.offsetMax = new Vector2(left + width, 0f);
+    }
+
     public void ShowLineup()
     {
         Only(_lineup);
         BgmPlayer.PlayBase(BgmPlayer.Team);
-        _edit.Clear();
-        _edit.AddRange(CharaRoster.UserTeam().Lineup);
-        _selRow = -1;
-        RebuildPool();
+        _edit = TeamSetup.Load();
+        _selRow = 1;
         RefreshLineup();
+        RebuildPool();
     }
+
+    private Slot SelSlot { get { return _selRow == 0 ? Slot.P : _edit.Order[_selRow - 1].S; } }
+    private CharaDef RowDef(int i) { return i == 0 ? _edit.Pitcher : _edit.Order[i - 1].D; }
 
     private void RebuildPool()
     {
         ClearChildren(_lineupPool);
         _poolCells.Clear(); _poolLabels.Clear();
-        foreach (var d in TeamSetup.Candidates())
+        Slot s = SelSlot;
+        _poolTitle.text = TeamSetup.SlotNames[(int)s] + "（" + TeamSetup.PositionOf(s) + "）";
+        foreach (var d in TeamSetup.Candidates(s))
         {
             var def = d;
             var cell = UiKit.Img(_lineupPool, "C_" + d.Id, SpriteFactory.White, new Color(0f, 0f, 0f, 0f), true);
@@ -114,55 +140,75 @@ public partial class AppShell
             var lb = UiKit.Txt(cell.transform, "Label", "", 13, Color.white, TextAnchor.MiddleCenter);
             lb.rectTransform.anchorMin = new Vector2(0f, 0f); lb.rectTransform.anchorMax = new Vector2(1f, 0f);
             lb.rectTransform.pivot = new Vector2(0.5f, 0f);
-            lb.rectTransform.anchoredPosition = Vector2.zero; lb.rectTransform.sizeDelta = new Vector2(0f, 28f);
+            lb.rectTransform.anchoredPosition = Vector2.zero; lb.rectTransform.sizeDelta = new Vector2(0f, 30f);
             _poolCells.Add(new KeyValuePair<CharaDef, Image>(d, th));
             _poolLabels.Add(lb);
         }
+        RefreshPoolMarks();
     }
 
     private void RefreshLineup()
     {
-        for (int i = 0; i < 9; i++)
+        for (int i = 0; i < 10; i++)
         {
-            var d = i < _edit.Count ? _edit[i] : null;
+            var d = RowDef(i);
+            Slot s = i == 0 ? Slot.P : _edit.Order[i - 1].S;
             _rowBg[i].color = i == _selRow ? RowSel : RowColor;
+            _rowNo[i].text = i == 0 ? "" : i.ToString();
+            _rowPos[i].text = TeamSetup.SlotShort[(int)s];
             _rowHead[i].sprite = d != null ? CharaCatalog.Head(d.Id) : null;
             _rowHead[i].enabled = _rowHead[i].sprite != null;
-            if (d != null) UiKit.FitName(_rowName[i], d.Name, 190f, 40f, 19, 12); else _rowName[i].text = "";
-            _rowPos[i].text = d != null ? d.Position : "";
+            if (d != null) UiKit.FitName(_rowName[i], d.Name, 170f, 36f, 18, 11); else _rowName[i].text = "";
         }
+        RefreshPoolMarks();
+    }
+
+    // 右の一覧: 今の編成にいる選手は暗くして、何番(投手)かを出す
+    private void RefreshPoolMarks()
+    {
         for (int k = 0; k < _poolCells.Count; k++)
         {
             var d = _poolCells[k].Key;
-            int at = _edit.IndexOf(d);
-            _poolCells[k].Value.color = at >= 0 ? new Color(0.45f, 0.45f, 0.45f, 1f) : Color.white;
-            _poolLabels[k].text = at >= 0 ? (at + 1) + "番" : d.Name;
-            _poolLabels[k].color = at >= 0 ? UiKit.GoldLight : Color.white;
+            string where = null;
+            if (_edit.Pitcher == d) where = "投手";
+            for (int j = 0; j < _edit.Order.Count; j++) if (_edit.Order[j].D == d) where = (j + 1) + "番 " + TeamSetup.SlotNames[(int)_edit.Order[j].S];
+            _poolCells[k].Value.color = where != null ? new Color(0.45f, 0.45f, 0.45f, 1f) : Color.white;
+            _poolLabels[k].text = where ?? d.Name;
+            _poolLabels[k].color = where != null ? UiKit.GoldLight : Color.white;
         }
     }
 
     private void OnRow(int i)
     {
         GameAudio.Play(Sfx.Click, 0.5f, 1.3f);
-        if (_selRow < 0) _selRow = i;
-        else if (_selRow == i) _selRow = -1;
-        else
-        {
-            var tmp = _edit[_selRow]; _edit[_selRow] = _edit[i]; _edit[i] = tmp;
-            _selRow = -1;
-            TeamSetup.Save(_edit);
-        }
+        bool slotChanged = _selRow != i;
+        _selRow = i;
         RefreshLineup();
+        if (slotChanged) RebuildPool();
     }
 
     private void OnPool(CharaDef d)
     {
         GameAudio.Play(Sfx.Click, 0.5f, 1.4f);
-        int at = _edit.IndexOf(d);
-        if (_selRow < 0) { _selRow = at; RefreshLineup(); return; }   // 打線にいる選手なら、その行を選ぶ
-        if (at >= 0) { var tmp = _edit[_selRow]; _edit[_selRow] = _edit[at]; _edit[at] = tmp; }
-        else _edit[_selRow] = d;
-        _selRow = -1;
+        if (_selRow == 0) _edit.Pitcher = d;
+        else
+        {
+            var e = _edit.Order[_selRow - 1];
+            int j = _edit.Order.FindIndex(x => x.D == d);
+            if (j >= 0) { var tmp = _edit.Order[j].D; _edit.Order[j].D = e.D; e.D = tmp; }   // 同じ守備の別の枠の選手と入れ替え
+            else e.D = d;
+        }
+        TeamSetup.Save(_edit);
+        RefreshLineup();
+    }
+
+    // 打順を上下に1つ動かす(守備位置は選手について動く)
+    private void MoveOrder(int row, int dir)
+    {
+        int a = row - 1, b = a + dir;
+        if (b < 0 || b >= _edit.Order.Count) return;
+        var tmp = _edit.Order[a]; _edit.Order[a] = _edit.Order[b]; _edit.Order[b] = tmp;
+        if (_selRow == row) _selRow = b + 1;
         TeamSetup.Save(_edit);
         RefreshLineup();
     }
