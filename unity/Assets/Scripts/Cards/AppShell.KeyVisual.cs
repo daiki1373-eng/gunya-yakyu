@@ -118,8 +118,9 @@ public partial class AppShell
         else if (MenuScreenOn())
         {
             // カード・ガチャ・編成・オンラインは、文字が読みやすいよう照明と夜空を見上げる
+            // (電光掲示板の題字が画面の下の端にのぞかない高さ)
             pos = new Vector3(14f + Mathf.Sin(a) * 3f, 2.2f, 2f);
-            look = new Vector3(-30f + Mathf.Sin(a * 0.7f) * 10f, 74f, 110f);
+            look = new Vector3(-30f + Mathf.Sin(a * 0.7f) * 10f, 86f, 110f);
         }
         else
         {
