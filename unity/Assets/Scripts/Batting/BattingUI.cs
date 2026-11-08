@@ -618,6 +618,8 @@ public partial class BattingUI
         _card.pivot = new Vector2(0f, 0f);
         _card.sizeDelta = new Vector2(560f, 140f);
         _card.anchoredPosition = new Vector2(CardHidden, 130f);
+        _cardGroup = bg.gameObject.AddComponent<CanvasGroup>();
+        _cardGroup.alpha = 0f;
         _cardStripe = NewImage(_card, "Stripe", Color.red);
         Place(_cardStripe.rectTransform, Vector2.zero, new Vector2(14f, 140f));
         var line = NewImage(_card, "Line", new Color(1f, 0.78f, 0.15f, 1f));
@@ -647,6 +649,7 @@ public partial class BattingUI
     }
 
     private Image _cardPortrait, _cardPortraitFrame;
+    private CanvasGroup _cardGroup;
 
     public void ShowIntroCard(string title, string name, string stats, string copy, Color stripe, Sprite portrait = null)
     {
@@ -682,13 +685,20 @@ public partial class BattingUI
         _cardT = Time.unscaledTime;
     }
 
+    // 札は画面の外から滑り込ませず、最終位置のすぐ左から短く寄せながら浮かび上がらせる
+    // (途中で名前や数値が画面の外に隠れたり、中身のない札だけが見えたりしないように)
     private void TickCard()
     {
         if (_card == null) return;
-        float u = Mathf.Clamp01((Time.unscaledTime - _cardT) / 0.28f);
+        float dur = _cardOn ? 0.22f : 0.16f;
+        float u = Mathf.Clamp01((Time.unscaledTime - _cardT) / dur);
         float e = 1f - (1f - u) * (1f - u);
-        float x = _cardOn ? Mathf.Lerp(CardHidden, CardX, e) : Mathf.Lerp(CardX, CardHidden, e);
+        float x, a;
+        if (_cardOn) { x = Mathf.Lerp(CardX - 48f, CardX, e); a = e; }
+        else { x = Mathf.Lerp(CardX, CardX - 24f, e); a = 1f - e; }
+        if (!_cardOn && u >= 1f) x = CardHidden;
         _card.anchoredPosition = new Vector2(x, 130f);
+        if (_cardGroup != null) _cardGroup.alpha = a;
     }
 
     public void Tick()
