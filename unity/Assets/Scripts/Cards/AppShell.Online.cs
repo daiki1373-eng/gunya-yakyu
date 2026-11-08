@@ -30,18 +30,22 @@ public partial class AppShell
 
         var l2 = UiKit.Txt(col, "OppLabel", "相手の番号", 20, UiKit.GoldLight, TextAnchor.MiddleCenter);
         UiKit.Place(l2.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -130f), new Vector2(400f, 30f));
-        var field = UiKit.Img(col, "Field", SpriteFactory.White, new Color(1f, 0.97f, 0.9f), true);
+        // 入力欄は上の帯・所持数の札と同じ紺の丸い札(白い四角だと浮くため)
+        var field = UiKit.Img(col, "Field", HomeSkin.Pill, Color.white, true);
         UiKit.Place(field.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -166f), new Vector2(300f, 64f));
-        var txt = UiKit.Txt(field.transform, "Text", "", 40, new Color(0.15f, 0.05f, 0.05f), TextAnchor.MiddleCenter, true, false);
+        var txt = HomeSkin.NavText(UiKit.Txt(field.transform, "Text", "", 40, Color.white, TextAnchor.MiddleCenter, true, false));
         UiKit.Fill(txt.rectTransform, 6f);
         txt.supportRichText = false;
-        var ph = UiKit.Txt(field.transform, "Placeholder", "000000", 40, new Color(0.6f, 0.55f, 0.5f), TextAnchor.MiddleCenter, false, false);
+        var ph = UiKit.Txt(field.transform, "Placeholder", "000000", 40, new Color(0.55f, 0.62f, 0.95f, 0.45f), TextAnchor.MiddleCenter, false, false);
         UiKit.Fill(ph.rectTransform, 6f);
         _codeInput = field.gameObject.AddComponent<InputField>();
         _codeInput.textComponent = txt;
         _codeInput.placeholder = ph;
         _codeInput.characterLimit = 6;
         _codeInput.contentType = InputField.ContentType.IntegerNumber;
+        _codeInput.customCaretColor = true;
+        _codeInput.caretColor = Color.white;
+        _codeInput.selectionColor = new Color(0.38f, 0.82f, 1f, 0.5f);
         if (WebPrompt.Available)
         {
             // ブラウザ版は入力欄を押すと標準の入力ダイアログを出す
