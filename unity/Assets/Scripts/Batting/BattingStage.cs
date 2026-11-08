@@ -176,6 +176,22 @@ public class BattingStage : MonoBehaviour
         position = ball - direction * distance + Vector3.up * (3.5f * (distance / 18f) + Mathf.Min(ball.y, 25f) * 0.25f);
         position.y = Mathf.Max(position.y, 2.5f);
         lookAt = ball + direction * 4f + Vector3.up * 0.5f;
+        // カメラ自身が外野の柵やファウル側のフェンス(広告板)に近づきすぎないよう、内側・上へ逃がす
+        Vector3 camFlat = new Vector3(position.x, 0f, position.z);
+        float camAngle = Mathf.Atan2(camFlat.x, camFlat.z) * Mathf.Rad2Deg;
+        float camFence = BattingConfig.FenceRadius(camAngle) - 30f;
+        if (camFlat.magnitude > camFence)
+        {
+            Vector3 c = camFlat.normalized * camFence;
+            position = new Vector3(c.x, Mathf.Max(position.y, 12f), c.z);
+        }
+        float camFoul = (Mathf.Abs(position.x) - position.z) * 0.7071f;
+        if (camFoul > 0f && position.z > 5f)   // 本塁の後ろ(バックネット側)はそのまま
+        {
+            Vector3 outward = new Vector3(Mathf.Sign(position.x) * 0.7071f, 0f, -0.7071f);
+            position -= outward * camFoul;
+            position.y = Mathf.Max(position.y, 8f);
+        }
     }
 
     private GameObject _zoneRoot;
