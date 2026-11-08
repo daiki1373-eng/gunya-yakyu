@@ -28,6 +28,11 @@ public class StadiumBuilder : MonoBehaviour
     private float _cheerUntil, _cheerAmp;
     private TextMesh _boardCount, _boardScore, _boardSpeed, _boardBatter;
     private SpriteRenderer[] _lampB, _lampS, _lampO;
+    // 掲示板の下の帯の文字(得点・回・BSO)。帯が画面の端で切れるときは消す
+    private readonly List<GameObject> _bandParts = new List<GameObject>();
+    private Vector3 _bandLocal;
+    private float _bandHalfH;
+    private bool _bandShown = true;
 
     public static StadiumBuilder Build(Transform root)
     {
@@ -464,11 +469,38 @@ public class StadiumBuilder : MonoBehaviour
         PlaceLamps(_lampO, "O", c + new Vector3(14.0f, -7.4f, -0.1f));
         var title = _root.Find("BoardTitle");
         if (title != null) title.localPosition = c + new Vector3(-6f, 7.6f, -0.1f);
+        _bandLocal = c + new Vector3(0f, -7.4f, 0f);
+        _bandHalfH = 2.1f;
+        if (_boardScore != null) _bandParts.Add(_boardScore.gameObject);
+        if (_boardCount != null) _bandParts.Add(_boardCount.gameObject);
+        foreach (var arr in new[] { _lampB, _lampS, _lampO })
+            if (arr != null) foreach (var l in arr) _bandParts.Add(l.gameObject);
+        foreach (var lab in new[] { "LampB", "LampS", "LampO" })
+        {
+            var t = _root.Find(lab);
+            if (t != null) _bandParts.Add(t.gameObject);
+        }
         // 出来事の絵(画面全体。絵の縦横比のまま収め、余白は暗くする)
         _visionEventBack = Quad("VisionEventBack", SpriteFactory.White, new Color(0.01f, 0.01f, 0.03f, 1f), OBoardText + 1, c + new Vector3(0f, 0f, -0.15f), Vector3.zero, new Vector2(39f, 19f));
         _visionEvent = Quad("VisionEvent", logo, Color.white, OBoardText + 2, c + new Vector3(0f, 0f, -0.2f), Vector3.zero, new Vector2(39f, 19f));
         _visionEventBack.gameObject.SetActive(false);
         _visionEvent.gameObject.SetActive(false);
+    }
+
+    // 打席の画では帯がちょうど画面の上端にかかり、文字が半分だけのぞく。
+    // 帯が画面の上下の端をまたぐときは文字を消す(画面の札に同じ情報が出ている)
+    public void FitBoardBand(Camera cam)
+    {
+        if (cam == null || _bandParts.Count == 0) return;
+        Vector3 top = cam.WorldToViewportPoint(_root.TransformPoint(_bandLocal + Vector3.up * _bandHalfH));
+        Vector3 bot = cam.WorldToViewportPoint(_root.TransformPoint(_bandLocal - Vector3.up * _bandHalfH));
+        bool cut = top.z > 0f && bot.z > 0f
+            && ((top.y > 1f && bot.y < 1f) || (top.y > 0f && bot.y < 0f));
+        bool show = !cut;
+        if (show == _bandShown) return;
+        _bandShown = show;
+        for (int i = 0; i < _bandParts.Count; i++)
+            if (_bandParts[i] != null) _bandParts[i].SetActive(show);
     }
 
     private static void SetLocal(TextMesh t, Vector3 pos, float scale)

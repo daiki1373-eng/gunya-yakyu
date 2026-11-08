@@ -283,6 +283,7 @@ public class BattingStage : MonoBehaviour
             if (_billboards[i] != null) _billboards[i].rotation = ct.rotation;
         }
         UpdateShadows();
+        if (Stadium != null) Stadium.FitBoardBand(Cam);
 
         if (Time.unscaledTime < _shakeUntil)
         {
