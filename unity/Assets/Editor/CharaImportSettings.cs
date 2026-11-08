@@ -70,7 +70,7 @@ public class CharaImportSettings : AssetPostprocessor
         ti.compressionQuality = 60;
         ti.maxTextureSize = p.Contains("/Thumb/") ? 512 : 2048;
         ti.spritePixelsPerUnit = 100f;
-        if (p.Contains("/Full/")) WebGL(ti, 1024, TextureImporterFormat.ASTC_6x6);
+        if (p.Contains("/Full/")) WebGL(ti, 1024, TextureImporterFormat.ASTC_8x8);   // 拡大表示の1枚絵。ダウンロード量を優先して 8x8
         else if (p.Contains("/Thumb/")) WebGL(ti, 512, TextureImporterFormat.ASTC_6x6);
         else if (p.Contains("/Pose/")) WebGL(ti, 1024, TextureImporterFormat.ASTC_8x8);
         else WebGL(ti, 2048, TextureImporterFormat.ASTC_6x6);   // 体・持ち物・切り抜き・頭(寸法はそのまま)

@@ -21,7 +21,7 @@ public class AudioImportSettings : AssetPostprocessor
                     || p.Contains("bgm-training") || p.Contains("bgm-tournament-entry") || p.Contains("bgm-champion");
         s.loadType = loop ? AudioClipLoadType.Streaming : AudioClipLoadType.CompressedInMemory;
         s.compressionFormat = AudioCompressionFormat.Vorbis;
-        s.quality = 0.5f;
+        s.quality = 0.3f;   // スマホのスピーカー・イヤホンで聞き分けにくい範囲で軽くする(ブラウザ版のダウンロード量を減らす)
         s.preloadAudioData = !loop;
         ai.defaultSampleSettings = s;
     }
