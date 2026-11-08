@@ -35,7 +35,8 @@ public class BattingStage : MonoBehaviour
     private ParticleSystem _hitSparks;
     private readonly List<Transform> _billboards = new List<Transform>();
     private Transform[] _fielders;
-    public float FollowDist = 18f;      // 打球カメラの後ろ距離(リプレイでは寄る)
+    public float FollowDist = 18f;
+    public bool ReplayWide;              // リプレイ用の画(柵や壁に寄らず、スタンドと照明を背景に入れる)      // 打球カメラの後ろ距離(リプレイでは寄る)
     private float _shakeAmp, _shakeUntil, _shakeDur = 0.01f;
     private CamMode _mode = CamMode.Catcher;
     private Vector3 _followTarget;
@@ -116,10 +117,35 @@ public class BattingStage : MonoBehaviour
         _followTarget = ballPos;
         _camVel = Vector3.zero;
         Vector3 pos, lookAt;
-        FollowFraming(ballPos, FollowDist, out pos, out lookAt);
+        Framing(ballPos, out pos, out lookAt);
         Cam.transform.position = pos;
         Cam.transform.rotation = Quaternion.LookRotation(lookAt - pos, Vector3.up);
         _sway = Quaternion.identity;
+    }
+
+    private void Framing(Vector3 ball, out Vector3 pos, out Vector3 lookAt)
+    {
+        if (ReplayWide) ReplayFraming(ball, out pos, out lookAt);
+        else FollowFraming(ball, FollowDist, out pos, out lookAt);
+    }
+
+    // リプレイの画: 打球の斜め後ろ・高めから、打球の先のスタンドと照明を見上げ気味に入れる。
+    // カメラは柵から十分内側に置き、外野の壁に寄って画面が壁だけにならないようにする。
+    public static void ReplayFraming(Vector3 ball, out Vector3 position, out Vector3 lookAt)
+    {
+        Vector3 flat = new Vector3(ball.x, 0f, ball.z);
+        Vector3 direction = flat.sqrMagnitude > 4f ? flat.normalized : Vector3.forward;
+        Vector3 side = new Vector3(direction.z, 0f, -direction.x);   // 打球の向きに対して右
+        float angle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+        float fence = BattingConfig.FenceRadius(angle);
+        float along = Mathf.Min(flat.magnitude, fence - 10f);
+        Vector3 b = direction * along + Vector3.up * ball.y;
+        position = b - direction * 24f + side * 9f;
+        float r = new Vector2(position.x, position.z).magnitude;
+        if (r > fence - 34f) position = position * ((fence - 34f) / r);
+        position.z = Mathf.Max(position.z, -10f);   // 本塁の後ろのスタンドに入らない
+        position.y = Mathf.Clamp(ball.y * 0.5f + 8f, 8f, 26f);
+        lookAt = b + direction * 6f + Vector3.up * 5f;
     }
 
     // 柵の手前で追走をやめ、スタンドを見渡す位置へ。打球が場外へ伸びても
@@ -140,10 +166,11 @@ public class BattingStage : MonoBehaviour
         float fence = BattingConfig.FenceRadius(angle);
         if (flat.magnitude >= fence - 6f)
         {
-            position = direction * (fence - 26f);
-            position.y = Mathf.Clamp(ball.y + 12f, 25f, 48f);
-            lookAt = direction * (fence + 8f);
-            lookAt.y = Mathf.Clamp(ball.y, 7f, 38f);
+            // 柵際の広告板が画面の手前をふさがないよう、柵から離れた高い位置から見下ろし気味に見る
+            position = direction * (fence - 42f);
+            position.y = Mathf.Clamp(ball.y + 16f, 30f, 52f);
+            lookAt = direction * (fence + 18f);
+            lookAt.y = Mathf.Clamp(ball.y + 4f, 14f, 40f);
             return;
         }
         position = ball - direction * distance + Vector3.up * (3.5f * (distance / 18f) + Mathf.Min(ball.y, 25f) * 0.25f);
@@ -219,7 +246,7 @@ public class BattingStage : MonoBehaviour
         else
         {
             Vector3 desired, lookAt;
-            FollowFraming(_followTarget, FollowDist, out desired, out lookAt);
+            Framing(_followTarget, out desired, out lookAt);
             ct.position = Vector3.SmoothDamp(ct.position, desired, ref _camVel, 0.32f, Mathf.Infinity, dt);
             Quaternion look = Quaternion.LookRotation(lookAt - ct.position, Vector3.up);
             ct.rotation = Quaternion.Slerp(ct.rotation, look, 1f - Mathf.Exp(-7f * dt));

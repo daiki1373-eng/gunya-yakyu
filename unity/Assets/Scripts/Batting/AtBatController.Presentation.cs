@@ -194,8 +194,10 @@ public partial class AtBatController
         float start = Mathf.Max(0f, moment - 0.65f);
         _ui.SetReplay(true, label);
         _ui.ClearCenter();
+        _ui.ShowBanner("");
         _stage.HideBall();
         _stage.FollowDist = dist;
+        _stage.ReplayWide = true;   // スタンドと照明が入る、少し引いた高めの画
         _stage.SnapFollow(tr.PosAt(start));
         _stage.SetPlaybackSpeed(speed);
         _presentationInput = true;
@@ -219,6 +221,7 @@ public partial class AtBatController
             _skipQueued = _swingQueued = false;
             _stage.SetPlaybackSpeed(1f);
             _stage.FollowDist = 18f;
+            _stage.ReplayWide = false;
             _stage.HideBall();
             _stage.ResetFielders();
             _ui.SetReplay(false);
@@ -271,6 +274,8 @@ public partial class AtBatController
     }
 
     public bool Replaying { get { return _replaying; } }
+    // 試合が終わった後(締めの演出・珍プレー・結果パネル)は、顔のカットインを出さない
+    public bool MatchOver { get { return _gs.GameOver; } }
 
     private void ShowPlayResult(PlayResult play)
     {
