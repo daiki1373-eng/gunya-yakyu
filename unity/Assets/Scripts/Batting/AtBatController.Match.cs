@@ -113,6 +113,7 @@ public partial class AtBatController
             GameAudio.Play(Sfx.Cheer, 0.45f);
         }
         if (won) { _stage.Stadium.LaunchFireworks(6); GameAudio.Play(Sfx.BigCheer, 0.8f); }
+        _ui.ClearCenter();   // 最後の打撃判定(MISS など)を「試合終了」と重ねない
         _ui.ShowResult((_gs.IsWalkOff ? "サヨナラ  " : "試合終了  ") + _gs.Runs + " - " + _gs.OppRuns + "  " + res);
         _ui.ShowBanner("コイン +" + coins);
         _stage.SetCameraMode(CamMode.Diamond);
@@ -122,11 +123,13 @@ public partial class AtBatController
         if (ReplayEnabled && _bestScore >= 3 && !_gs.IsWalkOff)
             yield return StartCoroutine(PlayReplay(_bestTraj, _bestPlay, 0.65f, 9f, "● 今日の珍プレー"));
         _bestScore = -1;
+        _stage.SetCameraMode(CamMode.Diamond);   // リプレイの画のまま結果パネルを出さない
 
         // 結果パネル: 「次の試合」か「ホーム」を選ぶまで待つ(自動操作では少し見せて次へ)
         _ui.ShowResult("");
         _ui.ShowBanner("");
         _ui.ClearCenter();   // 最後の打球の判定(NORMAL など)を残さない
+        _ui.ShowCommentary("", Color.white);   // 実況の文字もパネルの後ろに残さない
         _ui.ClearSpeed();
         string me = string.IsNullOrEmpty(AppShell.PlayerName) ? "じぶん" : AppShell.PlayerName;
         string rival = RivalName;

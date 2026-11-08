@@ -140,12 +140,12 @@ public class BattingStage : MonoBehaviour
         float fence = BattingConfig.FenceRadius(angle);
         float along = Mathf.Min(flat.magnitude, fence - 10f);
         Vector3 b = direction * along + Vector3.up * ball.y;
-        position = b - direction * 24f + side * 9f;
+        position = b - direction * 34f + side * 10f;
         float r = new Vector2(position.x, position.z).magnitude;
-        if (r > fence - 34f) position = position * ((fence - 34f) / r);
+        if (r > fence - 46f) position = position * ((fence - 46f) / r);
         position.z = Mathf.Max(position.z, -10f);   // 本塁の後ろのスタンドに入らない
-        position.y = Mathf.Clamp(ball.y * 0.5f + 8f, 8f, 26f);
-        lookAt = b + direction * 6f + Vector3.up * 5f;
+        position.y = Mathf.Clamp(ball.y * 0.4f + 10f, 10f, 22f);
+        lookAt = b + direction * 12f + Vector3.up * (8f + Mathf.Min(ball.y, 30f) * 0.3f);
     }
 
     // 柵の手前で追走をやめ、スタンドを見渡す位置へ。打球が場外へ伸びても
