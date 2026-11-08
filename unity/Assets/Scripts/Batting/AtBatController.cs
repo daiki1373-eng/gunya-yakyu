@@ -115,10 +115,11 @@ public partial class AtBatController : MonoBehaviour
     // 守っているチームの野手(一塁〜右翼の7人)をキャラの立ち姿にする。捕手は画面に出ない
     private void SkinFielders(CharaRoster.Team team)
     {
+        // 一塁〜右翼に、その守備位置の選手を立たせる(捕手は打席の視点の手前にいるので元の人形のまま)
+        var field = CharaRoster.FieldOf(team);
         for (int i = 2; i < FieldingModel.Defaults.Length; i++)
         {
-            int k = i - 2;
-            var d = k < team.Lineup.Count ? team.Lineup[k] : null;
+            var d = i < field.Length ? field[i] : null;
             _stage.SetFielderSkin(i, d != null ? CharaCatalog.Cut(d.Id) : null);
         }
     }

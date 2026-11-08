@@ -13,7 +13,7 @@ using UnityEngine.Networking;
 public class OnlineService : MonoBehaviour
 {
     [Serializable] private class Config { public string apiKey = ""; public string databaseURL = ""; }
-    [Serializable] public class TeamDoc { public string owner = ""; public string name = ""; public string[] lineup; public string pitcher = ""; public long updated; }
+    [Serializable] public class TeamDoc { public string owner = ""; public string name = ""; public string[] lineup; public string[] slots; public string pitcher = ""; public long updated; }
     [Serializable] private class SignUpRes { public string idToken; public string refreshToken; public string localId; public string expiresIn; }
     [Serializable] private class RefreshRes { public string id_token; public string refresh_token; public string user_id; public string expires_in; }
 
@@ -80,6 +80,14 @@ public class OnlineService : MonoBehaviour
         var doc = new TeamDoc { owner = _uid, name = name ?? "", pitcher = team.Pitcher != null ? team.Pitcher.Id : "", updated = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
         doc.lineup = new string[team.Lineup.Count];
         for (int i = 0; i < doc.lineup.Length; i++) doc.lineup[i] = team.Lineup[i].Id;
+        // 守備位置(打順と同じ並び。C/B1/…/DH)
+        var field = CharaRoster.FieldOf(team);
+        doc.slots = new string[team.Lineup.Count];
+        for (int i = 0; i < doc.slots.Length; i++)
+        {
+            int fi = System.Array.IndexOf(field, team.Lineup[i], 1);
+            doc.slots[i] = fi >= 1 ? ((Slot)fi).ToString() : "DH";
+        }
         string body = JsonUtility.ToJson(doc);
 
         string code = MyCode;
@@ -143,6 +151,21 @@ public class OnlineService : MonoBehaviour
         }
         var p = CharaCatalog.Get(doc.pitcher);
         t.Pitcher = p != null && CharaRoster.Role(p) == CharaRole.Pitcher ? p : CharaCatalog.Get("sleepyhead");
+        // 守備位置が送られていれば、そのとおりに守る
+        if (doc.slots != null && doc.slots.Length == t.Lineup.Count)
+        {
+            var f = new CharaDef[9];
+            f[0] = t.Pitcher;
+            for (int i = 0; i < doc.slots.Length; i++)
+            {
+                Slot s;
+                try { s = (Slot)Enum.Parse(typeof(Slot), doc.slots[i]); } catch (Exception) { continue; }
+                int fi = TeamSetup.FielderIndex(s);
+                if (fi > 0 && f[fi] == null) f[fi] = t.Lineup[i];
+            }
+            t.Field = f;
+            for (int i = 1; i < 9; i++) if (f[i] == null) { t.Field = null; break; }   // 欠けていれば自動で割り当て直す
+        }
         return t;
     }
 

@@ -36,6 +36,8 @@ public partial class AtBatController
     //   投げる: 投げたい場所に触れた瞬間、その場所へ投げる(長押し・メーターなし)。球種は画面のボタンで選ぶ
     //   盗塁・球種のボタンに触れた指は、離してもスイングしない
     private bool _pointerArmed, _hadTouch;
+    private Vector2 _lastTouchPos, _releasePos;
+    private int _releaseFrame = -1;
     public static bool InputDebug = false;   // 確認用の記録(ブラウザのコンソールに出す)
 
     private void HandleInput()
@@ -61,6 +63,8 @@ public partial class AtBatController
         bool touching = Input.touchCount > 0;
         if (!touching && _hadTouch)
         {
+            _releaseFrame = Time.frameCount;   // 指を離した場所(結果パネルのボタン用)
+            _releasePos = _lastTouchPos;
             if (InputDebug) Debug.Log("[Input] released armed=" + _pointerArmed);
             if (_pointerArmed && _gs.UserBatting) swing = true;   // 離したら振る
             _pointerArmed = false;
@@ -68,6 +72,7 @@ public partial class AtBatController
         if (touching)
         {
             Touch t0 = Input.GetTouch(0);
+            _lastTouchPos = t0.position;
             bool began = !_hadTouch || t0.phase == TouchPhase.Began;
             if (began)
             {

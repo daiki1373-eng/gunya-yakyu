@@ -31,6 +31,17 @@ public static class TeamSetup
         }
     }
 
+    // 守備の添字(FieldingModel の順)。指名打者は守らないので -1
+    public static int FielderIndex(Slot s)
+    {
+        switch (s)
+        {
+            case Slot.P: return 0; case Slot.C: return 1; case Slot.B1: return 2; case Slot.B2: return 3;
+            case Slot.B3: return 4; case Slot.SS: return 5; case Slot.LF: return 6; case Slot.CF: return 7;
+            case Slot.RF: return 8; default: return -1;
+        }
+    }
+
     public static bool Fits(CharaDef d, Slot s) { return d != null && d.Position == PositionOf(s); }
 
     public static bool Usable(CharaDef d)

@@ -122,6 +122,30 @@ public partial class AtBatController
         if (ReplayEnabled && _bestScore >= 3 && !_gs.IsWalkOff)
             yield return StartCoroutine(PlayReplay(_bestTraj, _bestPlay, 0.65f, 9f, "● 今日の珍プレー"));
         _bestScore = -1;
+
+        // 結果パネル: 「次の試合」か「ホーム」を選ぶまで待つ(自動操作では少し見せて次へ)
+        _ui.ShowResult("");
+        _ui.ShowBanner("");
+        _ui.ClearCenter();   // 最後の打球の判定(NORMAL など)を残さない
+        _ui.ClearSpeed();
+        string me = string.IsNullOrEmpty(AppShell.PlayerName) ? "じぶん" : AppShell.PlayerName;
+        string rival = RivalName;
+        if (rival.EndsWith("のチーム")) rival = rival.Substring(0, rival.Length - 4);
+        Color tc = won ? UiKit.GoldLight : (_gs.Runs < _gs.OppRuns ? new Color(0.62f, 0.78f, 1f) : Color.white);
+        _ui.ShowMatchResult((_gs.IsWalkOff ? "サヨナラ" : "") + res, tc,
+            me + "  " + _gs.Runs + " - " + _gs.OppRuns + "  " + rival, "コイン +" + coins);
+        int choice = -1;
+        float shownAt = Time.unscaledTime;
+        while (choice < 0)
+        {
+            if (AutoPlay && Time.unscaledTime - shownAt > 1.2f) choice = 0;
+            if (Time.unscaledTime - shownAt > 0.4f) choice = ResultChoice();
+            yield return null;
+        }
+        GameAudio.Play(Sfx.Click, 0.6f, 1.2f);
+        _ui.HideMatchResult();
+        if (choice == 1 && AppShell.Instance != null) AppShell.Instance.OpenMenu();   // ホームへ(次の試合は「試合」で始まる)
+
         _gs.NewGame();
         for (int b = 1; b <= 3; b++) _onBase[b] = null;
         _wasLoaded = _wasScoring = false;
@@ -218,4 +242,18 @@ public partial class AtBatController
         return sb.ToString();
     }
 
+
+    // 結果パネルのボタンが押されたか(0=次の試合、1=ホーム、-1=まだ)
+    private int ResultChoice()
+    {
+        if (AppShell.MenuOpen) return -1;
+        // 指を離したとき(またはクリック)に、その場所のボタンを押したことにする
+        Vector2? p = null;
+        if (_releaseFrame == Time.frameCount) p = _releasePos;
+        for (int i = 0; i < Input.touchCount; i++)
+            if (Input.GetTouch(i).phase == TouchPhase.Ended) p = Input.GetTouch(i).position;
+        if (Input.touchCount == 0 && Input.GetMouseButtonUp(0)) p = Input.mousePosition;
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)) return 0;
+        return p.HasValue ? _ui.ResultButtonAt(p.Value) : -1;
+    }
 }

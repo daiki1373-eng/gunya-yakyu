@@ -5,7 +5,7 @@ using UnityEngine.UI;
 // BattingUI.cs
 // ミニマルなHUD。ラベル・数値・短い状態表示・SWINGボタンだけ(説明文なし)。
 // ============================================================
-public class BattingUI
+public partial class BattingUI
 {
     private Text _count, _batter, _speed, _rank, _result, _quirk, _banner;
     private Image[] _bases = new Image[4];
@@ -694,6 +694,7 @@ public class BattingUI
     public void Tick()
     {
         TickCard();
+        TickResult();
         TickVersus();
         if (_comm != null && _comm.text.Length > 0)
         {

@@ -130,15 +130,45 @@ public static class CharaRoster
     }
 
     // ---- 打順・投手 ------------------------------------------------
-    public class Team { public List<CharaDef> Lineup = new List<CharaDef>(); public CharaDef Pitcher; }
+    // Field: 守備位置ごとの選手(添字は FieldingModel の順: 0投 1捕 2一 3二 4三 5遊 6左 7中 8右)。null なら自動で割り当てる
+    public class Team { public List<CharaDef> Lineup = new List<CharaDef>(); public CharaDef Pitcher; public CharaDef[] Field; }
+
+    // 守備位置を決める: 編成で決めてあればそれ、なければカードの守備(捕手・内野手・外野手)から割り当てる。打者専門は指名打者に回す
+    public static CharaDef[] FieldOf(Team t)
+    {
+        if (t.Field != null && t.Field.Length == 9) return t.Field;
+        var f = new CharaDef[9];
+        f[0] = t.Pitcher;
+        var pool = new List<CharaDef>(t.Lineup);
+        System.Func<string, CharaDef> take = pos =>
+        {
+            var d = pool.Find(x => x != null && x.Position == pos);
+            if (d != null) pool.Remove(d);
+            return d;
+        };
+        f[1] = take("捕手");
+        for (int i = 2; i <= 5; i++) f[i] = take("内野手");
+        for (int i = 6; i <= 8; i++) f[i] = take("外野手");
+        // 空いた位置は、打者専門以外 → 打者専門の順で埋める
+        pool.Sort((a, b) => (a.Position == "打者専門" ? 1 : 0) - (b.Position == "打者専門" ? 1 : 0));
+        for (int i = 1; i <= 8; i++) if (f[i] == null && pool.Count > 0) { f[i] = pool[0]; pool.RemoveAt(0); }
+        t.Field = f;
+        return f;
+    }
 
 
     // 自分のチーム: 編成(ポジションごとの9人+投手と打順)をそのまま使う。保存がなければ自動で組む
     public static Team UserTeam()
     {
         var l = TeamSetup.Load();
-        var t = new Team { Pitcher = l.Pitcher };
-        foreach (var e in l.Order) t.Lineup.Add(e.D);
+        var t = new Team { Pitcher = l.Pitcher, Field = new CharaDef[9] };
+        t.Field[0] = l.Pitcher;
+        foreach (var e in l.Order)
+        {
+            t.Lineup.Add(e.D);
+            int fi = TeamSetup.FielderIndex(e.S);
+            if (fi > 0) t.Field[fi] = e.D;
+        }
         return t;
     }
 
